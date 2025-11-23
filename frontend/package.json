@@ -1,0 +1,21 @@
+{
+  "name": "voidpoly-admin",
+  "version": "1.0.1",
+  "description": "VoidPoly 管理面板",
+  "private": true,
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "axios": "latest",
+    "voidpoly-admin": "link:",
+    "vue": "latest",
+    "vue-router": "latest"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "latest",
+    "vite": "latest"
+  }
+}

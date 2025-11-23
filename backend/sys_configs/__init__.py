@@ -28,6 +28,11 @@ from .filter_config import (
     clear_processed_markets,
 )
 
+from .auth_config import (
+    AuthConfig,
+    get_auth_config,
+)
+
 __all__ = [
     # 配置管理器
     "ConfigManager",
@@ -46,5 +51,8 @@ __all__ = [
     "is_market_processed",
     "mark_market_as_processed",
     "clear_processed_markets",
+    # 认证配置
+    "AuthConfig",
+    "get_auth_config",
 ]
 

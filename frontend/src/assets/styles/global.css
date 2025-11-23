@@ -1,0 +1,205 @@
+/**
+ * 全局样式 - 宝塔面板风格
+ * 特点：平面设计、无渐变、适当动画、简约专业
+ */
+
+/* 重置样式 */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body {
+  width: 100%;
+  height: 100%;
+  font-family: "Microsoft YaHei", "微软雅黑", Arial, sans-serif;
+  font-size: 14px;
+  color: #333;
+  background-color: #f5f5f5;
+}
+
+/* 颜色变量 - 宝塔风格 */
+:root {
+  --primary-color: #20a53a;
+  --primary-hover: #1a8c31;
+  --danger-color: #ff5722;
+  --danger-hover: #e64a19;
+  --warning-color: #ff9800;
+  --info-color: #2196f3;
+  --border-color: #ddd;
+  --bg-white: #fff;
+  --bg-gray: #f5f5f5;
+  --text-primary: #333;
+  --text-secondary: #666;
+  --text-placeholder: #999;
+}
+
+/* 输入框样式 */
+input[type="text"],
+input[type="password"],
+input[type="email"],
+textarea,
+select {
+  width: 100%;
+  height: 40px;
+  padding: 0 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background-color: var(--bg-white);
+  color: var(--text-primary);
+  font-size: 14px;
+  outline: none;
+  transition: all 0.2s ease;
+}
+
+input[type="text"]:focus,
+input[type="password"]:focus,
+input[type="email"]:focus,
+textarea:focus,
+select:focus {
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 3px rgba(32, 165, 58, 0.1);
+}
+
+input[type="text"]::placeholder,
+input[type="password"]::placeholder,
+input[type="email"]::placeholder,
+textarea::placeholder {
+  color: var(--text-placeholder);
+}
+
+/* 按钮样式 */
+button,
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 40px;
+  padding: 0 20px;
+  border: none;
+  border-radius: 6px;
+  background-color: var(--primary-color);
+  color: #fff;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  outline: none;
+  text-align: center;
+  text-decoration: none;
+  transition: all 0.2s ease;
+  vertical-align: middle;
+}
+
+button:hover,
+.btn:hover {
+  background-color: var(--primary-hover);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(32, 165, 58, 0.3);
+}
+
+button:disabled,
+.btn:disabled {
+  background-color: #ccc;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.btn-danger {
+  background-color: var(--danger-color);
+}
+
+.btn-danger:hover {
+  background-color: var(--danger-hover);
+  box-shadow: 0 2px 8px rgba(255, 87, 34, 0.3);
+}
+
+.btn-block {
+  width: 100%;
+}
+
+/* 卡片样式 */
+.card {
+  background-color: var(--bg-white);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 20px;
+}
+
+/* 表单组样式 */
+.form-group {
+  margin-bottom: 20px;
+}
+
+.form-label {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.form-error {
+  margin-top: 5px;
+  color: var(--danger-color);
+  font-size: 12px;
+}
+
+/* 工具类 */
+.text-center {
+  text-align: center;
+}
+
+.text-right {
+  text-align: right;
+}
+
+.mt-10 {
+  margin-top: 10px;
+}
+
+.mt-20 {
+  margin-top: 20px;
+}
+
+.mb-10 {
+  margin-bottom: 10px;
+}
+
+.mb-20 {
+  margin-bottom: 20px;
+}
+
+/* 清除浮动 */
+.clearfix::after {
+  content: "";
+  display: block;
+  clear: both;
+}
+
+/* 移动端全局适配 */
+@media (max-width: 768px) {
+  body {
+    font-size: 13px;
+  }
+
+  input[type="text"],
+  input[type="password"],
+  input[type="email"],
+  textarea,
+  select {
+    font-size: 16px; /* 防止 iOS 自动缩放 */
+  }
+
+  button,
+  .btn {
+    height: 44px; /* 增加触摸区域 */
+    line-height: 44px;
+  }
+}
+
+@media (max-width: 480px) {
+  .card {
+    padding: 15px;
+  }
+}
