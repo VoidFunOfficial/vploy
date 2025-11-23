@@ -21,7 +21,8 @@ from typing import Optional, Dict, List, Any, Union
 from py_clob_client.client import ClobClient
 from py_clob_client.clob_types import (
     OrderArgs, MarketOrderArgs, OrderType,
-    TradeParams, OpenOrderParams, BalanceAllowanceParams, AssetType, BookParams
+    TradeParams, OpenOrderParams, BalanceAllowanceParams, AssetType, BookParams,
+    PartialCreateOrderOptions
 )
 from py_clob_client.order_builder.constants import BUY, SELL
 from py_order_utils.model import SignedOrder
@@ -44,7 +45,7 @@ CHAIN_ID = int(os.getenv("CHAIN_ID", "137"))
 PRIVATE_KEY = os.getenv("PK", "0xc8cf499fdb0fc33c316dcecfe0338d1faf7f896422bb54396a59f33638ab4dbf")
 
 # 代理资金地址
-PROXY_FUNDER = os.getenv("PROXY_FUNDER", "0x0535c3fB8928dA48BD97dBfCF45dd3731c103246")
+PROXY_FUNDER = os.getenv("PROXY_FUNDER", "0x72E84A3675A23CE1eAbb2b4B8ca94F7Bb025584A")
 
 
 # ==================== 全局客户端实例 ====================
@@ -104,6 +105,7 @@ def get_client(
         signature_type=1,
         funder=funder
     )
+    
 
     # 使用 L1 签名，创建或派生 API 凭证
     api_creds = _global_client.create_or_derive_api_creds()
@@ -124,6 +126,7 @@ def create_limit_order(
     price: float,
     size: float,
     side: str,
+    neg_risk: Optional[bool] = None,
     client: Optional[ClobClient] = None
 ) -> SignedOrder:
     """
@@ -134,6 +137,7 @@ def create_limit_order(
         price (float): 订单价格
         size (float): 订单数量
         side (str): 订单方向，BUY 或 SELL
+        neg_risk (bool): 是否为负风险市场，如果为 None 则自动检测
         client (ClobClient): 客户端实例，如果为 None 则使用全局实例
 
     返回:
@@ -148,7 +152,8 @@ def create_limit_order(
         "token_id": token_id,
         "price": price,
         "size": size,
-        "side": side
+        "side": side,
+        "neg_risk": neg_risk
     })
 
     order_args = OrderArgs(
@@ -158,7 +163,12 @@ def create_limit_order(
         token_id=token_id
     )
 
-    signed_order = client.create_order(order_args)
+    # 如果指定了 neg_risk，则传入 PartialCreateOrderOptions
+    options = None
+    if neg_risk is not None:
+        options = PartialCreateOrderOptions(neg_risk=neg_risk)
+
+    signed_order = client.create_order(order_args, options)
 
     vlogger.info("CLOB.ORDER.CREATE_SUCCESS", msg="限价订单创建成功", extra={
         "order_salt": str(signed_order.order.salt)
@@ -171,6 +181,7 @@ def create_market_order(
     token_id: str,
     amount: float,
     side: str,
+    neg_risk: Optional[bool] = None,
     client: Optional[ClobClient] = None
 ) -> SignedOrder:
     """
@@ -180,6 +191,7 @@ def create_market_order(
         token_id (str): 代币 ID
         amount (float): 订单金额（以 USDC 计价）
         side (str): 订单方向，BUY 或 SELL
+        neg_risk (bool): 是否为负风险市场，如果为 None 则自动检测
         client (ClobClient): 客户端实例，如果为 None 则使用全局实例
 
     返回:
@@ -193,7 +205,8 @@ def create_market_order(
     vlogger.info("CLOB.ORDER.CREATE_MARKET", msg="创建市价订单", extra={
         "token_id": token_id,
         "amount": amount,
-        "side": side
+        "side": side,
+        "neg_risk": neg_risk
     })
 
     order_args = MarketOrderArgs(
@@ -202,7 +215,12 @@ def create_market_order(
         side=side
     )
 
-    signed_order = client.create_market_order(order_args)
+    # 如果指定了 neg_risk，则传入 PartialCreateOrderOptions
+    options = None
+    if neg_risk is not None:
+        options = PartialCreateOrderOptions(neg_risk=neg_risk)
+
+    signed_order = client.create_market_order(order_args, options)
 
     vlogger.info("CLOB.ORDER.CREATE_SUCCESS", msg="市价订单创建成功", extra={
         "order_salt": str(signed_order.order.salt)
@@ -423,7 +441,25 @@ def cancel_market_orders(
         })
         raise
 
-
+    client = client or get_client()
+    # 时间戳
+    expiration = int(time.time()) + expiration
+    order_args = OrderArgs(
+        price=price,
+        size=amount,
+        side=BUY,
+        token_id=token_id,
+        expiration=expiration,
+    )
+    signed_order = client.create_order(order_args)
+    resp = client.post_order(signed_order, OrderType.GTD)
+    vlogger.info("CLOB.ORDER.LIMIT_BUY_SUCCESS", msg="限价买入订单创建成功", extra={
+        "token_id": token_id,
+        "amount": amount,
+        "price": price,
+        "response": resp
+    })
+    return resp
 # ==================== 订单查询接口 ====================
 
 def get_order(
@@ -819,6 +855,7 @@ def place_limit_buy_order(
     token_id: str,
     price: float,
     size: float,
+    neg_risk: Optional[bool] = None,
     client: Optional[ClobClient] = None
 ) -> Dict[str, Any]:
     """
@@ -828,6 +865,7 @@ def place_limit_buy_order(
         token_id (str): 代币 ID
         price (float): 订单价格
         size (float): 订单数量
+        neg_risk (bool): 是否为负风险市场，如果为 None 则自动检测
         client (ClobClient): 客户端实例，如果为 None 则使用全局实例
 
     返回:
@@ -836,10 +874,11 @@ def place_limit_buy_order(
     vlogger.info("CLOB.ORDER.PLACE_LIMIT_BUY", msg="下限价买单", extra={
         "token_id": token_id,
         "price": price,
-        "size": size
+        "size": size,
+        "neg_risk": neg_risk
     })
 
-    signed_order = create_limit_order(token_id, price, size, BUY, client)
+    signed_order = create_limit_order(token_id, price, size, BUY, neg_risk, client)
     return post_order(signed_order, client=client)
 
 
@@ -847,6 +886,7 @@ def place_limit_sell_order(
     token_id: str,
     price: float,
     size: float,
+    neg_risk: Optional[bool] = None,
     client: Optional[ClobClient] = None
 ) -> Dict[str, Any]:
     """
@@ -856,6 +896,7 @@ def place_limit_sell_order(
         token_id (str): 代币 ID
         price (float): 订单价格
         size (float): 订单数量
+        neg_risk (bool): 是否为负风险市场，如果为 None 则自动检测
         client (ClobClient): 客户端实例，如果为 None 则使用全局实例
 
     返回:
@@ -864,16 +905,18 @@ def place_limit_sell_order(
     vlogger.info("CLOB.ORDER.PLACE_LIMIT_SELL", msg="下限价卖单", extra={
         "token_id": token_id,
         "price": price,
-        "size": size
+        "size": size,
+        "neg_risk": neg_risk
     })
 
-    signed_order = create_limit_order(token_id, price, size, SELL, client)
+    signed_order = create_limit_order(token_id, price, size, SELL, neg_risk, client)
     return post_order(signed_order, client=client)
 
 
 def place_market_buy_order(
     token_id: str,
     amount: float,
+    neg_risk: Optional[bool] = None,
     client: Optional[ClobClient] = None
 ) -> Dict[str, Any]:
     """
@@ -882,6 +925,7 @@ def place_market_buy_order(
     参数:
         token_id (str): 代币 ID
         amount (float): 订单金额（以 USDC 计价）
+        neg_risk (bool): 是否为负风险市场，如果为 None 则自动检测
         client (ClobClient): 客户端实例，如果为 None 则使用全局实例
 
     返回:
@@ -889,16 +933,18 @@ def place_market_buy_order(
     """
     vlogger.info("CLOB.ORDER.PLACE_MARKET_BUY", msg="下市价买单", extra={
         "token_id": token_id,
-        "amount": amount
+        "amount": amount,
+        "neg_risk": neg_risk
     })
 
-    signed_order = create_market_order(token_id, amount, BUY, client)
+    signed_order = create_market_order(token_id, amount, BUY, neg_risk, client)
     return post_order(signed_order, order_type=OrderType.FOK, client=client)
 
 
 def place_market_sell_order(
     token_id: str,
     amount: float,
+    neg_risk: Optional[bool] = None,
     client: Optional[ClobClient] = None
 ) -> Dict[str, Any]:
     """
@@ -907,6 +953,7 @@ def place_market_sell_order(
     参数:
         token_id (str): 代币 ID
         amount (float): 订单金额（以 USDC 计价）
+        neg_risk (bool): 是否为负风险市场，如果为 None 则自动检测
         client (ClobClient): 客户端实例，如果为 None 则使用全局实例
 
     返回:
@@ -914,10 +961,11 @@ def place_market_sell_order(
     """
     vlogger.info("CLOB.ORDER.PLACE_MARKET_SELL", msg="下市价卖单", extra={
         "token_id": token_id,
-        "amount": amount
+        "amount": amount,
+        "neg_risk": neg_risk
     })
 
-    signed_order = create_market_order(token_id, amount, SELL, client)
+    signed_order = create_market_order(token_id, amount, SELL, neg_risk, client)
     return post_order(signed_order, order_type=OrderType.FOK, client=client)
 
 

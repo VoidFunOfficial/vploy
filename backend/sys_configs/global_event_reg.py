@@ -119,8 +119,32 @@ def register_all_events():
     register_error("E-FILTER-007", "FILTER_PROCESSING_ERROR", "过滤处理错误", "error", overwrite=True)
     register_error("E-FILTER-008", "FILTER_CALL_FAILED", "过滤器调用失败", "error", overwrite=True)
 
+    # ==================== 健康检查模块事件 ====================
+    # EVT-HC-xxx 系列
+    register_event("EVT-HC-001", "HEALTH.CHECKER.INIT", "健康检查器初始化", overwrite=True)
+    register_event("EVT-HC-002", "HEALTH.ENDPOINT.ADD", "添加端点配置", overwrite=True)
+    register_event("EVT-HC-003", "HEALTH.ENDPOINT.REMOVE", "移除端点配置", overwrite=True)
+    register_event("EVT-HC-004", "HEALTH.CHECK.START", "开始健康检查", overwrite=True)
+    register_event("EVT-HC-005", "HEALTH.CHECK.SUCCESS", "端点检查成功", overwrite=True)
+    register_event("EVT-HC-006", "HEALTH.CHECK.FAILED", "端点检查失败", overwrite=True)
+    register_event("EVT-HC-007", "HEALTH.CHECK.COMPLETE", "健康检查完成", overwrite=True)
+    register_event("EVT-HC-008", "HEALTH.LOOP.START", "定时健康检查循环启动", overwrite=True)
+    register_event("EVT-HC-009", "HEALTH.LOOP.CANCEL", "定时健康检查循环被取消", overwrite=True)
+    register_event("EVT-HC-010", "HEALTH.LOOP.ERROR", "定时健康检查循环异常", overwrite=True)
+    register_event("EVT-HC-011", "HEALTH.LOOP.STOP", "定时健康检查循环已停止", overwrite=True)
+    register_event("EVT-HC-012", "HEALTH.CHECKER.ALREADY_RUNNING", "健康检查器已在运行中", overwrite=True)
+    register_event("EVT-HC-013", "HEALTH.CHECKER.START", "健康检查器已启动", overwrite=True)
+    register_event("EVT-HC-014", "HEALTH.CHECKER.NOT_RUNNING", "健康检查器未在运行", overwrite=True)
+    register_event("EVT-HC-015", "HEALTH.CHECKER.STOP", "健康检查器已停止", overwrite=True)
+
+    # E-HC-xxx 系列错误码
+    register_error("E-HC-001", "HEALTH_CHECK_LOOP_ERROR", "定时健康检查循环异常", "error", overwrite=True)
+    register_error("E-HC-002", "HEALTH_CHECK_TIMEOUT", "健康检查超时", "warning", overwrite=True)
+    register_error("E-HC-003", "HEALTH_CHECK_CONNECTION_ERROR", "健康检查连接错误", "warning", overwrite=True)
+    register_error("E-HC-004", "HEALTH_CHECK_UNKNOWN_ERROR", "健康检查未知错误", "error", overwrite=True)
+
 # 在模块导入时自动注册所有事件
 register_all_events()
 
 # 记录初始化完成
-vlogger.info("EVT-1003", msg="全局事件注册完成", extra={"total_events": "50+", "total_errors": "30+"})
+vlogger.info("EVT-1003", msg="全局事件注册完成", extra={"total_events": "65+", "total_errors": "34+"})

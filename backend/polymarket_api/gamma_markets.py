@@ -1,9 +1,9 @@
 import requests
-from typing import Optional, Dict, List, Any, Union
+from typing import Optional, Dict, List, Any, Union, Set
 from urllib.parse import urljoin
 import json
 from datetime import datetime, timedelta
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 # 导入全局 VLogger 实例
 from backend.sys_configs.global_event_reg import vlogger
@@ -27,6 +27,8 @@ class Market:
         category: 分类
         tags: 标签列表
         events: 关联事件列表
+        closedTime: 关闭时间
+        marks: 自定义标签集合（用于标记和分类）
     """
     id: str
     question: str
@@ -41,11 +43,12 @@ class Market:
     tags: Optional[List[Dict[str, Any]]] = None
     events: Optional[List[Dict[str, Any]]] = None
     closedTime: Optional[str] = None
+    marks: Set[str] = field(default_factory=set)
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> 'Market':
         """从字典创建 Market 对象"""
-        return cls(
+        market = cls(
             id=data.get('id', ''),
             question=data.get('question', ''),
             slug=data.get('slug', ''),
@@ -60,6 +63,80 @@ class Market:
             events=data.get('events', []),
             closedTime=data.get('closedTime')
         )
+
+        # 如果数据中包含 marks，则加载它
+        if 'marks' in data:
+            marks_data = data['marks']
+            if isinstance(marks_data, (list, set)):
+                market.marks = set(marks_data)
+            elif isinstance(marks_data, str):
+                # 如果是字符串，尝试解析为 JSON
+                try:
+                    parsed = json.loads(marks_data)
+                    if isinstance(parsed, list):
+                        market.marks = set(parsed)
+                except:
+                    pass
+
+        return market
+
+    def add_marks(self, mark: str) -> None:
+        """
+        添加单个标签
+
+        参数:
+            mark: 要添加的标签字符串
+        """
+        if not mark or not isinstance(mark, str):
+            vlogger.warn("MARKET.MARKS.INVALID", msg="无效的标签", extra={"mark": mark, "market_id": self.id})
+            return
+
+        self.marks.add(mark.strip())
+        vlogger.debug("MARKET.MARKS.ADDED", msg="添加标签", extra={"mark": mark, "market_id": self.id})
+
+    def remove_marks(self, mark: str) -> bool:
+        """
+        移除单个标签
+
+        参数:
+            mark: 要移除的标签字符串
+
+        返回:
+            bool: 如果标签存在并被移除返回 True，否则返回 False
+        """
+        if not mark or not isinstance(mark, str):
+            vlogger.warn("MARKET.MARKS.INVALID", msg="无效的标签", extra={"mark": mark, "market_id": self.id})
+            return False
+
+        mark = mark.strip()
+        if mark in self.marks:
+            self.marks.remove(mark)
+            vlogger.debug("MARKET.MARKS.REMOVED", msg="移除标签", extra={"mark": mark, "market_id": self.id})
+            return True
+        else:
+            vlogger.debug("MARKET.MARKS.NOT_FOUND", msg="标签不存在", extra={"mark": mark, "market_id": self.id})
+            return False
+
+    def has_mark(self, mark: str) -> bool:
+        """
+        检查是否包含指定标签
+
+        参数:
+            mark: 要检查的标签字符串
+
+        返回:
+            bool: 如果包含该标签返回 True，否则返回 False
+        """
+        return mark.strip() in self.marks if mark else False
+
+    def get_marks(self) -> Set[str]:
+        """
+        获取所有标签
+
+        返回:
+            Set[str]: 标签集合的副本
+        """
+        return self.marks.copy()
 
 
 @dataclass
@@ -79,6 +156,7 @@ class Event:
         tags: 标签列表
         volume: 交易量
         liquidity: 流动性
+        marks: 自定义标签集合（用于标记和分类）
     """
     id: str
     title: str
@@ -91,11 +169,12 @@ class Event:
     tags: Optional[List[Dict[str, Any]]] = None
     volume: Optional[float] = None
     liquidity: Optional[float] = None
+    marks: Set[str] = field(default_factory=set)
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> 'Event':
         """从字典创建 Event 对象"""
-        return cls(
+        event = cls(
             id=data.get('id', ''),
             title=data.get('title', ''),
             slug=data.get('slug', ''),
@@ -108,6 +187,128 @@ class Event:
             volume=data.get('volume'),
             liquidity=data.get('liquidity')
         )
+
+        # 如果数据中包含 marks，则加载它
+        if 'marks' in data:
+            marks_data = data['marks']
+            if isinstance(marks_data, (list, set)):
+                event.marks = set(marks_data)
+            elif isinstance(marks_data, str):
+                # 如果是字符串，尝试解析为 JSON
+                try:
+                    parsed = json.loads(marks_data)
+                    if isinstance(parsed, list):
+                        event.marks = set(parsed)
+                except:
+                    pass
+
+        return event
+
+    def add_marks(self, mark: str) -> None:
+        """
+        添加单个标签
+
+        参数:
+            mark: 要添加的标签字符串
+        """
+        if not mark or not isinstance(mark, str):
+            vlogger.warn("EVENT.MARKS.INVALID", msg="无效的标签", extra={"mark": mark, "event_id": self.id})
+            return
+
+        self.marks.add(mark.strip())
+        vlogger.debug("EVENT.MARKS.ADDED", msg="添加标签", extra={"mark": mark, "event_id": self.id})
+
+    def remove_marks(self, mark: str) -> bool:
+        """
+        移除单个标签
+
+        参数:
+            mark: 要移除的标签字符串
+
+        返回:
+            bool: 如果标签存在并被移除返回 True，否则返回 False
+        """
+        if not mark or not isinstance(mark, str):
+            vlogger.warn("EVENT.MARKS.INVALID", msg="无效的标签", extra={"mark": mark, "event_id": self.id})
+            return False
+
+        mark = mark.strip()
+        if mark in self.marks:
+            self.marks.remove(mark)
+            vlogger.debug("EVENT.MARKS.REMOVED", msg="移除标签", extra={"mark": mark, "event_id": self.id})
+            return True
+        else:
+            vlogger.debug("EVENT.MARKS.NOT_FOUND", msg="标签不存在", extra={"mark": mark, "event_id": self.id})
+            return False
+
+    def has_mark(self, mark: str) -> bool:
+        """
+        检查是否包含指定标签
+
+        参数:
+            mark: 要检查的标签字符串
+
+        返回:
+            bool: 如果包含该标签返回 True，否则返回 False
+        """
+        return mark.strip() in self.marks if mark else False
+
+    def get_marks(self) -> Set[str]:
+        """
+        获取所有标签
+
+        返回:
+            Set[str]: 标签集合的副本
+        """
+        return self.marks.copy()
+
+    def get_markets_with_marks(self) -> List['Market']:
+        """
+        获取 Event 的所有 Market 对象，并自动将 Event 的 marks 传播到每个 Market
+
+        该方法会将 Event.markets（字典列表）转换为 Market 对象列表，
+        并自动将 Event 的所有 marks 添加到每个 Market 中。
+
+        返回:
+            List[Market]: Market 对象列表，每个 Market 都继承了 Event 的 marks
+        """
+        if not self.markets:
+            return []
+
+        market_objects = []
+        for market_data in self.markets:
+            # 如果已经是 Market 对象，直接使用
+            if isinstance(market_data, Market):
+                market = market_data
+            # 如果是字典，转换为 Market 对象
+            elif isinstance(market_data, dict):
+                try:
+                    market = Market.from_dict(market_data)
+                except Exception as e:
+                    vlogger.warn("EVENT.MARKET.PARSE_ERROR", msg="市场数据解析失败", extra={
+                        "event_id": self.id,
+                        "market_data": market_data,
+                        "error": str(e)
+                    })
+                    continue
+            else:
+                continue
+
+            # 将 Event 的 marks 传播到 Market
+            if self.marks:
+                for mark in self.marks:
+                    market.add_marks(mark)
+
+            market_objects.append(market)
+
+        if market_objects and self.marks:
+            vlogger.debug("EVENT.MARKS.PROPAGATED", msg="标签已传播到关联市场", extra={
+                "event_id": self.id,
+                "marks_count": len(self.marks),
+                "markets_count": len(market_objects)
+            })
+
+        return market_objects
 
 
 @dataclass
@@ -588,12 +789,13 @@ class GammaMarketsAPI:
                 return []
             raise
 
-    def get_event_markets(self, event_id: str) -> List[Market]:
+    def get_event_markets(self, event_id: str, propagate_marks: bool = True) -> List[Market]:
         """
         获取单个事件下的所有市场
 
         参数:
             event_id (str): 事件 ID
+            propagate_marks (bool): 是否将 Event 的 marks 传播到 Market，默认为 True
 
         返回:
             List[Market]: 市场对象列表
@@ -612,6 +814,12 @@ class GammaMarketsAPI:
         for market_data in event.markets:
             try:
                 market = Market.from_dict(market_data)
+
+                # 如果启用了 marks 传播，将 Event 的 marks 添加到 Market
+                if propagate_marks and event.marks:
+                    for mark in event.marks:
+                        market.add_marks(mark)
+
                 markets.append(market)
             except Exception as e:
                 vlogger.warn("API.MARKET.PARSE_ERROR", msg="市场数据解析失败", extra={
@@ -621,7 +829,8 @@ class GammaMarketsAPI:
 
         vlogger.info("API.EVENT.MARKETS", msg="获取事件市场完成", extra={
             "event_id": event_id,
-            "market_count": len(markets)
+            "market_count": len(markets),
+            "marks_propagated": propagate_marks and len(event.marks) > 0
         })
 
         return markets

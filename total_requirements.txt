@@ -1,0 +1,113 @@
+# ============================================================
+# VoidPoly 项目总依赖包
+# ============================================================
+# 本文件包含整个 backend 项目所需的所有 Python 依赖包
+# 生成时间: 2025-11-23
+# ============================================================
+
+# ==================== 核心依赖 ====================
+
+# 日志系统 (VLogger)
+loguru>=0.7.0
+
+# HTTP 请求
+requests>=2.31.0
+
+# 数据处理
+pandas>=2.0.0
+numpy>=1.24.0
+
+# ==================== Polymarket API 依赖 ====================
+
+# CLOB API 客户端 (本地包)
+# py-clob-client (本地目录: py_clob_client/)
+# py-order-utils
+
+# Web3 和以太坊相关
+eth-account>=0.8.0
+eth-abi>=4.0.0
+eth-keys>=0.4.0
+eth-utils>=2.1.0
+web3>=6.0.0
+
+# EIP-712 签名
+poly-eip712-structs>=1.1.0
+
+# 加密相关
+pycryptodome>=3.18.0
+ecdsa>=0.18.0
+
+# ==================== AI 分析依赖 ====================
+
+# Coze AI SDK
+cozepy>=0.1.0
+
+
+# ==================== 数据库依赖 ====================
+
+# SQLite (Python 内置，无需安装)
+# sqlite3
+
+# ==================== 配置管理依赖 ====================
+
+# 环境变量管理
+python-dotenv>=1.0.0
+
+# JSON 处理 (Python 内置)
+# json
+
+# ==================== 开发和测试依赖 ====================
+
+# 类型检查
+typing-extensions>=4.5.0
+
+
+
+# ==================== 可选依赖 ====================
+
+# YAML 配置文件支持（如需要请取消注释）
+# PyYAML>=6.0
+
+# 邮件发送（VLogger 告警功能）
+# smtplib (Python 内置)
+
+# ==================== 说明 ====================
+# 
+# 1. 本地包依赖:
+#    - py_clob_client: 位于项目根目录的 py_clob_client/ 文件夹
+#      这是一个本地修改版的 Polymarket CLOB 客户端
+#      安装方式: pip install -e ./py_clob_client
+#
+# 2. Python 内置模块（无需安装）:
+#    - asyncio
+#    - json
+#    - sqlite3
+#    - dataclasses (Python 3.7+)
+#    - typing (Python 3.5+)
+#    - datetime
+#    - pathlib
+#    - threading
+#    - os, sys
+#    - re
+#    - uuid
+#    - enum
+#    - urllib
+#
+# 3. 安装方式:
+#    pip install -r total_requirements.txt
+#    pip install -e ./py_clob_client
+#
+# 4. 环境要求:
+#    - Python >= 3.8
+#    - 建议使用虚拟环境 (venv 或 conda)
+#
+# 5. 模块说明:
+#    - backend/vlogger: 企业级日志系统
+#    - backend/polymarket_api: Polymarket API 客户端封装
+#    - backend/ai_analysis: AI 分析模块 (Coze + GPT)
+#    - backend/filter: 事件和市场过滤器
+#    - backend/auto_decision: 自动决策和仓位管理
+#    - backend/sys_configs: 统一配置管理系统
+#
+# ============================================================
+
