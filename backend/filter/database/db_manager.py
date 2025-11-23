@@ -12,7 +12,7 @@ from datetime import datetime
 from pathlib import Path
 
 # 导入 VLogger 日志系统
-from backend.sys_configs.global_event_reg import vlogger
+from ...sys_configs.global_event_reg import vlogger
 
 
 class DatabaseManager:

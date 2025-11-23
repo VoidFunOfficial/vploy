@@ -21,7 +21,7 @@ from datetime import datetime
 
 # 导入统一配置管理器
 try:
-    from backend.sys_configs import get_email_config, save_email_config
+    from ..sys_configs import get_email_config, save_email_config
     USE_UNIFIED_CONFIG = True
 except ImportError:
     USE_UNIFIED_CONFIG = False

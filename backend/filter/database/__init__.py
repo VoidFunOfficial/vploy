@@ -6,7 +6,7 @@
 """
 
 # 导入统一配置管理器
-from backend.sys_configs import (
+from ...sys_configs import (
     get_blacklist,
     add_blacklist_item,
     remove_blacklist_item,

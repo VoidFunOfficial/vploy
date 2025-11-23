@@ -1,10 +1,7 @@
-import os
-import sys
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from polymarket_api import Event, Market, GammaMarketsAPI
+from ..polymarket_api import Event, Market, GammaMarketsAPI
 from cozepy import COZE_CN_BASE_URL
 # 导入全局 VLogger 实例
-from backend.sys_configs.global_event_reg import vlogger
+from ..sys_configs.global_event_reg import vlogger
 coze_api_token = 'pat_7WIJOd6lO8cDox7ciTFaL4CX2dJdBrb0P5qMZLRdng2IvjgKSpJtobzmlIEtJ8D'
 coze_api_base = COZE_CN_BASE_URL
 

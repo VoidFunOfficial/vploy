@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 from dataclasses import dataclass, field
 
 # 导入全局 VLogger 实例
-from backend.sys_configs.global_event_reg import vlogger
+from ..sys_configs.global_event_reg import vlogger
 
 
 @dataclass
@@ -29,6 +29,8 @@ class Market:
         events: 关联事件列表
         closedTime: 关闭时间
         marks: 自定义标签集合（用于标记和分类）
+        negRisk: 是否为负风险市场
+        clobTokenIds: CLOB 代币 ID 列表
     """
     id: str
     question: str
@@ -44,7 +46,8 @@ class Market:
     events: Optional[List[Dict[str, Any]]] = None
     closedTime: Optional[str] = None
     marks: Set[str] = field(default_factory=set)
-
+    negRisk: Optional[bool] = None
+    clobTokenIds: Optional[List[str]] = None
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> 'Market':
         """从字典创建 Market 对象"""
@@ -61,7 +64,9 @@ class Market:
             category=data.get('category'),
             tags=data.get('tags', []),
             events=data.get('events', []),
-            closedTime=data.get('closedTime')
+            closedTime=data.get('closedTime'),
+            negRisk=data.get('negRisk'),
+            clobTokenIds=data.get('clobTokenIds')
         )
 
         # 如果数据中包含 marks，则加载它
@@ -157,6 +162,7 @@ class Event:
         volume: 交易量
         liquidity: 流动性
         marks: 自定义标签集合（用于标记和分类）
+        negRisk: 是否为负风险事件
     """
     id: str
     title: str
@@ -170,6 +176,7 @@ class Event:
     volume: Optional[float] = None
     liquidity: Optional[float] = None
     marks: Set[str] = field(default_factory=set)
+    negRisk: Optional[bool] = None
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> 'Event':
@@ -185,7 +192,8 @@ class Event:
             markets=data.get('markets', []),
             tags=data.get('tags', []),
             volume=data.get('volume'),
-            liquidity=data.get('liquidity')
+            liquidity=data.get('liquidity'),
+            negRisk=data.get('negRisk')
         )
 
         # 如果数据中包含 marks，则加载它

@@ -34,13 +34,8 @@ import sys
 
 import aiohttp
 
-# 添加项目根目录到 Python 路径
-project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-if project_root not in sys.path:
-    sys.path.insert(0, project_root)
-
 # 导入全局 VLogger 实例
-from backend.sys_configs.global_event_reg import vlogger
+from ..sys_configs.global_event_reg import vlogger
 
 
 # ==================== 端点类型枚举 ====================

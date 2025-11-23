@@ -10,7 +10,7 @@ from pathlib import Path
 
 # 导入统一配置管理器
 try:
-    from backend.sys_configs import get_vlogger_config, save_vlogger_config
+    from ..sys_configs import get_vlogger_config, save_vlogger_config
     USE_UNIFIED_CONFIG = True
 except ImportError:
     USE_UNIFIED_CONFIG = False

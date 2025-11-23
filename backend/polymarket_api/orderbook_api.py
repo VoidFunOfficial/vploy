@@ -22,7 +22,7 @@ import json
 from datetime import datetime
 
 # 导入全局 VLogger 实例
-from backend.sys_configs.global_event_reg import vlogger
+from ..sys_configs.global_event_reg import vlogger
 
 
 class PolymarketOrderbookClient:

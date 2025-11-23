@@ -4,7 +4,7 @@
 统一管理所有模块的事件注册码和错误码，提供全局 VLogger 实例。
 """
 
-from backend.vlogger import get_logger, register_event, register_error
+from ..vlogger import get_logger, register_event, register_error
 
 # 创建全局 VLogger 实例
 vlogger = get_logger("voidpoly")
@@ -48,6 +48,49 @@ def register_all_events():
     register_error("E-CLOB-009", "TIMEOUT_ERROR", "请求超时", "warning", overwrite=True)
     register_error("E-CLOB-010", "JSON_DECODE_ERROR", "JSON 解析错误", "error", overwrite=True)
     register_error("E-CLOB-011", "INVALID_RESPONSE", "无效响应", "error", overwrite=True)
+
+    # ==================== 自动交易模块事件 ====================
+    # EVT-AT-xxx 系列
+    register_event("EVT-AT-001", "AUTO_TRADE.INIT", "自动交易器初始化", overwrite=True)
+    register_event("EVT-AT-002", "AUTO_TRADE.GET_INSTRUCTIONS", "获取交易决策指令", overwrite=True)
+    register_event("EVT-AT-003", "AUTO_TRADE.GET_INSTRUCTIONS_SUCCESS", "获取交易指令成功", overwrite=True)
+    register_event("EVT-AT-004", "AUTO_TRADE.ANALYZE_ORDERBOOK", "分析订单簿", overwrite=True)
+    register_event("EVT-AT-005", "AUTO_TRADE.ANALYZE_ORDERBOOK_SUCCESS", "订单簿分析完成", overwrite=True)
+    register_event("EVT-AT-006", "AUTO_TRADE.CALCULATE_SLIPPAGE", "计算滑点", overwrite=True)
+    register_event("EVT-AT-007", "AUTO_TRADE.CALCULATE_SLIPPAGE_SUCCESS", "滑点计算完成", overwrite=True)
+    register_event("EVT-AT-008", "AUTO_TRADE.EXECUTE_TRADE", "开始执行交易", overwrite=True)
+    register_event("EVT-AT-009", "AUTO_TRADE.EXECUTE_TRADE_SUCCESS", "交易执行成功", overwrite=True)
+    register_event("EVT-AT-010", "AUTO_TRADE.EXECUTE_BATCH", "开始批量执行交易", overwrite=True)
+    register_event("EVT-AT-011", "AUTO_TRADE.EXECUTE_BATCH_COMPLETE", "批量交易执行完成", overwrite=True)
+    register_event("EVT-AT-012", "AUTO_TRADE.EXECUTE_AUTO_TRADING", "开始自动交易流程", overwrite=True)
+    register_event("EVT-AT-013", "AUTO_TRADE.EXECUTE_AUTO_TRADING_SUCCESS", "自动交易流程完成", overwrite=True)
+
+    # E-AT-xxx 系列错误码
+    register_error("E-AT-001", "GET_INSTRUCTIONS_ERROR", "获取交易指令失败", "error", overwrite=True)
+    register_error("E-AT-002", "GET_INSTRUCTIONS_EXCEPTION", "获取交易指令异常", "error", overwrite=True)
+    register_error("E-AT-003", "ANALYZE_ORDERBOOK_ERROR", "订单簿分析失败", "error", overwrite=True)
+    register_error("E-AT-004", "CALCULATE_SLIPPAGE_ERROR", "滑点计算异常", "error", overwrite=True)
+    register_error("E-AT-005", "TOKEN_ID_ERROR", "无法获取token_id", "error", overwrite=True)
+    register_error("E-AT-006", "EXECUTE_TRADE_ERROR", "交易执行异常", "error", overwrite=True)
+    register_error("E-AT-007", "GET_TOKEN_ID_ERROR", "获取token_id失败", "error", overwrite=True)
+    register_error("E-AT-008", "EXECUTE_AUTO_TRADING_ERROR", "自动交易流程异常", "error", overwrite=True)
+
+    # 自动交易配置相关事件
+    register_event("EVT-AT-014", "AUTO_TRADE.CONFIG.INIT", "自动交易配置管理器初始化", overwrite=True)
+    register_event("EVT-AT-015", "AUTO_TRADE.CONFIG.LOADED", "配置加载成功", overwrite=True)
+    register_event("EVT-AT-016", "AUTO_TRADE.CONFIG.SAVED", "配置保存成功", overwrite=True)
+    register_event("EVT-AT-017", "AUTO_TRADE.CONFIG.UPDATED", "配置项更新", overwrite=True)
+    register_event("EVT-AT-018", "AUTO_TRADE.CONFIG.REFRESHED", "配置已刷新", overwrite=True)
+    register_event("EVT-AT-019", "AUTO_TRADE.CONFIG.USE_DEFAULT", "使用默认配置", overwrite=True)
+    register_event("EVT-AT-020", "AUTO_TRADE.CONFIG.TABLE_CREATED", "配置表创建成功", overwrite=True)
+
+    # 自动交易配置相关错误码
+    register_error("E-AT-CONFIG-001", "TABLE_ERROR", "创建配置表失败", "error", overwrite=True)
+    register_error("E-AT-CONFIG-002", "LOAD_ERROR", "配置加载失败", "error", overwrite=True)
+    register_error("E-AT-CONFIG-003", "SAVE_ERROR", "配置保存失败", "error", overwrite=True)
+    register_error("E-AT-CONFIG-004", "UPDATE_ERROR", "配置更新失败", "error", overwrite=True)
+    register_error("E-AT-CONFIG-005", "GET_ERROR", "获取配置失败", "error", overwrite=True)
+    register_error("E-AT-CONFIG-006", "DB_LOAD_ERROR", "数据库配置加载失败", "error", overwrite=True)
     register_error("E-CLOB-012", "RATE_LIMIT_ERROR", "速率限制", "warning", overwrite=True)
 
     # ==================== Polymarket API 模块事件 ====================

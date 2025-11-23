@@ -9,14 +9,7 @@
 5. 测试已处理事件管理
 """
 
-import sys
-from pathlib import Path
-
-# 添加项目根目录到 Python 路径
-project_root = Path(__file__).parent.parent.parent
-sys.path.insert(0, str(project_root))
-
-from backend.sys_configs import (
+from . import (
     init_config_database,
     get_vlogger_config,
     save_vlogger_config,

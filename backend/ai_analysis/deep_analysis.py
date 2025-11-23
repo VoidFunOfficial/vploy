@@ -34,15 +34,13 @@ from typing import Dict, Any, Optional, List
 from dataclasses import dataclass, field
 from datetime import datetime
 import os
-import sys
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # 导入 GPT API 客户端
-from ai_analysis.gpt_api import send_request, process_result, get_result, parse_cookie_string
+from .gpt_api import send_request, process_result, get_result, parse_cookie_string
 
 # 导入全局 VLogger 实例
-from backend.sys_configs.global_event_reg import vlogger
-from backend.vlogger import LogLevel
+from ..sys_configs.global_event_reg import vlogger
+from ..vlogger import LogLevel
 
 
 # ==================== JSON 结构验证 ====================

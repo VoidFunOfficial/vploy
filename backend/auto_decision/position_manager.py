@@ -1,23 +1,22 @@
-import sys
-import os
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from polymarket_api import get_client, get_collateral_balance, AssetType
-# 1e6整数
-def get_available_balance():
-    return get_client().get_collateral_balance(AssetType.COLLATERAL).get('balance', 0)
-
 from dataclasses import dataclass, asdict
 from typing import List, Dict, Any, Tuple, Optional
 import math
 from datetime import datetime
 import json
 
+# 导入 Polymarket API 客户端
+from ..polymarket_api import get_client, get_collateral_balance, AssetType
+
+# 1e6整数
+def get_available_balance():
+    return get_client().get_collateral_balance(AssetType.COLLATERAL).get('balance', 0)
+
 # 导入全局 VLogger 实例
-from backend.sys_configs.global_event_reg import vlogger
+from ..sys_configs.global_event_reg import vlogger
 
 # 导入 Polymarket API 数据结构
 try:
-    from backend.polymarket_api.gamma_markets import Market as GammaMarket
+    from ..polymarket_api.gamma_markets import Market as GammaMarket
     GAMMA_MARKET_AVAILABLE = True
 except ImportError:
     GAMMA_MARKET_AVAILABLE = False
@@ -399,7 +398,7 @@ def convert_gamma_market_to_input(
         # AI 会自动从 event_summary 中解析出 market_id
         market_id = str(gamma_market.id)
         if market_id not in ai_analysis:
-            vvlogger.warn("POSITION.CONVERT.NO_ANALYSIS", msg="未找到对应的 AI 分析结果", extra={
+            vlogger.warn("POSITION.CONVERT.NO_ANALYSIS", msg="未找到对应的 AI 分析结果", extra={
                 "market_id": market_id,
                 "available_keys": list(ai_analysis.keys())[:5]  # 只显示前5个键
             })
@@ -423,7 +422,7 @@ def convert_gamma_market_to_input(
         )
 
     except (AttributeError, KeyError, ValueError, TypeError) as e:
-        vvlogger.warn("POSITION.CONVERT.FAILED", msg="市场数据转换失败", extra={
+        vlogger.warn("POSITION.CONVERT.FAILED", msg="市场数据转换失败", extra={
             "market_id": getattr(gamma_market, 'id', 'unknown'),
             "error": str(e),
             "error_type": type(e).__name__
@@ -585,7 +584,7 @@ def allocate_optimal_positions_pro(
             - error: 错误信息（如果失败）
     """
     # 初始化日志
-    vvlogger.info("POSITION.ALLOCATE.START", msg="开始仓位分配（Pro版本）", extra={
+    vlogger.info("POSITION.ALLOCATE.START", msg="开始仓位分配（Pro版本）", extra={
         "market_count": len(gamma_markets),
         "M_cents": M_cents,
         "kappa": kappa,
@@ -598,10 +597,10 @@ def allocate_optimal_positions_pro(
         # 步骤 1: 获取可用余额（如果未提供）
         if M_cents is None:
             M_cents = get_available_balance()
-            
-                vlogger.info("POSITION.BALANCE.FETCHED", msg="获取账户余额", extra={
-                    "M_cents": M_cents
-                })
+
+            vlogger.info("POSITION.BALANCE.FETCHED", msg="获取账户余额", extra={
+                "M_cents": M_cents
+            })
 
         # 步骤 2: 转换数据格式
         markets: List[Market] = []
@@ -621,8 +620,8 @@ def allocate_optimal_positions_pro(
 
         if not markets:
             error_msg = "没有有效的市场数据"
-            
-                vlogger.error("POSITION.ALLOCATE.NO_MARKETS", msg=error_msg, error_code="E-POS-001")
+
+            vlogger.error("POSITION.ALLOCATE.NO_MARKETS", msg=error_msg, error_code="E-POS-001")
             return {
                 "success": False,
                 "error": error_msg,
@@ -631,11 +630,11 @@ def allocate_optimal_positions_pro(
                 "summary": {}
             }
 
-        
-            vlogger.info("POSITION.MARKETS.CONVERTED", msg="市场数据转换完成", extra={
-                "valid_markets": len(markets),
-                "total_markets": len(gamma_markets)
-            })
+
+        vlogger.info("POSITION.MARKETS.CONVERTED", msg="市场数据转换完成", extra={
+            "valid_markets": len(markets),
+            "total_markets": len(gamma_markets)
+        })
 
         # 步骤 3: 调用原有的分配算法
         allocation_result = allocate_optimal_positions(
@@ -718,13 +717,13 @@ def allocate_optimal_positions_pro(
         }
 
         # 步骤 6: 记录成功日志
-        
-            vlogger.info("POSITION.ALLOCATE.SUCCESS", msg="仓位分配完成", extra={
-                "tradable_markets": len(instructions),
-                "total_alloc_cents": total_alloc_cents,
-                "expected_profit_cents": total_expected_profit_cents,
-                "expected_roi": f"{summary['expected_roi']:.2f}%"
-            })
+
+        vlogger.info("POSITION.ALLOCATE.SUCCESS", msg="仓位分配完成", extra={
+            "tradable_markets": len(instructions),
+            "total_alloc_cents": total_alloc_cents,
+            "expected_profit_cents": total_expected_profit_cents,
+            "expected_roi": f"{summary['expected_roi']:.2f}%"
+        })
 
         return {
             "success": True,
@@ -736,11 +735,11 @@ def allocate_optimal_positions_pro(
 
     except Exception as e:
         error_msg = f"仓位分配异常: {str(e)}"
-        
-            vlogger.error("POSITION.ALLOCATE.EXCEPTION", msg=error_msg, error_code="E-POS-002", extra={
-                "exception": str(e),
-                "exception_type": type(e).__name__
-            })
+
+        vlogger.error("POSITION.ALLOCATE.EXCEPTION", msg=error_msg, error_code="E-POS-002", extra={
+            "exception": str(e),
+            "exception_type": type(e).__name__
+        })
 
         return {
             "success": False,
@@ -814,20 +813,20 @@ def export_instructions_to_json(
         with open(filepath, 'w', encoding='utf-8') as f:
             json.dump(data, f, indent=2, ensure_ascii=False)
 
-        
-            vlogger.info("POSITION.EXPORT.SUCCESS", msg="交易指令导出成功", extra={
-                "filepath": filepath,
-                "instruction_count": len(instructions)
-            })
+
+        vlogger.info("POSITION.EXPORT.SUCCESS", msg="交易指令导出成功", extra={
+            "filepath": filepath,
+            "instruction_count": len(instructions)
+        })
 
         return True
 
     except Exception as e:
-        
-            vlogger.error("POSITION.EXPORT.FAILED", msg="交易指令导出失败", error_code="E-POS-003", extra={
-                "filepath": filepath,
-                "error": str(e)
-            })
+
+        vlogger.error("POSITION.EXPORT.FAILED", msg="交易指令导出失败", error_code="E-POS-003", extra={
+            "filepath": filepath,
+            "error": str(e)
+        })
         return False
 
 

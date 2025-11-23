@@ -28,7 +28,7 @@ from py_clob_client.order_builder.constants import BUY, SELL
 from py_order_utils.model import SignedOrder
 
 # 导入全局 VLogger 实例
-from backend.sys_configs.global_event_reg import vlogger
+from ..sys_configs.global_event_reg import vlogger
 
 
 

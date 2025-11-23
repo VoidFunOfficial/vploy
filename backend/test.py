@@ -1,8 +1,8 @@
-from ai_analysis import deep_analysis
-from polymarket_api import event_summary_readableforai
-from polymarket_api import GammaMarketsAPI
-from auto_decision import position_manager
-from ai_analysis import gpt_api
+from .ai_analysis import deep_analysis
+from .polymarket_api import event_summary_readableforai
+from .polymarket_api import GammaMarketsAPI
+from .auto_decision import position_manager
+from .ai_analysis import gpt_api
 import asyncio
 import json
 

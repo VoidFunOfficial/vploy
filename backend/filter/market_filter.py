@@ -16,7 +16,7 @@ from datetime import datetime
 
 # 导入 polymarket_api 数据结构
 try:
-    from polymarket_api import Market, Event
+    from ..polymarket_api import Market, Event
     POLYMARKET_API_AVAILABLE = True
 except ImportError:
     print("[Error] polymarket_api not found, using simple Market class")
@@ -24,7 +24,7 @@ except ImportError:
 
 
 # 导入 VLogger 日志系统
-from backend.sys_configs.global_event_reg import vlogger
+from ..sys_configs.global_event_reg import vlogger
 
 # 导入数据库模块
 from .database import (
