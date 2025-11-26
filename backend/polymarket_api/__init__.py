@@ -75,7 +75,7 @@ CLOB API（需要身份验证）:
 """
 
 # 导入全局 VLogger 实例
-from ..sys_configs.global_event_reg import vlogger
+from backend.sys_configs.global_event_reg import vlogger
 
 # Gamma Markets API
 from .gamma_markets import (

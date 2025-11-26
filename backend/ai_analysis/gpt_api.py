@@ -3,6 +3,7 @@ import json
 import uuid
 import time
 from typing import Optional
+from ..sys_configs.token_refresher import get_token_refresher, TokenType
 
 """
 关键说明:
@@ -11,6 +12,22 @@ __Secure-auth_token   为 中转平台账号   的 auth_token 有效期 14D
 _account              为 平台账号唯一标识符 不可更改
 """
 ACCOUNT_ID = "f9f24477-3b6b-4a27-a298-c8663fd4edc5"
+
+# 获取 TokenRefresher 实例
+token_refresher = get_token_refresher()
+
+def handle_error_response(result: dict) -> None:
+    """
+    处理错误响应,如果error不为空或success为false,立即标记token为过期
+
+    参数:
+        result: API响应结果字典
+    """
+    # 检查是否有错误或success为false
+    if not result.get("success", True) or result.get("error"):
+        # 立即标记 auth_token 和 access_token 为过期
+        token_refresher.set_expired_immediate(TokenType.AUTH_TOKEN.value)
+        token_refresher.set_expired_immediate(TokenType.ACCESS_TOKEN.value)
 
 def parse_cookie_string(cookie_string: str) -> dict:
     """
@@ -249,7 +266,7 @@ def send_request(
                 # 这里只取第一段，和浏览器 UI 展示的主文本保持一致
                 full_text += str(parts[0])
 
-        return {
+        result = {
             "success": True,
             "status_code": response.status_code,
             "text": full_text,
@@ -258,6 +275,8 @@ def send_request(
             "message_id": message_id,
             "websocket_request_id": websocket_request_id,
         }
+        handle_error_response(result)
+        return result
 
     except requests.exceptions.RequestException as e:
         # 处理请求异常，同时尽量把服务端返回的错误内容也带出来，便于排查422等问题
@@ -270,7 +289,7 @@ def send_request(
             except Exception:
                 response_text = ""
 
-        return {
+        result = {
             "success": False,
             "error": str(e),
             "status_code": status_code,
@@ -278,6 +297,8 @@ def send_request(
             "message_id": message_id,
             "websocket_request_id": websocket_request_id,
         }
+        handle_error_response(result)
+        return result
 
 
 def send_request_stream(
@@ -467,7 +488,7 @@ def send_request_stream(
                             if parts:
                                 full_response = parts[0]
 
-        return {
+        result = {
             "success": True,
             "status_code": response.status_code,
             "response": full_response,
@@ -475,14 +496,18 @@ def send_request_stream(
             "message_id": message_id,
             "websocket_request_id": websocket_request_id
         }
+        handle_error_response(result)
+        return result
 
     except requests.exceptions.RequestException as e:
-        return {
+        result = {
             "success": False,
             "error": str(e),
             "message_id": message_id,
             "websocket_request_id": websocket_request_id
         }
+        handle_error_response(result)
+        return result
 
 def process_result(result):
     if result["success"]:
@@ -639,11 +664,13 @@ def get_result(
         # 获取最后一条AI回答
         ai_response = ai_responses[-1] if ai_responses else ""
         if len(ai_responses) == 0 and ai_response == "":
-            return {
+            result = {
                 "success": False,
                 "error": "AI is thinking"
             }
-        return {
+            handle_error_response(result)
+            return result
+        result = {
             "success": True,
             "conversation_id": data.get("conversation_id"),
             "title": title,
@@ -652,6 +679,8 @@ def get_result(
             "create_time": create_time,
             "update_time": update_time
         }
+        handle_error_response(result)
+        return result
 
     except requests.exceptions.RequestException as e:
         # 处理请求异常
@@ -664,22 +693,28 @@ def get_result(
             except Exception:
                 response_text = ""
 
-        return {
+        result = {
             "success": False,
             "error": str(e),
             "status_code": status_code,
             "response_text": response_text
         }
+        handle_error_response(result)
+        return result
     except json.JSONDecodeError as e:
-        return {
+        result = {
             "success": False,
             "error": f"JSON解析错误: {str(e)}"
         }
+        handle_error_response(result)
+        return result
     except Exception as e:
-        return {
+        result = {
             "success": False,
             "error": f"未知错误: {str(e)}"
         }
+        handle_error_response(result)
+        return result
 
 
 # 使用示例

@@ -115,17 +115,18 @@ class ConfigManager:
     def init_tables(self):
         """
         初始化数据库表结构
-        
+
         创建以下表：
         1. vlogger_config: VLogger 日志配置表
         2. email_config: 邮件配置表
         3. filter_blacklist: Filter 黑名单配置表
         4. processed_markets: 已处理事件表
         5. config_metadata: 配置元数据表
+        6. position_listen_list: 持仓监听列表表
         """
         conn = self.get_connection()
         cursor = conn.cursor()
-        
+
         try:
             # 1. VLogger 日志配置表
             cursor.execute("""
@@ -139,7 +140,7 @@ class ConfigManager:
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             """)
-            
+
             # 2. 邮件配置表
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS email_config (
@@ -152,7 +153,7 @@ class ConfigManager:
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             """)
-            
+
             # 3. Filter 黑名单配置表
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS filter_blacklist (
@@ -165,7 +166,7 @@ class ConfigManager:
                     UNIQUE(blacklist_type, value)
                 )
             """)
-            
+
             # 4. 已处理事件表
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS processed_markets (
@@ -175,7 +176,7 @@ class ConfigManager:
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             """)
-            
+
             # 5. 配置元数据表
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS config_metadata (
@@ -188,28 +189,48 @@ class ConfigManager:
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             """)
-            
+
+            # 6. 持仓监听列表表
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS position_listen_list (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    market_id TEXT NOT NULL,
+                    marks TEXT,
+                    buy_price REAL NOT NULL,
+                    buy_side TEXT NOT NULL,
+                    shares REAL,
+                    is_active INTEGER DEFAULT 1,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+
             # 创建索引
             cursor.execute("""
-                CREATE INDEX IF NOT EXISTS idx_vlogger_config_key 
+                CREATE INDEX IF NOT EXISTS idx_vlogger_config_key
                 ON vlogger_config(config_key)
             """)
-            
+
             cursor.execute("""
-                CREATE INDEX IF NOT EXISTS idx_email_config_key 
+                CREATE INDEX IF NOT EXISTS idx_email_config_key
                 ON email_config(config_key)
             """)
-            
+
             cursor.execute("""
-                CREATE INDEX IF NOT EXISTS idx_filter_blacklist_type 
+                CREATE INDEX IF NOT EXISTS idx_filter_blacklist_type
                 ON filter_blacklist(blacklist_type, is_active)
             """)
-            
+
             cursor.execute("""
-                CREATE INDEX IF NOT EXISTS idx_processed_markets_id 
+                CREATE INDEX IF NOT EXISTS idx_processed_markets_id
                 ON processed_markets(market_id)
             """)
-            
+
+            cursor.execute("""
+                CREATE INDEX IF NOT EXISTS idx_position_listen_market_id
+                ON position_listen_list(market_id, is_active)
+            """)
+
             conn.commit()
             print("[ConfigManager] 数据库表创建完成")
                 

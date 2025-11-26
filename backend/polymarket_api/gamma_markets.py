@@ -1188,6 +1188,66 @@ class GammaMarketsAPI:
 
         return events
 
+    def get_better_events(self, limit: Optional[int] = None, offset: Optional[int] = None) -> List[Event]:
+        """
+        获取优质事件列表（按创建时间降序排列，排除特定标签）
+
+        排除的标签ID包括：102127, 1, 102134, 1312, 1013, 21, 102169, 235, 972
+
+        参数:
+            limit (int): 返回结果数量限制，可选
+            offset (int): 分页偏移量，可选
+
+        返回:
+            List[Event]: 事件对象列表，按创建时间降序排列
+        """
+        vlogger.info("API.EVENT.BETTER", msg="获取优质事件")
+
+        # 构建基础参数
+        params = [
+            ("order", "createdAt"),
+            ("ascending", "false"),
+            ("exclude_tag_id", "102127"),
+            ("exclude_tag_id", "1"),
+            ("exclude_tag_id", "102134"),
+            ("exclude_tag_id", "1312"),
+            ("exclude_tag_id", "1013"),
+            ("exclude_tag_id", "21"),
+            ("exclude_tag_id", "102169"),
+            ("exclude_tag_id", "235"),
+            ("exclude_tag_id", "972")
+        ]
+
+        if limit is not None:
+            params.append(("limit", limit))
+        if offset is not None:
+            params.append(("offset", offset))
+
+        vlogger.info("API.EVENT.BETTER", msg="获取优质事件列表", extra={
+            "params": dict(params[:2])  # 只记录基础参数，避免日志过长
+        })
+
+        data = self._make_request("/events", params)
+
+        # 将响应数据转换为 Event 对象列表
+        events = []
+        if isinstance(data, list):
+            for item in data:
+                try:
+                    event = Event.from_dict(item)
+                    events.append(event)
+                except Exception as e:
+                    vlogger.warn("API.EVENT.PARSE_ERROR", msg="事件数据解析失败", extra={
+                        "item": item,
+                        "error": str(e)
+                    })
+
+        vlogger.info("API.EVENT.BETTER", msg="优质事件列表获取完成", extra={
+            "count": len(events)
+        })
+
+        return events
+
 
 # ==================== 便捷函数 ====================
 
@@ -1298,10 +1358,6 @@ def event_summary_readable(event: Event) -> str:
     if event.liquidity is not None:
         summary_lines.append(f"总流动性: ${event.liquidity:,.2f}")
     
-    # 标签信息
-    if event.tags:
-        tag_names = [tag.get('label', tag.get('slug', '未知')) for tag in event.tags]
-        summary_lines.append(f"标签: {', '.join(tag_names)}")
     
     # 市场信息
     if event.markets:
@@ -1310,11 +1366,7 @@ def event_summary_readable(event: Event) -> str:
         
         for idx, market_data in enumerate(event.markets, 1):
             summary_lines.append(f"\n市场 #{idx}:")
-            summary_lines.append(f"  问题: {market_data.get('question', '未知')}")
-            summary_lines.append(f"  市场ID: {market_data.get('id', '未知')}")
-            summary_lines.append(f"  Slug: {market_data.get('slug', '未知')}")
-            summary_lines.append(f"  状态: {'活跃' if market_data.get('active') else '已关闭'}")
-            
+            summary_lines.append(f"  问题: {market_data.get('question', '未知')}")        
             # 选项和价格
             outcomes = market_data.get('outcomes')
             outcome_prices = market_data.get('outcomePrices')
@@ -1374,7 +1426,7 @@ def event_summary_readableforai(event: Event) -> str:
     #节约token,省略不必要的信息
     summary_lines = []
     summary_lines.append(f"Event Title: {event.title}")
-    
+    summary_lines.append(f"Market Rule: {event.description}")
     
     if event.start_date:
         summary_lines.append(f"Start Date: {event.start_date}")
@@ -1386,10 +1438,25 @@ def event_summary_readableforai(event: Event) -> str:
     if event.markets:
         for idx, market_data in enumerate(event.markets, 1):
             idx = market_data.get('id')
-            summary_lines.append(f"{idx}:")
-            summary_lines.append(f"  End Date: {market_data.get('endDate', '未知')}\n")
             summary_lines.append(f"  Question: {market_data.get('question', '未知')}")
-            
+            summary_lines.append(f"{idx}:")
+            outcomes = market_data.get('outcomes')
+            outcome_prices = market_data.get('outcomePrices')
+            if outcomes and outcome_prices:
+                try:
+                    # 尝试解析 JSON 字符串
+                    if isinstance(outcomes, str):
+                        import json
+                        outcomes = json.loads(outcomes)
+                    if isinstance(outcome_prices, str):
+                        outcome_prices = json.loads(outcome_prices)
+                    
+                    summary_lines.append("  Choices and Prices:")
+                    for outcome, price in zip(outcomes, outcome_prices):
+                        summary_lines.append(f"    - {outcome}: ${price}")
+                except Exception as e:
+                    summary_lines.append(f"  Choices: {outcomes}")
+                    summary_lines.append(f"  Prices: {outcome_prices}")     
     else:
         summary_lines.append("\n该事件暂无关联市场")
     

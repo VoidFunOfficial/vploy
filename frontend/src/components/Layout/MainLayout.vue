@@ -74,6 +74,7 @@ export default {
       { id: 'monitor', name: '监控', icon: '👁️' },
       { id: 'logs', name: '日志管理', icon: '📝' },
       { id: 'api', name: 'API 刷新', icon: '🔄' },
+      { id: 'database', name: '数据库管理', icon: '🗄️' },
       { id: 'settings', name: '设置', icon: '⚙️' }
     ])
 

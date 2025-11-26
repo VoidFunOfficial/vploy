@@ -6,6 +6,15 @@
     <!-- 日志管理 -->
     <LogManagement v-else-if="activeMenu === 'logs'" />
 
+    <!-- 数据库管理 -->
+    <DatabaseManagement v-else-if="activeMenu === 'database'" />
+
+    <!-- 分析界面 -->
+    <Analysis v-else-if="activeMenu === 'analysis'" />
+
+    <!-- Token 管理 -->
+    <TokenManagement v-else-if="activeMenu === 'api'" />
+
     <!-- 其他菜单项的占位内容 -->
     <div v-else class="placeholder-content">
       <div class="placeholder-card">
@@ -21,13 +30,19 @@ import { ref } from 'vue'
 import MainLayout from '@/components/Layout/MainLayout.vue'
 import SystemOverview from '@/components/SystemOverview.vue'
 import LogManagement from '@/components/LogManagement.vue'
+import DatabaseManagement from '@/components/DatabaseManagement.vue'
+import Analysis from '@/components/Analysis.vue'
+import TokenManagement from '@/components/TokenManagement.vue'
 
 export default {
   name: 'Dashboard',
   components: {
     MainLayout,
     SystemOverview,
-    LogManagement
+    LogManagement,
+    DatabaseManagement,
+    Analysis,
+    TokenManagement
   },
   setup() {
     const activeMenu = ref('overview')
@@ -43,6 +58,7 @@ export default {
       monitor: '监控',
       logs: '日志管理',
       api: 'API 刷新',
+      database: '数据库管理',
       settings: '设置'
     }
 

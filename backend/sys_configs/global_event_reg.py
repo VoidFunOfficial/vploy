@@ -186,8 +186,38 @@ def register_all_events():
     register_error("E-HC-003", "HEALTH_CHECK_CONNECTION_ERROR", "健康检查连接错误", "warning", overwrite=True)
     register_error("E-HC-004", "HEALTH_CHECK_UNKNOWN_ERROR", "健康检查未知错误", "error", overwrite=True)
 
+    # ==================== 持仓监听模块事件 ====================
+    # EVT-PL-xxx 系列
+    register_event("EVT-PL-001", "POSITION.LISTEN.ADD_START", "开始添加持仓监听", overwrite=True)
+    register_event("EVT-PL-002", "POSITION.LISTEN.ADD_SUCCESS", "持仓监听添加成功", overwrite=True)
+    register_event("EVT-PL-003", "POSITION.LISTEN.UPDATE", "更新持仓监听", overwrite=True)
+    register_event("EVT-PL-004", "POSITION.LISTEN.REMOVE", "移除持仓监听", overwrite=True)
+    register_event("EVT-PL-005", "POSITION.LISTEN.QUERY", "查询持仓监听列表", overwrite=True)
+    register_event("EVT-PL-006", "POSITION.CHECK.START", "开始检查持仓监听列表", overwrite=True)
+    register_event("EVT-PL-007", "POSITION.CHECK.NO_RECORDS", "没有找到激活的监听记录", overwrite=True)
+    register_event("EVT-PL-008", "POSITION.CHECK.RECORDS_FOUND", "找到监听记录", overwrite=True)
+    register_event("EVT-PL-009", "POSITION.CHECK.PROCESS_RECORD", "处理监听记录", overwrite=True)
+    register_event("EVT-PL-010", "POSITION.CHECK.MARKET_NOT_FOUND", "未找到市场数据", overwrite=True)
+    register_event("EVT-PL-011", "POSITION.CHECK.NO_TOKEN_IDS", "市场缺少clobTokenIds", overwrite=True)
+    register_event("EVT-PL-012", "POSITION.CHECK.PRICE_FETCHED", "获取当前价格成功", overwrite=True)
+    register_event("EVT-PL-013", "POSITION.CHECK.RECORD_SUCCESS", "监听记录处理成功", overwrite=True)
+    register_event("EVT-PL-014", "POSITION.CHECK.COMPLETE", "持仓检查完成", overwrite=True)
+    register_event("EVT-PL-015", "POSITION.PROCESS", "处理持仓信息", overwrite=True)
+
+    # E-POSITION-xxx 系列错误码
+    register_error("E-POSITION-001", "INVALID_MARKET_ID", "market_id不能为空", "error", overwrite=True)
+    register_error("E-POSITION-002", "INVALID_BUY_SIDE", "buy_side参数无效", "error", overwrite=True)
+    register_error("E-POSITION-003", "INVALID_BUY_PRICE", "buy_price参数无效", "error", overwrite=True)
+    register_error("E-POSITION-004", "ADD_FAILED", "持仓监听添加失败", "error", overwrite=True)
+    register_error("E-POSITION-005", "ADD_ERROR", "添加持仓监听时发生异常", "error", overwrite=True)
+    register_error("E-POSITION-006", "PRICE_ERROR", "获取价格失败", "error", overwrite=True)
+    register_error("E-POSITION-007", "RECORD_ERROR", "处理监听记录时发生异常", "error", overwrite=True)
+    register_error("E-POSITION-008", "CHECK_ERROR", "检查持仓监听列表时发生异常", "error", overwrite=True)
+    register_error("E-POSITION-009", "INVALID_SHARES", "shares参数无效", "error", overwrite=True)
+def register_need_to_alert():
+    register_alert_rule(AlertRule("E-TOKEN-001", AlertLevel.P0, enabled=True))
 # 在模块导入时自动注册所有事件
 register_all_events()
 
 # 记录初始化完成
-vlogger.info("EVT-1003", msg="全局事件注册完成", extra={"total_events": "65+", "total_errors": "34+"})
+vlogger.info("EVT-1003", msg="全局事件注册完成", extra={"total_events": "70+", "total_errors": "39+"})
