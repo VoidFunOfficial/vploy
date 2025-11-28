@@ -48,11 +48,10 @@ class SequenceState(str, Enum):
     序列状态枚举
 
     状态流转:
-        PENDING -> FILTERING -> ANALYSIS -> DECISION -> TRADING -> MONITORING -> COMPLETED
-                                                                            -> FAILED
+        MARKING -> ANALYSIS -> DECISION -> TRADING -> MONITORING -> COMPLETED
+                                                                 -> FAILED
     """
-    PENDING = "PENDING"           # 待处理: 新创建的序列,等待过滤
-    FILTERING = "FILTERING"       # 过滤中: 正在进行事件过滤
+    MARKING = "MARKING"           # 标记中: 新创建的序列,等待标记处理
     ANALYSIS = "ANALYSIS"         # 分析中: 正在进行AI分析
     DECISION = "DECISION"         # 决策中: 正在进行交易决策
     TRADING = "TRADING"           # 交易中: 正在执行交易
@@ -72,6 +71,7 @@ class WatchingSequence:
         sequence_id: 序列唯一标识符
         market_id: 市场ID
         state: 当前状态
+        mark: 标记信息(用于标识序列的特殊属性或分类)
         data: 序列相关数据(事件数据、分析结果、交易指令等)
         created_at: 创建时间
         updated_at: 最后更新时间
@@ -81,7 +81,8 @@ class WatchingSequence:
     """
     sequence_id: int
     market_id: str
-    state: SequenceState = SequenceState.PENDING
+    state: SequenceState = SequenceState.MARKING
+    mark: Optional[str] = None
     data: Dict[str, Any] = field(default_factory=dict)
     created_at: float = field(default_factory=time.time)
     updated_at: float = field(default_factory=time.time)
@@ -220,12 +221,12 @@ class VCoreScheduler:
                             sequence_id=seq_id,
                             market_id=market_id,
                             state=SequenceState.MONITORING,
+                            mark=position.get('marks'),  # 使用持仓的 marks 作为 mark
                             data={
                                 'position_id': position['id'],
                                 'buy_price': position['buy_price'],
                                 'buy_side': position['buy_side'],
-                                'shares': position['shares'],
-                                'marks': position['marks']
+                                'shares': position['shares']
                             },
                             metadata={'source': 'position_listen_list'}
                         )
@@ -282,10 +283,8 @@ class VCoreScheduler:
         })
 
         # 根据状态分发到对应的处理函数
-        if sequence.state == SequenceState.PENDING:
-            self._handle_pending(sequence)
-        elif sequence.state == SequenceState.FILTERING:
-            self._handle_filtering(sequence)
+        if sequence.state == SequenceState.MARKING:
+            self._handle_marking(sequence)
         elif sequence.state == SequenceState.ANALYSIS:
             self._handle_analysis(sequence)
         elif sequence.state == SequenceState.DECISION:
@@ -349,7 +348,8 @@ class VCoreScheduler:
     def add_sequence(
         self,
         market_id: str,
-        initial_state: SequenceState = SequenceState.PENDING,
+        initial_state: SequenceState = SequenceState.MARKING,
+        mark: Optional[str] = None,
         data: Optional[Dict[str, Any]] = None,
         metadata: Optional[Dict[str, Any]] = None
     ) -> int:
@@ -359,6 +359,7 @@ class VCoreScheduler:
         参数:
             market_id: 市场ID
             initial_state: 初始状态
+            mark: 标记信息
             data: 序列数据
             metadata: 元数据
 
@@ -376,6 +377,7 @@ class VCoreScheduler:
             sequence_id=seq_id,
             market_id=market_id,
             state=initial_state,
+            mark=mark,
             data=data or {},
             metadata=metadata or {}
         )
@@ -435,6 +437,7 @@ class VCoreScheduler:
                     'sequence_id': sequence.sequence_id,
                     'market_id': sequence.market_id,
                     'state': sequence.state,
+                    'mark': sequence.mark,
                     'created_at': sequence.created_at,
                     'updated_at': sequence.updated_at,
                     'retry_count': sequence.retry_count,
@@ -458,6 +461,7 @@ class VCoreScheduler:
                     'sequence_id': seq.sequence_id,
                     'market_id': seq.market_id,
                     'state': seq.state,
+                    'mark': seq.mark,
                     'created_at': seq.created_at,
                     'updated_at': seq.updated_at,
                     'retry_count': seq.retry_count,
@@ -471,53 +475,36 @@ class VCoreScheduler:
     # 以下函数定义了各个状态的处理逻辑接口
     # 当前阶段只提供占位符实现,后续可扩展具体业务逻辑
 
-    def _handle_pending(self, sequence: WatchingSequence):
+    def _handle_marking(self, sequence: WatchingSequence):
         """
-        处理 PENDING 状态的序列
+        处理 MARKING 状态的序列
 
         业务逻辑(待实现):
+            - 处理序列的标记信息
+            - 根据 mark 进行分类或特殊处理
             - 初始化序列数据
-            - 准备进入过滤阶段
+            - 准备进入分析阶段
 
         参数:
             sequence: 监听序列对象
         """
-        vlogger.info("VCORE.HANDLE.PENDING", msg="处理 PENDING 状态序列", extra={
+        vlogger.info("VCORE.HANDLE.MARKING", msg="处理 MARKING 状态序列", extra={
             "sequence_id": sequence.sequence_id,
-            "market_id": sequence.market_id
+            "market_id": sequence.market_id,
+            "mark": sequence.mark
         })
 
-        # TODO: 实现具体的 PENDING 状态处理逻辑
-        # 示例: 初始化数据,准备进入过滤阶段
-
-        # 暂时直接转换到 FILTERING 状态
-        self._update_sequence_state(sequence, SequenceState.FILTERING)
-
-    def _handle_filtering(self, sequence: WatchingSequence):
-        """
-        处理 FILTERING 状态的序列
-
-        业务逻辑(待实现):
-            - 调用 filter 模块进行事件过滤
-            - 检查过滤结果
-            - 根据结果决定是否进入分析阶段
-
-        参数:
-            sequence: 监听序列对象
-        """
-        vlogger.info("VCORE.HANDLE.FILTERING", msg="处理 FILTERING 状态序列", extra={
-            "sequence_id": sequence.sequence_id,
-            "market_id": sequence.market_id
-        })
-
-        # TODO: 实现具体的过滤逻辑
+        # TODO: 实现具体的 MARKING 状态处理逻辑
         # 示例:
-        # from backend.filter import EventFilter
-        # filter_result = EventFilter().filter_event(sequence.data['event'])
-        # if filter_result['passed']:
-        #     self._update_sequence_state(sequence, SequenceState.ANALYSIS)
-        # else:
-        #     self._update_sequence_state(sequence, SequenceState.FAILED)
+        # - 根据 mark 进行不同的处理路径
+        # - 验证 mark 的有效性
+        # - 初始化相关数据
+        # if sequence.mark == "high_priority":
+        #     # 高优先级处理
+        #     pass
+        # elif sequence.mark == "low_priority":
+        #     # 低优先级处理
+        #     pass
 
         # 占位符: 直接转换到 ANALYSIS 状态
         self._update_sequence_state(sequence, SequenceState.ANALYSIS)
@@ -711,9 +698,9 @@ class VCoreScheduler:
         # TODO: 实现具体的失败处理逻辑
         # 示例:
         # if sequence.retry_count < self.max_retry:
-        #     # 重试: 重置状态到 PENDING
+        #     # 重试: 重置状态到 MARKING
         #     sequence.retry_count += 1
-        #     self._update_sequence_state(sequence, SequenceState.PENDING)
+        #     self._update_sequence_state(sequence, SequenceState.MARKING)
         # else:
         #     # 达到最大重试次数,从监听列表中移除
         #     self.remove_sequence(sequence.sequence_id)
@@ -725,8 +712,8 @@ class VCoreScheduler:
                 "sequence_id": sequence.sequence_id,
                 "retry_count": sequence.retry_count
             })
-            # 重置到 PENDING 状态
-            self._update_sequence_state(sequence, SequenceState.PENDING)
+            # 重置到 MARKING 状态
+            self._update_sequence_state(sequence, SequenceState.MARKING)
         else:
             vlogger.error("VCORE.MAX_RETRY_REACHED", msg="达到最大重试次数",
                          error_code="E-VCORE-005", extra={
@@ -793,7 +780,8 @@ def stop_scheduler():
 
 def add_market_to_watch(
     market_id: str,
-    initial_state: SequenceState = SequenceState.PENDING,
+    initial_state: SequenceState = SequenceState.MARKING,
+    mark: Optional[str] = None,
     data: Optional[Dict[str, Any]] = None,
     metadata: Optional[Dict[str, Any]] = None
 ) -> int:
@@ -803,6 +791,7 @@ def add_market_to_watch(
     参数:
         market_id: 市场ID
         initial_state: 初始状态
+        mark: 标记信息
         data: 序列数据
         metadata: 元数据
 
@@ -813,6 +802,7 @@ def add_market_to_watch(
     return scheduler.add_sequence(
         market_id=market_id,
         initial_state=initial_state,
+        mark=mark,
         data=data,
         metadata=metadata
     )

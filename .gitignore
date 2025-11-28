@@ -1,3 +1,5 @@
 __pycache__
 .env
 py_clob_client
+node_modules
+pnpm-lock.yaml

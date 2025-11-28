@@ -5,6 +5,7 @@ Polymarket API Python 客户端
 1. Gamma Markets API - 市场数据查询（无需身份验证）
 2. Orderbook API - 订单簿和价格查询（无需身份验证）
 3. CLOB API - 订单管理和交易（需要身份验证）
+4. WebSocket API - 实时市场数据和用户订单流（部分需要身份验证）
 
 主要功能：
 
@@ -26,6 +27,12 @@ CLOB API（需要身份验证）:
 - 交易记录查询
 - 账户余额和授权查询
 - 服务器时间同步
+
+WebSocket API:
+- 市场频道（无需身份验证）：订单簿、价格变化、最新成交价
+- 用户频道（需要身份验证）：用户订单、交易记录
+- 自动重连和心跳保活
+- 消息回调处理
 
 使用 VLogger 记录关键操作和错误
 
@@ -72,6 +79,24 @@ CLOB API（需要身份验证）:
     balance = get_collateral_balance()
     trades = get_trades(limit=50)
     response = place_limit_buy_order(token_id, price=0.55, size=100)
+
+    # WebSocket API
+    from polymarket_api import PolymarketWSClient
+
+    # 市场频道（无需身份验证）
+    client = PolymarketWSClient()
+    client.on_message(lambda msg: print(msg))
+    await client.connect()
+    await client.subscribe_market("market_id")
+
+    # 用户频道（需要身份验证）
+    client = PolymarketWSClient(
+        api_key="your_key",
+        api_secret="your_secret",
+        api_passphrase="your_passphrase"
+    )
+    await client.connect()
+    await client.subscribe_user()
 """
 
 # 导入全局 VLogger 实例
@@ -94,6 +119,14 @@ from .gamma_markets import (
 # Orderbook API
 from .orderbook_api import (
     PolymarketOrderbookClient,
+)
+
+# WebSocket API
+from .wss_client import (
+    PolymarketWSClient,
+    ChannelType,
+    MessageType,
+    WSConfig,
 )
 
 # CLOB API 作为子模块导入（需要身份验证的订单管理功能）
@@ -143,6 +176,17 @@ from .clob_api import (
     OrderType,
 )
 
+# Easy Trade API - 高级交易功能
+from .easy_trade import (
+    # 冰山订单
+    iceberg_order,
+    IcebergOrder,
+    IcebergOrderStatus,
+    IcebergOrderManager,
+    OrderSlice,
+    SliceStatus,
+)
+
 __version__ = "1.0.0"
 __all__ = [
     # Gamma Markets API
@@ -159,6 +203,12 @@ __all__ = [
 
     # Orderbook API
     "PolymarketOrderbookClient",
+
+    # WebSocket API
+    "PolymarketWSClient",
+    "ChannelType",
+    "MessageType",
+    "WSConfig",
 
     # CLOB API (作为子模块 - 需要身份验证的订单管理功能)
     "clob_api",
@@ -205,5 +255,13 @@ __all__ = [
     "SELL",
     "AssetType",
     "OrderType",
+
+    # Easy Trade API - 高级交易功能
+    "iceberg_order",
+    "IcebergOrder",
+    "IcebergOrderStatus",
+    "IcebergOrderManager",
+    "OrderSlice",
+    "SliceStatus",
 ]
 
