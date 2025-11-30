@@ -27,7 +27,7 @@ except ImportError:
 from ..sys_configs.global_event_reg import vlogger
 
 # 导入数据库模块
-from .database import (
+from ..sys_configs.filter_config import (
     get_blacklist,
     is_market_processed,
     mark_market_as_processed,

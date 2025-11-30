@@ -29,7 +29,7 @@ except ImportError:
 from ..sys_configs.global_event_reg import vlogger
 
 # 导入数据库模块
-from .database import (
+from ..sys_configs.filter_config import (
     get_blacklist,
     is_market_processed,
     mark_market_as_processed,
@@ -331,9 +331,67 @@ class EventFilter:
         返回:
             List[Event]: 通过 AI 过滤的事件列表
         """
-        events = [event for event in events if ai_filter_event(event)]
+        input_count = len(events)
 
-        return events
+        if input_count == 0:
+            vlogger.debug("FILTER.AI.SKIP", msg="AI 过滤输入为空，跳过过滤")
+            return events
+
+        vlogger.info("FILTER.AI.START", msg="开始 AI 过滤", extra={
+            "input_count": input_count
+        })
+
+        # 过滤事件
+        filtered_events = []
+        passed_count = 0
+        failed_count = 0
+
+        for event in events:
+            event_id = getattr(event, 'id', 'unknown')
+            event_title = getattr(event, 'title', '')
+
+            try:
+                # 调用 AI 过滤
+                is_passed = ai_filter_event(event)
+
+                if is_passed:
+                    filtered_events.append(event)
+                    passed_count += 1
+                    vlogger.debug("FILTER.AI.PASSED", msg="事件通过 AI 过滤", extra={
+                        "event_id": event_id,
+                        "title": event_title[:100]
+                    })
+                else:
+                    failed_count += 1
+                    vlogger.debug("FILTER.AI.BLOCKED", msg="事件被 AI 过滤", extra={
+                        "event_id": event_id,
+                        "title": event_title[:100]
+                    })
+
+            except Exception as e:
+                # AI 调用失败时，默认通过（保守策略）
+                filtered_events.append(event)
+                passed_count += 1
+                vlogger.warn("FILTER.AI.ERROR", msg="AI 过滤异常，默认通过", extra={
+                    "event_id": event_id,
+                    "title": event_title[:100],
+                    "error": str(e)
+                })
+
+        output_count = len(filtered_events)
+        filtered_count = input_count - output_count
+        pass_rate = (output_count / input_count * 100) if input_count > 0 else 0
+
+        vlogger.info("FILTER.AI.COMPLETE", msg="AI 过滤完成", extra={
+            "input_count": input_count,
+            "output_count": output_count,
+            "filtered_count": filtered_count,
+            "passed_count": passed_count,
+            "failed_count": failed_count,
+            "pass_rate": f"{pass_rate:.2f}%"
+        })
+
+        return filtered_events
 
     async def ai_process_event(self, event: Event) -> bool:
         """

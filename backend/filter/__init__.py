@@ -21,10 +21,7 @@ from .market_filter import (
     filter_markets,
 )
 
-from .database import (
-    DatabaseManager,
-    get_db_manager,
-    init_database,
+from ..sys_configs.filter_config import (
     get_blacklist,
     add_blacklist_item,
     remove_blacklist_item,
@@ -40,10 +37,6 @@ __all__ = [
     "MarketFilter",
     "filter_events",  # 默认使用 event_filter 的 filter_events
     "filter_markets",
-    # 数据库管理
-    "DatabaseManager",
-    "get_db_manager",
-    "init_database",
     # 黑名单管理
     "get_blacklist",
     "add_blacklist_item",

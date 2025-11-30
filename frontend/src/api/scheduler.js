@@ -71,3 +71,14 @@ export function deleteScheduledTask(taskId) {
   })
 }
 
+/**
+ * 立即执行定时任务一次
+ * @param {number} taskId - 任务ID
+ */
+export function runScheduledTaskNow(taskId) {
+  return request({
+    url: `/scheduler/tasks/${taskId}/run`,
+    method: 'post'
+  })
+}
+

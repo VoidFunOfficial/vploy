@@ -83,6 +83,13 @@
               </td>
               <td class="actions">
                 <button
+                  class="btn-sm btn-run"
+                  @click="runTaskNow(task)"
+                  title="立即执行一次"
+                >
+                  ▶ 执行
+                </button>
+                <button
                   class="btn-sm"
                   :class="task.enabled ? 'btn-warning' : 'btn-success'"
                   @click="toggleTask(task)"
@@ -251,7 +258,8 @@ import {
   getScheduledTasks,
   createScheduledTask,
   updateScheduledTask,
-  deleteScheduledTask
+  deleteScheduledTask,
+  runScheduledTaskNow
 } from '@/api/scheduler'
 
 export default {
@@ -437,6 +445,27 @@ export default {
       } catch (error) {
         console.error('切换任务状态失败:', error)
         alert('切换任务状态失败: ' + (error.response?.data?.message || error.message))
+      }
+    }
+
+    // 立即执行任务
+    const runTaskNow = async (task) => {
+      if (!confirm(`确定要立即执行任务 "${task.name}" 吗？`)) {
+        return
+      }
+
+      try {
+        const response = await runScheduledTaskNow(task.id)
+        if (response.success) {
+          alert(`任务 "${task.name}" 已开始执行`)
+          // 刷新任务列表以更新最后运行时间
+          setTimeout(() => {
+            refreshTasks()
+          }, 1000)
+        }
+      } catch (error) {
+        console.error('执行任务失败:', error)
+        alert('执行任务失败: ' + (error.response?.data?.message || error.message))
       }
     }
 
@@ -678,6 +707,7 @@ export default {
       closeDialog,
       submitForm,
       toggleTask,
+      runTaskNow,
       confirmDelete,
       formatTime,
       isHueyTask,
@@ -959,6 +989,15 @@ tr.huey-task:hover {
 .btn-sm:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+.btn-run {
+  background: #9c27b0;
+  color: white;
+}
+
+.btn-run:hover {
+  background: #7b1fa2;
 }
 
 /* 对话框 */

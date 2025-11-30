@@ -11,11 +11,11 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from backend.task_manager.health_check import (
-    check_node,
     check_all_nodes,
     get_health_report,
     get_db,
-    API_NODES
+    API_NODES,
+    _check_node
 )
 from backend.task_manager.email_report import (
     generate_health_report_html,

@@ -45,6 +45,7 @@ class DynamicScheduler:
             'health_report': self._execute_health_report,
             'profit_email': self._execute_profit_email,
             'periodic_health_check': self._execute_periodic_health_check,
+            'event_sniffing': self._execute_event_sniffing,
         }
         
         logger.info(
@@ -206,7 +207,113 @@ class DynamicScheduler:
                     extra={"error": str(e)},
                     trace_id=trace_id
                 )
-    
+
+    def _execute_event_sniffing(self, task: ScheduledTask):
+        """
+        执行事件嗅探任务
+
+        每30分钟获取优质事件，过滤后添加到任务队列
+        """
+        from ..vlogger import TraceContext
+        from ..polymarket_api import GammaMarketsAPI
+        from ..filter import EventFilter
+        from .tasks import submit_task
+        from .models import AsyncTask, TaskStage, TaskStatus
+
+        with TraceContext() as trace_id:
+            logger.info(
+                "DYNAMIC_SCHEDULER.EVENT_SNIFFING.START",
+                msg="开始执行事件嗅探任务",
+                trace_id=trace_id
+            )
+
+            try:
+                # 1. 获取优质事件
+                with GammaMarketsAPI() as api:
+                    events = api.get_better_events(limit=50)
+
+                logger.info(
+                    "DYNAMIC_SCHEDULER.EVENT_SNIFFING.FETCH",
+                    msg=f"获取到 {len(events)} 个事件",
+                    extra={"count": len(events)},
+                    trace_id=trace_id
+                )
+
+                # 2. 使用过滤器过滤事件
+                event_filter = EventFilter()
+                filtered_events = event_filter.filter_events(events)
+
+                logger.info(
+                    "DYNAMIC_SCHEDULER.EVENT_SNIFFING.FILTER",
+                    msg=f"过滤后剩余 {len(filtered_events)} 个事件",
+                    extra={
+                        "original_count": len(events),
+                        "filtered_count": len(filtered_events)
+                    },
+                    trace_id=trace_id
+                )
+
+                # 3. 逐个添加到任务队列
+                submitted_count = 0
+                for event in filtered_events:
+                    try:
+                        # 创建MARK阶段的任务
+                        async_task = AsyncTask(
+                            stage=TaskStage.MARK,
+                            status=TaskStatus.WAITING,
+                            metadata={
+                                "event_id": event.id,
+                                "event_title": event.title,
+                                "source": "event_sniffing",
+                                "sniffing_time": datetime.now().isoformat()
+                            }
+                        )
+
+                        task_id = submit_task(async_task)
+                        submitted_count += 1
+
+                        logger.debug(
+                            "DYNAMIC_SCHEDULER.EVENT_SNIFFING.SUBMIT",
+                            msg=f"提交事件任务: {event.title}",
+                            extra={
+                                "task_id": task_id,
+                                "event_id": event.id
+                            },
+                            trace_id=trace_id
+                        )
+
+                    except Exception as e:
+                        logger.error(
+                            "DYNAMIC_SCHEDULER.EVENT_SNIFFING.SUBMIT_ERROR",
+                            msg=f"提交事件任务失败: {event.id}",
+                            error_code="E-DYNAMIC-SCHEDULER-011",
+                            extra={
+                                "event_id": event.id,
+                                "error": str(e)
+                            },
+                            trace_id=trace_id
+                        )
+
+                logger.info(
+                    "DYNAMIC_SCHEDULER.EVENT_SNIFFING.SUCCESS",
+                    msg="事件嗅探任务执行成功",
+                    extra={
+                        "fetched": len(events),
+                        "filtered": len(filtered_events),
+                        "submitted": submitted_count
+                    },
+                    trace_id=trace_id
+                )
+
+            except Exception as e:
+                logger.error(
+                    "DYNAMIC_SCHEDULER.EVENT_SNIFFING.ERROR",
+                    msg="事件嗅探任务执行失败",
+                    error_code="E-DYNAMIC-SCHEDULER-012",
+                    extra={"error": str(e)},
+                    trace_id=trace_id
+                )
+
     def _calculate_next_run(self, task: ScheduledTask) -> datetime:
         """
         计算下次运行时间

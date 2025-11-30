@@ -1,18 +1,17 @@
 """
 健康检查模块
 
-实现API节点延迟检测、数据持久化、统计分析和告警功能。
+实现API节点延迟检测和统计报告功能。
 """
 
 import time
 import sqlite3
 import requests
 from datetime import datetime, timedelta
-from typing import List, Dict, Any, Optional, Tuple
+from typing import List, Dict, Any, Optional
 from dataclasses import dataclass
 
 from ..vlogger import get_logger, TraceContext
-from ..vlogger.alerts import AlertLevel, _alert_manager, AlertRule, register_alert_rule
 from .config import get_config
 
 
@@ -279,101 +278,27 @@ def get_db() -> HealthCheckDatabase:
     return _db
 
 
-# ==================== 初始化 ====================
-
-def init_health_check_alerts():
-    """初始化健康检查告警规则"""
-    # 注册超时告警规则
-    register_alert_rule(AlertRule(
-        event_code="EVT-HEALTH-TIMEOUT",
-        level=AlertLevel.P1,
-        dedup_window_seconds=300,  # 5分钟去重
-        throttle_max_per_minute=1
-    ))
-
-    # 注册高延迟告警规则
-    register_alert_rule(AlertRule(
-        event_code="EVT-HEALTH-HIGH-LATENCY",
-        level=AlertLevel.P1,
-        dedup_window_seconds=300,  # 5分钟去重
-        throttle_max_per_minute=1
-    ))
-
-    # 注册失败告警规则
-    register_alert_rule(AlertRule(
-        event_code="EVT-HEALTH-FAILED",
-        level=AlertLevel.P1,
-        dedup_window_seconds=300,  # 5分钟去重
-        throttle_max_per_minute=1
-    ))
-
-    logger.info(
-        "HEALTH_CHECK.INIT",
-        msg="健康检查告警规则初始化完成"
-    )
-
-
-# 自动初始化告警规则
-init_health_check_alerts()
-
-
-
-
 # ==================== 节点检测 ====================
 
-def check_node(node_url: str) -> HealthCheckResult:
-    """
-    检测单个节点的延迟
-
-    参数:
-        node_url: 节点URL
-
-    返回:
-        HealthCheckResult: 检测结果
-    """
+def _check_node(node_url: str) -> HealthCheckResult:
+    """检测单个节点的延迟（内部函数）"""
     check_time = datetime.now()
 
     try:
-        # 记录开始时间
         start_time = time.time()
-
-        # 发送HTTP GET请求
         response = requests.get(
             node_url,
             timeout=REQUEST_TIMEOUT,
             headers={"User-Agent": "VoidPoly-HealthCheck/1.0"}
         )
-
-        # 计算延迟（毫秒）
         latency_ms = (time.time() - start_time) * 1000
 
-        # 检查响应状态
         if response.status_code == 200:
             status = "success"
             error_msg = None
-
-            logger.debug(
-                "HEALTH_CHECK.NODE.SUCCESS",
-                msg=f"节点检测成功: {node_url}",
-                extra={
-                    "node_url": node_url,
-                    "latency_ms": round(latency_ms, 2),
-                    "status_code": response.status_code
-                }
-            )
         else:
             status = "failed"
             error_msg = f"HTTP {response.status_code}"
-
-            logger.warn(
-                "HEALTH_CHECK.NODE.HTTP_ERROR",
-                msg=f"节点返回错误状态码: {node_url}",
-                extra={
-                    "node_url": node_url,
-                    "status_code": response.status_code,
-                    "latency_ms": round(latency_ms, 2)
-                }
-            )
 
         result = HealthCheckResult(
             node_url=node_url,
@@ -384,48 +309,20 @@ def check_node(node_url: str) -> HealthCheckResult:
         )
 
     except requests.exceptions.Timeout:
-        # 超时
-        latency_ms = REQUEST_TIMEOUT * 1000
-        status = "timeout"
-        error_msg = f"请求超时 (>{REQUEST_TIMEOUT}s)"
-
-        logger.warn(
-            "HEALTH_CHECK.NODE.TIMEOUT",
-            msg=f"节点请求超时: {node_url}",
-            extra={
-                "node_url": node_url,
-                "timeout": REQUEST_TIMEOUT
-            }
-        )
-
         result = HealthCheckResult(
             node_url=node_url,
-            latency_ms=latency_ms,
-            status=status,
-            error_msg=error_msg,
+            latency_ms=REQUEST_TIMEOUT * 1000,
+            status="timeout",
+            error_msg=f"请求超时 (>{REQUEST_TIMEOUT}s)",
             check_time=check_time
         )
 
     except Exception as e:
-        # 其他错误
-        status = "failed"
-        error_msg = str(e)
-
-        logger.error(
-            "HEALTH_CHECK.NODE.FAILED",
-            msg=f"节点检测失败: {node_url}",
-            error_code="E-HEALTH-001",
-            extra={
-                "node_url": node_url,
-                "error": str(e)
-            }
-        )
-
         result = HealthCheckResult(
             node_url=node_url,
             latency_ms=None,
-            status=status,
-            error_msg=error_msg,
+            status="failed",
+            error_msg=str(e),
             check_time=check_time
         )
 
@@ -449,15 +346,12 @@ def check_all_nodes() -> List[HealthCheckResult]:
 
         results = []
         for node_url in API_NODES:
-            result = check_node(node_url)
+            result = _check_node(node_url)
             results.append(result)
 
             # 保存到数据库
             db = get_db()
             db.save_result(result)
-
-            # 检查是否需要告警
-            check_and_alert(result, trace_id)
 
         logger.info(
             "HEALTH_CHECK.CHECK_ALL.COMPLETE",
@@ -475,91 +369,7 @@ def check_all_nodes() -> List[HealthCheckResult]:
 
 
 
-# ==================== 告警机制 ====================
-
-def check_and_alert(result: HealthCheckResult, trace_id: Optional[str] = None):
-    """
-    检查结果并触发告警
-
-    参数:
-        result: 检测结果
-        trace_id: 追踪ID
-    """
-    node_name = result.node_url.replace("https://", "").replace("http://", "").rstrip("/")
-
-    # 检查超时
-    if result.status == "timeout":
-        _alert_manager.send_alert(
-            event_code="EVT-HEALTH-TIMEOUT",
-            message=f"API节点请求超时: {node_name}",
-            extra={
-                "node_url": result.node_url,
-                "timeout": f"{REQUEST_TIMEOUT}s",
-                "check_time": result.check_time.isoformat()
-            }
-        )
-
-        logger.error(
-            "HEALTH_CHECK.ALERT.TIMEOUT",
-            msg=f"触发超时告警: {node_name}",
-            error_code="E-HEALTH-TIMEOUT",
-            extra={
-                "node_url": result.node_url,
-                "alert_level": "P1"
-            },
-            trace_id=trace_id
-        )
-
-    # 检查延迟过高
-    elif result.status == "success" and result.latency_ms and result.latency_ms > LATENCY_HIGH_THRESHOLD:
-        _alert_manager.send_alert(
-            event_code="EVT-HEALTH-HIGH-LATENCY",
-            message=f"API节点延迟过高: {node_name}",
-            extra={
-                "node_url": result.node_url,
-                "latency_ms": round(result.latency_ms, 2),
-                "threshold": LATENCY_HIGH_THRESHOLD,
-                "check_time": result.check_time.isoformat()
-            }
-        )
-
-        logger.warn(
-            "HEALTH_CHECK.ALERT.HIGH_LATENCY",
-            msg=f"触发高延迟告警: {node_name}",
-            extra={
-                "node_url": result.node_url,
-                "latency_ms": round(result.latency_ms, 2),
-                "alert_level": "P1"
-            },
-            trace_id=trace_id
-        )
-
-    # 检查请求失败
-    elif result.status == "failed":
-        _alert_manager.send_alert(
-            event_code="EVT-HEALTH-FAILED",
-            message=f"API节点请求失败: {node_name}",
-            extra={
-                "node_url": result.node_url,
-                "error": result.error_msg,
-                "check_time": result.check_time.isoformat()
-            }
-        )
-
-        logger.error(
-            "HEALTH_CHECK.ALERT.FAILED",
-            msg=f"触发失败告警: {node_name}",
-            error_code="E-HEALTH-FAILED",
-            extra={
-                "node_url": result.node_url,
-                "error": result.error_msg,
-                "alert_level": "P1"
-            },
-            trace_id=trace_id
-        )
-
-
-# ==================== 统计分析 ====================
+# ==================== 统计报告 ====================
 
 def get_health_report(hours_12: bool = True, hours_72: bool = True) -> Dict[str, Any]:
     """

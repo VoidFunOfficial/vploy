@@ -4,7 +4,6 @@ from cozepy import COZE_CN_BASE_URL
 from ..sys_configs.global_event_reg import vlogger
 from ..sys_configs.token_refresher import get_token_refresher, TokenType
 
-coze_api_token = 'pat_7WIJOd6lO8cDox7ciTFaL4CX2dJdBrb0P5qMZLRdng2IvjgKSpJtobzmlIEtJ8D'
 coze_api_base = COZE_CN_BASE_URL
 
 # 获取 TokenRefresher 实例
@@ -12,8 +11,42 @@ token_refresher = get_token_refresher()
 
 from cozepy import Coze, TokenAuth, Message, ChatStatus, MessageContentType, ChatEventType  # noqa
 
-# Init the Coze client through the access_token.
-coze = Coze(auth=TokenAuth(token=coze_api_token), base_url=coze_api_base)
+def _get_coze_token() -> str:
+    """
+    从 TokenRefresher 获取最新的 Coze API Token
+
+    返回:
+        str: Coze API Token
+
+    异常:
+        ValueError: 如果 token 不存在或已过期
+    """
+    token_status = token_refresher.get_token_status(TokenType.COZE_TOKEN.value)
+
+    if not token_status:
+        vlogger.error("EVT-8065", msg="Coze Token 未配置", error_code="E-COZE-002")
+        raise ValueError("Coze Token 未配置，请先在系统中配置 Token")
+
+    if token_status.get('is_expired'):
+        vlogger.error("EVT-8066", msg="Coze Token 已过期", error_code="E-COZE-003")
+        raise ValueError("Coze Token 已过期，请更新 Token")
+
+    token_value = token_status.get('token_value')
+    if not token_value:
+        vlogger.error("EVT-8067", msg="Coze Token 值为空", error_code="E-COZE-004")
+        raise ValueError("Coze Token 值为空")
+
+    return token_value
+
+def _get_coze_client() -> Coze:
+    """
+    获取 Coze 客户端实例，使用最新的 token
+
+    返回:
+        Coze: Coze 客户端实例
+    """
+    token = _get_coze_token()
+    return Coze(auth=TokenAuth(token=token), base_url=coze_api_base)
 
 filter_bot_id = '7572964851103350847'
 user_id = 'vpolymarket-filter'
@@ -50,6 +83,9 @@ def chat_with_coze(bot_id: str, prompt: str, user_id: str = 'vpolymarket-filter'
     result = []
 
     try:
+        # 每次调用时获取最新的 Coze 客户端（使用最新 token）
+        coze = _get_coze_client()
+
         for event in coze.chat.stream(
             bot_id=bot_id,
             user_id=user_id,
@@ -75,19 +111,41 @@ def chat_with_coze(bot_id: str, prompt: str, user_id: str = 'vpolymarket-filter'
 def ai_filter_event(event: Event) -> bool:
     """
     使用Coze AI进行事件过滤
-    
+
     参数:
         event (Event): 事件信息
-    
+
     返回:
         bool: 是否通过过滤
     """
     prompt = event.title
+    event_id = getattr(event, 'id', 'unknown')
+
+    vlogger.debug("EVT-8062", msg="开始 AI 过滤事件", extra={
+        "event_id": event_id,
+        "title": prompt[:100]
+    })
+
     try:
         response = chat_with_coze(bot_id=filter_bot_id, prompt=prompt)
-        return "Yes" in response
+        print(response)
+        is_passed = "Yes" in response
+
+        vlogger.info("EVT-8061", msg="AI 过滤完成", extra={
+            "event_id": event_id,
+            "title": prompt[:100],
+            "response": response[:200],
+            "is_passed": is_passed
+        })
+
+        return is_passed
+
     except Exception as e:
-        vlogger.error("EVT-8063", msg="Coze AI调用失败", error_code="E-FILTER-005", extra={"error": str(e)})
+        vlogger.error("EVT-8063", msg="Coze AI调用失败，默认通过", error_code="E-FILTER-005", extra={
+            "event_id": event_id,
+            "title": prompt[:100],
+            "error": str(e)
+        })
         return True
 
 # 示例调用

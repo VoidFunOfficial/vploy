@@ -10,7 +10,8 @@ from ...task_manager import (
     update_scheduled_task,
     get_scheduled_task_info,
     list_scheduled_tasks,
-    TaskDatabase
+    TaskDatabase,
+    get_scheduler
 )
 from ...vlogger import get_logger
 
@@ -277,21 +278,21 @@ def delete_scheduled_task(task_id):
                 'success': False,
                 'message': f'任务不存在: {task_id}'
             }), 404
-        
+
         # 删除任务
         db.delete_scheduled_task(task_id)
-        
+
         logger.info(
             "SCHEDULER.API.DELETE.SUCCESS",
             msg=f"删除定时任务成功: {task.name}",
             extra={"task_id": task_id, "name": task.name}
         )
-        
+
         return jsonify({
             'success': True,
             'message': '删除定时任务成功'
         }), 200
-        
+
     except Exception as e:
         logger.error(
             "SCHEDULER.API.DELETE.ERROR",
@@ -302,5 +303,60 @@ def delete_scheduled_task(task_id):
         return jsonify({
             'success': False,
             'message': f'删除定时任务失败: {str(e)}'
+        }), 500
+
+
+@scheduler_bp.route('/tasks/<int:task_id>/run', methods=['POST'])
+def run_scheduled_task_now(task_id):
+    """
+    立即执行定时任务一次
+
+    不影响任务的正常调度，只是手动触发一次执行
+    """
+    try:
+        # 获取任务信息
+        task = db.get_scheduled_task(task_id)
+        if not task:
+            return jsonify({
+                'success': False,
+                'message': f'任务不存在: {task_id}'
+            }), 404
+
+        logger.info(
+            "SCHEDULER.API.RUN_NOW.START",
+            msg=f"手动触发任务执行: {task.name}",
+            extra={"task_id": task_id, "task_name": task.name}
+        )
+
+        # 获取调度器实例并执行任务
+        scheduler = get_scheduler()
+        scheduler._execute_task(task)
+
+        # 更新最后运行时间（但不更新下次运行时间，保持原有调度）
+        from datetime import datetime
+        task.last_run = datetime.now()
+        db.update_scheduled_task(task)
+
+        logger.info(
+            "SCHEDULER.API.RUN_NOW.SUCCESS",
+            msg=f"手动执行任务成功: {task.name}",
+            extra={"task_id": task_id, "task_name": task.name}
+        )
+
+        return jsonify({
+            'success': True,
+            'message': f'任务 {task.name} 已立即执行'
+        }), 200
+
+    except Exception as e:
+        logger.error(
+            "SCHEDULER.API.RUN_NOW.ERROR",
+            msg=f"手动执行任务失败: {task_id}",
+            error_code="E-SCHEDULER-API-006",
+            extra={"task_id": task_id, "error": str(e)}
+        )
+        return jsonify({
+            'success': False,
+            'message': f'执行任务失败: {str(e)}'
         }), 500
 

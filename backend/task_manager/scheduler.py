@@ -498,6 +498,33 @@ def init_default_scheduled_tasks():
             extra={"task_id": task_id, "next_run": profit_next.isoformat()}
         )
 
+    # 事件嗅探任务（每30分钟）
+    event_sniffing_cron = "*/30 * * * *"  # 每30分钟
+    event_sniffing_next = croniter(event_sniffing_cron, now).get_next(datetime)
+
+    task_id = add_scheduled_task(
+        name="event_sniffing",
+        task_type="cron",
+        schedule=event_sniffing_cron,
+        enabled=True,
+        metadata={
+            "description": "事件嗅探任务 - 每30分钟获取并过滤优质事件",
+            "auto_created": True,
+            "huey_task": False  # 由动态调度器执行
+        }
+    )
+
+    # 更新下次运行时间
+    task = db.get_scheduled_task(task_id)
+    if task and not task.next_run:
+        task.next_run = event_sniffing_next
+        db.update_scheduled_task(task)
+        logger.info(
+            "SCHEDULER.INIT.EVENT_SNIFFING",
+            msg=f"事件嗅探任务已初始化，下次运行: {event_sniffing_next}",
+            extra={"task_id": task_id, "next_run": event_sniffing_next.isoformat()}
+        )
+
     logger.info(
         "SCHEDULER.INIT.SUCCESS",
         msg="预定义定时任务初始化完成"
