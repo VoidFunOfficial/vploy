@@ -28,6 +28,7 @@ from .alerts import (
 )
 from .sanitizer import Sanitizer, sanitize, add_sensitive_field
 from .trace import TraceContext, generate_trace_id
+from .email_helper import email_send, email_send_with_db_config
 
 __version__ = "1.0.0"
 __all__ = [
@@ -57,5 +58,7 @@ __all__ = [
     "add_sensitive_field",
     "TraceContext",
     "generate_trace_id",
+    "email_send",
+    "email_send_with_db_config",
 ]
 

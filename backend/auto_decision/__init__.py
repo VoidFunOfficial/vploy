@@ -8,14 +8,12 @@
 """
 
 from .position_manager import (
-    TradeInstruction,
-    allocate_optimal_positions_pro,
-    get_available_balance,
+    allocate,
+    convert_to_simple_market
 )
 
 __all__ = [
-    "TradeInstruction",
-    "allocate_optimal_positions_pro",
-    "get_available_balance",
+    "allocate",
+    "convert_to_simple_market"
 ]
 

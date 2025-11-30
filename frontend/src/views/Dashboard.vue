@@ -9,6 +9,12 @@
     <!-- 数据库管理 -->
     <DatabaseManagement v-else-if="activeMenu === 'database'" />
 
+    <!-- 定时任务管理 -->
+    <SchedulerManagement v-else-if="activeMenu === 'scheduler'" />
+
+    <!-- 任务管理 -->
+    <TaskManagement v-else-if="activeMenu === 'tasks'" />
+
     <!-- 分析界面 -->
     <Analysis v-else-if="activeMenu === 'analysis'" />
 
@@ -31,6 +37,8 @@ import MainLayout from '@/components/Layout/MainLayout.vue'
 import SystemOverview from '@/components/SystemOverview.vue'
 import LogManagement from '@/components/LogManagement.vue'
 import DatabaseManagement from '@/components/DatabaseManagement.vue'
+import SchedulerManagement from '@/components/SchedulerManagement.vue'
+import TaskManagement from '@/components/TaskManagement.vue'
 import Analysis from '@/components/Analysis.vue'
 import TokenManagement from '@/components/TokenManagement.vue'
 
@@ -41,6 +49,8 @@ export default {
     SystemOverview,
     LogManagement,
     DatabaseManagement,
+    SchedulerManagement,
+    TaskManagement,
     Analysis,
     TokenManagement
   },
@@ -52,6 +62,7 @@ export default {
       overview: '系统宏观信息',
       system: '系统信息',
       profit: '盈亏情况',
+      tasks: '任务管理',
       filter: '过滤',
       analysis: '分析',
       trade: '交易',
@@ -59,6 +70,7 @@ export default {
       logs: '日志管理',
       api: 'API 刷新',
       database: '数据库管理',
+      scheduler: '定时任务管理',
       settings: '设置'
     }
 

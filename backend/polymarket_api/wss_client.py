@@ -47,12 +47,16 @@ class MessageType(Enum):
 @dataclass
 class WSConfig:
     """WebSocket 配置"""
-    url: str = "wss://ws-subscriptions-clob.polymarket.com/ws/"
+    base_url: str = "wss://ws-subscriptions-clob.polymarket.com/ws"
     ping_interval: int = 20  # 心跳间隔(秒)
     ping_timeout: int = 10  # 心跳超时(秒)
     reconnect_delay: int = 5  # 重连延迟(秒)
     max_reconnect_attempts: int = 10  # 最大重连次数
     message_queue_size: int = 1000  # 消息队列大小
+
+    def get_url(self, channel: ChannelType) -> str:
+        """根据频道类型获取对应的 WebSocket URL"""
+        return f"{self.base_url}/{channel.value}"
 
 
 class PolymarketWSClient:
@@ -60,26 +64,22 @@ class PolymarketWSClient:
     Polymarket CLOB WebSocket 客户端
 
     功能:
-    - 支持 USER 和 MARKET 频道订阅
+    - 支持 USER 和 MARKET 频道订阅(使用不同的 WebSocket 端点)
+    - USER 频道: wss://ws-subscriptions-clob.polymarket.com/ws/user
+    - MARKET 频道: wss://ws-subscriptions-clob.polymarket.com/ws/market
     - 自动重连机制
     - 心跳保活
     - 消息回调处理
     - 订阅管理
 
     示例:
-        # 市场频道(无需认证)
+        # 市场频道(无需认证,自动连接到 /ws/market)
         client = PolymarketWSClient()
         client.on_message(lambda msg: print(msg))
-        await client.connect()
         await client.subscribe_market("market_id")
 
-        # 用户频道(需要认证)
-        client = PolymarketWSClient(
-            api_key="your_key",
-            api_secret="your_secret",
-            api_passphrase="your_passphrase"
-        )
-        await client.connect()
+        # 用户频道(需要认证,自动连接到 /ws/user)
+        client = PolymarketWSClient()
         await client.subscribe_user()
     """
 
@@ -102,9 +102,14 @@ class PolymarketWSClient:
         self.api_passphrase = a.api_passphrase
         self.config = config or WSConfig()
 
-        self._ws: Optional[WebSocketClientProtocol] = None
-        self._running = False
-        self._reconnect_count = 0
+        # 为不同频道维护独立的连接
+        self._ws_user: Optional[WebSocketClientProtocol] = None
+        self._ws_market: Optional[WebSocketClientProtocol] = None
+
+        self._running_user = False
+        self._running_market = False
+        self._reconnect_count_user = 0
+        self._reconnect_count_market = 0
         self._subscriptions: Set[str] = set()  # 已订阅的频道
 
         # 回调函数
@@ -114,11 +119,13 @@ class PolymarketWSClient:
         self._disconnect_callbacks: List[Callable[[], None]] = []
 
         # 任务
-        self._receive_task: Optional[asyncio.Task] = None
-        self._ping_task: Optional[asyncio.Task] = None
+        self._receive_task_user: Optional[asyncio.Task] = None
+        self._receive_task_market: Optional[asyncio.Task] = None
+        self._ping_task_user: Optional[asyncio.Task] = None
+        self._ping_task_market: Optional[asyncio.Task] = None
 
         vlogger.info("INGEST.WS.INIT", msg="WebSocket 客户端初始化", extra={
-            "url": self.config.url,
+            "base_url": self.config.base_url,
             "has_auth": bool(self.api_key and self.api_secret and self.api_passphrase)
         })
 
@@ -138,28 +145,47 @@ class PolymarketWSClient:
         """注册断开连接回调"""
         self._disconnect_callbacks.append(callback)
 
-    async def connect(self) -> None:
-        """建立 WebSocket 连接"""
-        if self._running:
-            vlogger.warn("INGEST.WS.ALREADY_CONNECTED", msg="WebSocket 已连接")
-            return
+    async def _connect_channel(self, channel: ChannelType) -> None:
+        """建立指定频道的 WebSocket 连接"""
+        if channel == ChannelType.USER:
+            if self._running_user:
+                vlogger.warn("INGEST.WS.ALREADY_CONNECTED", msg="USER 频道已连接")
+                return
+            ws_attr = "_ws_user"
+            running_attr = "_running_user"
+            reconnect_attr = "_reconnect_count_user"
+            receive_task_attr = "_receive_task_user"
+            ping_task_attr = "_ping_task_user"
+        else:
+            if self._running_market:
+                vlogger.warn("INGEST.WS.ALREADY_CONNECTED", msg="MARKET 频道已连接")
+                return
+            ws_attr = "_ws_market"
+            running_attr = "_running_market"
+            reconnect_attr = "_reconnect_count_market"
+            receive_task_attr = "_receive_task_market"
+            ping_task_attr = "_ping_task_market"
 
         try:
-            vlogger.info("INGEST.WS.CONNECTING", msg="正在连接 WebSocket", extra={
-                "url": self.config.url
+            url = self.config.get_url(channel)
+            vlogger.info("INGEST.WS.CONNECTING", msg=f"正在连接 {channel.value.upper()} 频道", extra={
+                "url": url,
+                "channel": channel.value
             })
 
-            self._ws = await websockets.connect(
-                self.config.url,
+            ws = await websockets.connect(
+                url,
                 ping_interval=self.config.ping_interval,
                 ping_timeout=self.config.ping_timeout
             )
 
-            self._running = True
-            self._reconnect_count = 0
+            setattr(self, ws_attr, ws)
+            setattr(self, running_attr, True)
+            setattr(self, reconnect_attr, 0)
 
-            vlogger.info("INGEST.WS.CONNECTED", msg="WebSocket 连接成功", extra={
-                "url": self.config.url
+            vlogger.info("INGEST.WS.CONNECTED", msg=f"{channel.value.upper()} 频道连接成功", extra={
+                "url": url,
+                "channel": channel.value
             })
 
             # 触发连接回调
@@ -171,34 +197,51 @@ class PolymarketWSClient:
                                 error_code="E-WS-001", extra={"error": str(e)})
 
             # 启动接收和心跳任务
-            self._receive_task = asyncio.create_task(self._receive_loop())
-            self._ping_task = asyncio.create_task(self._ping_loop())
+            receive_task = asyncio.create_task(self._receive_loop(channel))
+            ping_task = asyncio.create_task(self._ping_loop(channel))
+            setattr(self, receive_task_attr, receive_task)
+            setattr(self, ping_task_attr, ping_task)
 
         except Exception as e:
-            vlogger.error("INGEST.WS.CONNECT_FAILED", msg="WebSocket 连接失败",
-                        error_code="E-WS-002", extra={"error": str(e)})
+            vlogger.error("INGEST.WS.CONNECT_FAILED", msg=f"{channel.value.upper()} 频道连接失败",
+                        error_code="E-WS-002", extra={"error": str(e), "channel": channel.value})
             await self._handle_error(e)
             raise
 
-    async def disconnect(self) -> None:
-        """断开 WebSocket 连接"""
-        if not self._running:
-            return
+    async def _disconnect_channel(self, channel: ChannelType) -> None:
+        """断开指定频道的 WebSocket 连接"""
+        if channel == ChannelType.USER:
+            if not self._running_user:
+                return
+            ws = self._ws_user
+            running_attr = "_running_user"
+            receive_task = self._receive_task_user
+            ping_task = self._ping_task_user
+        else:
+            if not self._running_market:
+                return
+            ws = self._ws_market
+            running_attr = "_running_market"
+            receive_task = self._receive_task_market
+            ping_task = self._ping_task_market
 
-        vlogger.info("INGEST.WS.DISCONNECTING", msg="正在断开 WebSocket 连接")
+        vlogger.info("INGEST.WS.DISCONNECTING", msg=f"正在断开 {channel.value.upper()} 频道连接")
 
-        self._running = False
+        setattr(self, running_attr, False)
 
         # 取消任务
-        if self._receive_task:
-            self._receive_task.cancel()
-        if self._ping_task:
-            self._ping_task.cancel()
+        if receive_task:
+            receive_task.cancel()
+        if ping_task:
+            ping_task.cancel()
 
         # 关闭连接
-        if self._ws:
-            await self._ws.close()
-            self._ws = None
+        if ws:
+            await ws.close()
+            if channel == ChannelType.USER:
+                self._ws_user = None
+            else:
+                self._ws_market = None
 
         # 触发断开回调
         for callback in self._disconnect_callbacks:
@@ -208,7 +251,12 @@ class PolymarketWSClient:
                 vlogger.error("INGEST.WS.CALLBACK_ERROR", msg="断开回调执行失败",
                             error_code="E-WS-003", extra={"error": str(e)})
 
-        vlogger.info("INGEST.WS.DISCONNECTED", msg="WebSocket 已断开")
+        vlogger.info("INGEST.WS.DISCONNECTED", msg=f"{channel.value.upper()} 频道已断开")
+
+    async def disconnect(self) -> None:
+        """断开所有 WebSocket 连接"""
+        await self._disconnect_channel(ChannelType.USER)
+        await self._disconnect_channel(ChannelType.MARKET)
 
     async def subscribe_user(self) -> None:
         """
@@ -218,6 +266,10 @@ class PolymarketWSClient:
         """
         if not all([self.api_key, self.api_secret, self.api_passphrase]):
             raise ValueError("订阅 USER 频道需要提供 API 认证信息")
+
+        # 先连接 USER 频道
+        if not self._running_user:
+            await self._connect_channel(ChannelType.USER)
 
         channel = ChannelType.USER.value
 
@@ -234,7 +286,7 @@ class PolymarketWSClient:
             "channel": channel
         }
 
-        await self._send_message(message)
+        await self._send_message(message, ChannelType.USER)
         self._subscriptions.add(channel)
 
         vlogger.info("INGEST.WS.SUBSCRIBED", msg="订阅用户频道", extra={
@@ -248,6 +300,10 @@ class PolymarketWSClient:
         参数:
             market_id: 市场 ID (condition ID)
         """
+        # 先连接 MARKET 频道
+        if not self._running_market:
+            await self._connect_channel(ChannelType.MARKET)
+
         channel = ChannelType.MARKET.value
 
         message = {
@@ -258,7 +314,7 @@ class PolymarketWSClient:
             "channel": channel
         }
 
-        await self._send_message(message)
+        await self._send_message(message, ChannelType.MARKET)
         self._subscriptions.add(f"{channel}:{market_id}")
 
         vlogger.info("INGEST.WS.SUBSCRIBED", msg="订阅市场频道", extra={
@@ -274,6 +330,14 @@ class PolymarketWSClient:
             asset_id: 资产 ID (token ID)
             channel: 频道类型
         """
+        # 先连接对应频道
+        if channel == ChannelType.USER:
+            if not self._running_user:
+                await self._connect_channel(ChannelType.USER)
+        else:
+            if not self._running_market:
+                await self._connect_channel(ChannelType.MARKET)
+
         auth = {}
         if channel == ChannelType.USER:
             if not all([self.api_key, self.api_secret, self.api_passphrase]):
@@ -292,7 +356,7 @@ class PolymarketWSClient:
             "channel": channel.value
         }
 
-        await self._send_message(message)
+        await self._send_message(message, channel)
         self._subscriptions.add(f"{channel.value}:asset:{asset_id}")
 
         vlogger.info("INGEST.WS.SUBSCRIBED", msg="订阅资产", extra={
@@ -317,7 +381,7 @@ class PolymarketWSClient:
             "channel": channel
         }
 
-        await self._send_message(message)
+        await self._send_message(message, ChannelType.MARKET)
         self._subscriptions.discard(f"{channel}:{market_id}")
 
         vlogger.info("INGEST.WS.UNSUBSCRIBED", msg="取消订阅市场频道", extra={
@@ -341,71 +405,100 @@ class PolymarketWSClient:
             "channel": channel
         }
 
-        await self._send_message(message)
+        await self._send_message(message, ChannelType.USER)
         self._subscriptions.discard(channel)
 
         vlogger.info("INGEST.WS.UNSUBSCRIBED", msg="取消订阅用户频道", extra={
             "channel": channel
         })
 
-    async def _send_message(self, message: Dict[str, Any]) -> None:
-        """发送消息"""
-        if not self._ws or not self._running:
-            raise RuntimeError("WebSocket 未连接")
+    async def _send_message(self, message: Dict[str, Any], channel: ChannelType) -> None:
+        """发送消息到指定频道"""
+        if channel == ChannelType.USER:
+            ws = self._ws_user
+            running = self._running_user
+        else:
+            ws = self._ws_market
+            running = self._running_market
+
+        if not ws or not running:
+            raise RuntimeError(f"{channel.value.upper()} 频道未连接")
 
         try:
-            await self._ws.send(json.dumps(message))
+            await ws.send(json.dumps(message))
             vlogger.debug("INGEST.WS.MESSAGE_SENT", msg="发送消息", extra={
                 "message_type": message.get("type"),
                 "channel": message.get("channel")
             })
         except Exception as e:
             vlogger.error("INGEST.WS.SEND_FAILED", msg="发送消息失败",
-                        error_code="E-WS-004", extra={"error": str(e)})
+                        error_code="E-WS-004", extra={"error": str(e), "channel": channel.value})
             raise
 
-    async def _receive_loop(self) -> None:
+    async def _receive_loop(self, channel: ChannelType) -> None:
         """接收消息循环"""
+        if channel == ChannelType.USER:
+            ws = self._ws_user
+            running_attr = "_running_user"
+        else:
+            ws = self._ws_market
+            running_attr = "_running_market"
+
         try:
-            async for message in self._ws:
+            async for message in ws:
                 try:
                     data = json.loads(message)
                     await self._handle_message(data)
                 except json.JSONDecodeError as e:
                     vlogger.error("INGEST.WS.PARSE_ERROR", msg="消息解析失败",
-                                error_code="E-DATA-001", extra={"error": str(e), "message": message})
+                                error_code="E-DATA-001", extra={
+                                    "error": str(e),
+                                    "message": message,
+                                    "channel": channel.value
+                                })
                 except Exception as e:
                     vlogger.error("INGEST.WS.HANDLE_ERROR", msg="消息处理失败",
-                                error_code="E-WS-005", extra={"error": str(e)})
+                                error_code="E-WS-005", extra={
+                                    "error": str(e),
+                                    "channel": channel.value
+                                })
         except asyncio.CancelledError:
-            vlogger.debug("INGEST.WS.RECEIVE_CANCELLED", msg="接收循环已取消")
+            vlogger.debug("INGEST.WS.RECEIVE_CANCELLED", msg=f"{channel.value.upper()} 频道接收循环已取消")
         except Exception as e:
-            vlogger.error("INGEST.WS.RECEIVE_ERROR", msg="接收循环异常",
-                        error_code="E-WS-006", extra={"error": str(e)})
+            vlogger.error("INGEST.WS.RECEIVE_ERROR", msg=f"{channel.value.upper()} 频道接收循环异常",
+                        error_code="E-WS-006", extra={"error": str(e), "channel": channel.value})
             await self._handle_error(e)
-            if self._running:
-                await self._reconnect()
+            if getattr(self, running_attr):
+                await self._reconnect(channel)
 
-    async def _ping_loop(self) -> None:
+    async def _ping_loop(self, channel: ChannelType) -> None:
         """心跳循环"""
+        if channel == ChannelType.USER:
+            ws_attr = "_ws_user"
+            running_attr = "_running_user"
+        else:
+            ws_attr = "_ws_market"
+            running_attr = "_running_market"
+
         try:
-            while self._running:
+            while getattr(self, running_attr):
                 await asyncio.sleep(self.config.ping_interval)
-                if self._ws and self._running:
+                ws = getattr(self, ws_attr)
+                if ws and getattr(self, running_attr):
                     try:
-                        pong = await self._ws.ping()
+                        pong = await ws.ping()
                         await asyncio.wait_for(pong, timeout=self.config.ping_timeout)
-                        vlogger.debug("INGEST.WS.PING", msg="心跳成功")
+                        vlogger.debug("INGEST.WS.PING", msg=f"{channel.value.upper()} 频道心跳成功")
                     except asyncio.TimeoutError:
-                        vlogger.warn("INGEST.WS.PING_TIMEOUT", msg="心跳超时")
-                        if self._running:
-                            await self._reconnect()
+                        vlogger.warn("INGEST.WS.PING_TIMEOUT", msg=f"{channel.value.upper()} 频道心跳超时")
+                        if getattr(self, running_attr):
+                            await self._reconnect(channel)
                         break
         except asyncio.CancelledError:
-            vlogger.debug("INGEST.WS.PING_CANCELLED", msg="心跳循环已取消")
+            vlogger.debug("INGEST.WS.PING_CANCELLED", msg=f"{channel.value.upper()} 频道心跳循环已取消")
         except Exception as e:
-            vlogger.error("INGEST.WS.PING_ERROR", msg="心跳循环异常",
-                        error_code="E-WS-007", extra={"error": str(e)})
+            vlogger.error("INGEST.WS.PING_ERROR", msg=f"{channel.value.upper()} 频道心跳循环异常",
+                        error_code="E-WS-007", extra={"error": str(e), "channel": channel.value})
 
     async def _handle_message(self, data: Dict[str, Any]) -> None:
         """处理接收到的消息"""
@@ -433,62 +526,86 @@ class PolymarketWSClient:
                 vlogger.error("INGEST.WS.CALLBACK_ERROR", msg="错误回调执行失败",
                             error_code="E-WS-009", extra={"error": str(e)})
 
-    async def _reconnect(self) -> None:
-        """重连"""
-        if self._reconnect_count >= self.config.max_reconnect_attempts:
-            vlogger.error("INGEST.WS.RECONNECT_FAILED", msg="达到最大重连次数",
+    async def _reconnect(self, channel: ChannelType) -> None:
+        """重连指定频道"""
+        if channel == ChannelType.USER:
+            reconnect_count_attr = "_reconnect_count_user"
+        else:
+            reconnect_count_attr = "_reconnect_count_market"
+
+        reconnect_count = getattr(self, reconnect_count_attr)
+
+        if reconnect_count >= self.config.max_reconnect_attempts:
+            vlogger.error("INGEST.WS.RECONNECT_FAILED", msg=f"{channel.value.upper()} 频道达到最大重连次数",
                         error_code="E-WS-010", extra={
-                            "reconnect_count": self._reconnect_count,
-                            "max_attempts": self.config.max_reconnect_attempts
+                            "reconnect_count": reconnect_count,
+                            "max_attempts": self.config.max_reconnect_attempts,
+                            "channel": channel.value
                         })
-            await self.disconnect()
+            await self._disconnect_channel(channel)
             return
 
-        self._reconnect_count += 1
+        setattr(self, reconnect_count_attr, reconnect_count + 1)
 
-        vlogger.info("INGEST.WS.RECONNECTING", msg="正在重连", extra={
-            "attempt": self._reconnect_count,
+        vlogger.info("INGEST.WS.RECONNECTING", msg=f"{channel.value.upper()} 频道正在重连", extra={
+            "attempt": reconnect_count + 1,
             "max_attempts": self.config.max_reconnect_attempts,
-            "delay": self.config.reconnect_delay
+            "delay": self.config.reconnect_delay,
+            "channel": channel.value
         })
 
-        await self.disconnect()
+        await self._disconnect_channel(channel)
         await asyncio.sleep(self.config.reconnect_delay)
 
         try:
-            await self.connect()
+            await self._connect_channel(channel)
 
-            # 重新订阅
+            # 重新订阅该频道的订阅
             subscriptions = list(self._subscriptions)
-            self._subscriptions.clear()
+            # 清除该频道的订阅记录
+            self._subscriptions = {s for s in self._subscriptions if not s.startswith(channel.value)}
 
             for sub in subscriptions:
-                if sub == ChannelType.USER.value:
+                if channel == ChannelType.USER and sub == ChannelType.USER.value:
                     await self.subscribe_user()
-                elif sub.startswith(f"{ChannelType.MARKET.value}:"):
+                elif channel == ChannelType.MARKET and sub.startswith(f"{ChannelType.MARKET.value}:"):
                     market_id = sub.split(":", 1)[1]
                     if market_id.startswith("asset:"):
                         asset_id = market_id.split(":", 1)[1]
-                        await self.subscribe_asset(asset_id)
+                        await self.subscribe_asset(asset_id, ChannelType.MARKET)
                     else:
                         await self.subscribe_market(market_id)
 
-            vlogger.info("INGEST.WS.RECONNECTED", msg="重连成功", extra={
-                "attempt": self._reconnect_count
+            vlogger.info("INGEST.WS.RECONNECTED", msg=f"{channel.value.upper()} 频道重连成功", extra={
+                "attempt": reconnect_count + 1,
+                "channel": channel.value
             })
 
         except Exception as e:
-            vlogger.error("INGEST.WS.RECONNECT_ERROR", msg="重连失败",
+            vlogger.error("INGEST.WS.RECONNECT_ERROR", msg=f"{channel.value.upper()} 频道重连失败",
                         error_code="E-WS-011", extra={
                             "error": str(e),
-                            "attempt": self._reconnect_count
+                            "attempt": reconnect_count + 1,
+                            "channel": channel.value
                         })
-            await self._reconnect()
+            await self._reconnect(channel)
 
     @property
     def is_connected(self) -> bool:
-        """是否已连接"""
-        return self._running and self._ws is not None and not self._ws.closed
+        """是否已连接(任一频道连接即返回 True)"""
+        user_connected = self._running_user and self._ws_user is not None and not self._ws_user.closed
+        market_connected = self._running_market and self._ws_market is not None and not self._ws_market.closed
+        return user_connected or market_connected
+
+    @property
+    def is_user_connected(self) -> bool:
+        """USER 频道是否已连接"""
+        return self._running_user and self._ws_user is not None and not self._ws_user.closed
+
+    @property
+    def is_market_connected(self) -> bool:
+        """MARKET 频道是否已连接"""
+        return self._running_market and self._ws_market is not None and not self._ws_market.closed
 
     @property
     def subscriptions(self) -> Set[str]:

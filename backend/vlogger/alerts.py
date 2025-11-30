@@ -6,11 +6,6 @@
 """
 
 import time
-import smtplib
-import ssl
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
-from email.header import Header
 from enum import Enum
 from typing import Dict, Optional, Any, Callable, List
 from dataclasses import dataclass, field
@@ -18,6 +13,9 @@ from threading import Lock
 from collections import defaultdict
 import json
 from datetime import datetime
+
+# 导入邮件发送辅助函数
+from .email_helper import email_send
 
 # 导入统一配置管理器
 try:
@@ -459,7 +457,6 @@ class EmailSender:
             config: 邮件配置，如果为 None 则使用默认配置
         """
         self.config = config or EmailConfig()
-        self._lock = Lock()
 
     def send_alert_email(self, alert_level: AlertLevel, event_code: str,
                         message: str, extra: Dict[str, Any] = None) -> bool:
@@ -476,37 +473,23 @@ class EmailSender:
             bool: 发送是否成功
         """
         try:
-            with self._lock:
-                # 构建邮件内容
-                subject = self._build_subject(alert_level, event_code)
-                body = self._build_body(alert_level, event_code, message, extra)
+            # 构建邮件内容
+            subject = self._build_subject(alert_level, event_code)
+            body = self._build_body(alert_level, event_code, message, extra)
 
-                # 创建邮件
-                msg = MIMEMultipart('alternative')
-                msg['From'] = f"{self.config.from_name} <{self.config.username}>"
-                msg['To'] = ", ".join(self.config.to_emails)
-                msg['Subject'] = Header(subject, 'utf-8')
-
-                # 添加 HTML 和纯文本内容
-                text_part = MIMEText(body['text'], 'plain', 'utf-8')
-                html_part = MIMEText(body['html'], 'html', 'utf-8')
-
-                msg.attach(text_part)
-                msg.attach(html_part)
-
-                # 发送邮件
-                if self.config.use_ssl:
-                    context = ssl.create_default_context()
-                    with smtplib.SMTP_SSL(self.config.smtp_server, self.config.smtp_port, context=context) as server:
-                        server.login(self.config.username, self.config.password)
-                        server.send_message(msg)
-                else:
-                    with smtplib.SMTP(self.config.smtp_server, self.config.smtp_port) as server:
-                        server.starttls()
-                        server.login(self.config.username, self.config.password)
-                        server.send_message(msg)
-
-                return True
+            # 使用通用邮件发送函数
+            return email_send(
+                smtp_server=self.config.smtp_server,
+                smtp_port=self.config.smtp_port,
+                username=self.config.username,
+                password=self.config.password,
+                from_name=self.config.from_name,
+                to_emails=self.config.to_emails,
+                subject=subject,
+                body_text=body['text'],
+                body_html=body['html'],
+                use_ssl=self.config.use_ssl
+            )
 
         except Exception as e:
             print(f"发送告警邮件失败: {e}")

@@ -68,6 +68,7 @@ export default {
       { id: 'overview', name: '系统宏观信息', icon: '📊' },
       { id: 'system', name: '系统信息', icon: '💻' },
       { id: 'profit', name: '盈亏情况', icon: '💰' },
+      { id: 'tasks', name: '任务管理', icon: '📋' },
       { id: 'filter', name: '过滤', icon: '🔍' },
       { id: 'analysis', name: '分析', icon: '📈' },
       { id: 'trade', name: '交易', icon: '💱' },
@@ -75,6 +76,7 @@ export default {
       { id: 'logs', name: '日志管理', icon: '📝' },
       { id: 'api', name: 'API 刷新', icon: '🔄' },
       { id: 'database', name: '数据库管理', icon: '🗄️' },
+      { id: 'scheduler', name: '定时任务管理', icon: '⏰' },
       { id: 'settings', name: '设置', icon: '⚙️' }
     ])
 

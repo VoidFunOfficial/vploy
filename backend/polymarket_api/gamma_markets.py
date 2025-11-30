@@ -24,6 +24,7 @@ class Market:
         volume: 交易量
         liquidity: 流动性
         end_date: 结束时间
+        tau: 结算剩余天数
         category: 分类
         tags: 标签列表
         events: 关联事件列表
@@ -41,6 +42,7 @@ class Market:
     volume: Optional[str] = None
     liquidity: Optional[str] = None
     end_date: Optional[str] = None
+    tau: Optional[int] = None
     category: Optional[str] = None
     tags: Optional[List[Dict[str, Any]]] = None
     events: Optional[List[Dict[str, Any]]] = None
@@ -51,6 +53,18 @@ class Market:
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> 'Market':
         """从字典创建 Market 对象"""
+        end_data = data.get('endDate')
+        tau = None
+        if end_data:
+            try:
+                end_date = datetime.strptime(end_data, "%Y-%m-%dT%H:%M:%SZ")
+                tau = (end_date - datetime.now()).days
+            except ValueError as e:
+                vlogger.warn("MARKET.DATE.PARSE_ERROR", msg="时间格式解析失败", extra={
+                    "end_date": end_data,
+                    "error": str(e)
+                })
+
         market = cls(
             id=data.get('id', ''),
             question=data.get('question', ''),
@@ -61,6 +75,7 @@ class Market:
             volume=data.get('volume'),
             liquidity=data.get('liquidity'),
             end_date=data.get('endDate'),
+            tau=tau,
             category=data.get('category'),
             tags=data.get('tags', []),
             events=data.get('events', []),
@@ -156,6 +171,7 @@ class Event:
         description: 事件描述
         start_date: 开始时间
         end_date: 结束时间
+        tau: 结算剩余天数
         active: 是否活跃
         markets: 关联市场列表
         tags: 标签列表
@@ -170,6 +186,7 @@ class Event:
     description: Optional[str] = None
     start_date: Optional[str] = None
     end_date: Optional[str] = None
+    tau: Optional[int] = None
     active: Optional[bool] = None
     markets: Optional[List[Dict[str, Any]]] = None
     tags: Optional[List[Dict[str, Any]]] = None
@@ -181,6 +198,18 @@ class Event:
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> 'Event':
         """从字典创建 Event 对象"""
+        end_data = data.get('endDate')
+        tau = None
+        if end_data:
+            try:
+                end_date = datetime.strptime(end_data, "%Y-%m-%dT%H:%M:%SZ")
+                tau = (end_date - datetime.now()).days
+            except ValueError as e:
+                vlogger.warn("EVENT.DATE.PARSE_ERROR", msg="时间格式解析失败", extra={
+                    "end_date": end_data,
+                    "error": str(e)
+                })
+
         event = cls(
             id=data.get('id', ''),
             title=data.get('title', ''),
@@ -188,6 +217,7 @@ class Event:
             description=data.get('description'),
             start_date=data.get('startDate'),
             end_date=data.get('endDate'),
+            tau=tau,
             active=data.get('active'),
             markets=data.get('markets', []),
             tags=data.get('tags', []),

@@ -1,30 +1,8 @@
-from dataclasses import dataclass, asdict
-from typing import List, Dict, Any, Tuple, Optional
+from dataclasses import dataclass
+from typing import List, Dict, Any
 import math
-from datetime import datetime
-import json
 
-# 导入 Polymarket API 客户端
-from ..polymarket_api import get_client, get_collateral_balance, AssetType
-
-# 1e6整数
-def get_available_balance():
-    return get_client().get_collateral_balance(AssetType.COLLATERAL).get('balance', 0)
-
-# 导入全局 VLogger 实例
-from ..sys_configs.global_event_reg import vlogger
-
-# 导入 Polymarket API 数据结构
-try:
-    from ..polymarket_api.gamma_markets import Market as GammaMarket
-    GAMMA_MARKET_AVAILABLE = True
-except ImportError:
-    GAMMA_MARKET_AVAILABLE = False
-
-# VLogger 事件和错误码已在全局事件注册文件中统一管理
-
-TICK = 0.01
-EPS  = 1e-12
+EPS = 1e-9
 
 @dataclass
 class SimpleMarket:
@@ -34,16 +12,6 @@ class SimpleMarket:
     p: float           # 我们预测概率
     a: float           # 不利方向滑点
     tau: int           # 距离结算的天数
-
-def convert_to_simple_market(market: GammaMarket) -> SimpleMarket:
-    """将 GammaMarket 对象转换为 SimpleMarket"""
-    return SimpleMarket(
-        mid=market.id,
-        m=market.outcome_prices[0],
-        p=market.p,
-        a=market.a,
-        tau=market.tau
-    )
 
 def clip_cost(x: float) -> float:
     """把成本裁剪在 (0,1) 内，避免 log 数值问题"""
