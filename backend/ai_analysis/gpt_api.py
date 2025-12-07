@@ -51,7 +51,7 @@ def parse_cookie_string(cookie_string: str) -> dict:
     return cookies_dict
 
 
-def send_request(
+def send_request_stream(
     prompt: str,
     cookie_header: str = '',
     auth_token: str = '',
@@ -301,7 +301,7 @@ def send_request(
         return result
 
 
-def send_request_stream(
+def send_request(
     prompt: str,
     auth_token: str = '',
     access_token: str = '',
@@ -720,9 +720,7 @@ def get_result(
 # 使用示例
     
 if __name__ == "__main__":
-
-    # 从浏览器复制的完整Cookie字符串
-    cookie_string =   "__Secure-auth_token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3NjQ0ODg1OTIsInN1YiI6ImFhOGQ3ZmFjNThiNjQ3ZDdhMGIxOGUyOTNlOTZkNGQ1IiwiaWF0IjoxNzYzMjc4OTkyLCJ0b2tlbl90eXBlIjoiYXV0aF90b2tlbiJ9.OybGxLfP3tz6pcclLp2CKcpiEIKxGm3GuliEKu5hp6c;oai-nav-state=1;oai-did=4bc875ef-9530-4184-88c5-0e425f655700;__Secure-access_token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3NjM3ODcyNTgsInN1YiI6ImFhOGQ3ZmFjNThiNjQ3ZDdhMGIxOGUyOTNlOTZkNGQ1IiwiaWF0IjoxNzYzNjUyMjU4LCJ0b2tlbl90eXBlIjoiYWNjZXNzX3Rva2VuIiwic3Vic2NyaXB0aW9uX2lkIjoiNjY0MGM3NWMxNDQ4MGI4YWZmZGUxY2VhIiwiYWNjb3VudF9pZCI6IjY4ZTBjMDNmMTNjMTE1ZDM5NWQwNzM2NyJ9.PHhr1dw9Yoizp9iM4bEXUY9BgVw60xoKmEVLdYqWBVA;_account=f9f24477-3b6b-4a27-a298-c8663fd4edc5;oai-locale=en-US" 
+    cookie_string = "__Secure-auth_token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3NjU3MjQwMDIsInN1YiI6ImFhOGQ3ZmFjNThiNjQ3ZDdhMGIxOGUyOTNlOTZkNGQ1IiwiaWF0IjoxNzY0NTE0NDAyLCJ0b2tlbl90eXBlIjoiYXV0aF90b2tlbiJ9.EJVhF6QoNb2ZdacUamTpJkSilnwmT095dcwbz6PZLSo;oai-nav-state=1;oai-did=4bc875ef-9530-4184-88c5-0e425f655700;__Secure-access_token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3NjQ2NDk1MDksInN1YiI6ImFhOGQ3ZmFjNThiNjQ3ZDdhMGIxOGUyOTNlOTZkNGQ1IiwiaWF0IjoxNzY0NTE0NTA5LCJ0b2tlbl90eXBlIjoiYWNjZXNzX3Rva2VuIiwic3Vic2NyaXB0aW9uX2lkIjoiNjY0MGM3NWMxNDQ4MGI4YWZmZGUxY2VhIiwiYWNjb3VudF9pZCI6IjY4ZTBjMDNmMTNjMTE1ZDM5NWQwNzM2NCJ9.WJJeWGvirDjQgI98N9X4mYOJgR4a6t70_p1D5DH58TA;_account=f9f24477-3b6b-4a27-a298-c8663fd4edc5;oai-locale=en-US"
     cookies_dict = parse_cookie_string(cookie_string)
     result2 = get_result(
             conversation_id="69199985-e7f8-832f-9db9-03300ba6c101",

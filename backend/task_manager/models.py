@@ -66,8 +66,8 @@ class AsyncTask:
         self.update_time = update_time or datetime.now()
 
     def to_dict(self) -> Dict[str, Any]:
-        """转换为字典格式"""
-        return {
+        """转换为字典格式（包含扩展信息）"""
+        base_dict = {
             "id": self.id,
             "stage": self.stage.value,
             "status": self.status.value,
@@ -77,6 +77,78 @@ class AsyncTask:
             "create_time": self.create_time.isoformat() if self.create_time else None,
             "update_time": self.update_time.isoformat() if self.update_time else None,
         }
+
+        # 添加扩展信息
+        extended_info = self._get_extended_info()
+        if extended_info:
+            base_dict["extended_info"] = extended_info
+
+        return base_dict
+
+    def _get_extended_info(self) -> Optional[Dict[str, Any]]:
+        """
+        获取任务的扩展信息（根据不同阶段返回不同的详细信息）
+
+        返回:
+            Optional[Dict[str, Any]]: 扩展信息字典
+        """
+        # ANALYSIS阶段的扩展信息
+        if self.stage == TaskStage.ANALYSIS:
+            analysis_status = self.result.get("analysis_status")
+            conversation_id = self.result.get("conversation_id")
+            market_ids = self.result.get("market_ids", [])
+
+            return {
+                "type": "analysis",
+                "analysis_status": analysis_status,
+                "conversation_id": conversation_id,
+                "market_count": len(market_ids) if market_ids else 0,
+                "market_ids": market_ids,
+                "has_result": bool(self.result.get("analysis_result"))
+            }
+
+        # MARK阶段的扩展信息
+        elif self.stage == TaskStage.MARK:
+            event_id = self.metadata.get("event_id")
+            mark_result = self.result.get("mark")
+
+            return {
+                "type": "mark",
+                "event_id": event_id,
+                "mark_result": mark_result
+            }
+
+        # DECISION阶段的扩展信息
+        elif self.stage == TaskStage.DECISION:
+            decision_result = self.result.get("decision")
+
+            return {
+                "type": "decision",
+                "decision_result": decision_result
+            }
+
+        # TRADE阶段的扩展信息
+        elif self.stage == TaskStage.TRADE:
+            trade_status = self.result.get("trade_status")
+            order_ids = self.result.get("order_ids", [])
+
+            return {
+                "type": "trade",
+                "trade_status": trade_status,
+                "order_count": len(order_ids) if order_ids else 0,
+                "order_ids": order_ids
+            }
+
+        # LISTEN阶段的扩展信息
+        elif self.stage == TaskStage.LISTEN:
+            listen_status = self.result.get("listen_status")
+
+            return {
+                "type": "listen",
+                "listen_status": listen_status
+            }
+
+        return None
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "AsyncTask":

@@ -116,13 +116,12 @@
     </div>
 
     <!-- 创建/编辑对话框 -->
-    <div v-if="dialogVisible" class="dialog-overlay" @click.self="closeDialog">
-      <div class="dialog">
-        <div class="dialog-header">
-          <h3>{{ isEditing ? '编辑任务' : '新建任务' }}</h3>
-          <button class="btn-close" @click="closeDialog">×</button>
-        </div>
-        <div class="dialog-body">
+    <Modal
+      v-model:visible="dialogVisible"
+      :title="isEditing ? '编辑任务' : '新建任务'"
+      :confirm-text="isEditing ? '保存' : '创建'"
+      @confirm="submitForm"
+    >
           <div class="form-group">
             <label>任务名称 *</label>
             <input
@@ -242,13 +241,7 @@
               placeholder="任务描述（可选）"
             ></textarea>
           </div>
-        </div>
-        <div class="dialog-footer">
-          <button class="btn-secondary" @click="closeDialog">取消</button>
-          <button class="btn-primary" @click="submitForm">{{ isEditing ? '保存' : '创建' }}</button>
-        </div>
-      </div>
-    </div>
+    </Modal>
   </div>
 </template>
 
@@ -261,9 +254,13 @@ import {
   deleteScheduledTask,
   runScheduledTaskNow
 } from '@/api/scheduler'
+import { toast, confirm, Modal } from '@/components/Notification'
 
 export default {
   name: 'SchedulerManagement',
+  components: {
+    Modal
+  },
   setup() {
     const loading = ref(false)
     const tasks = ref([])
@@ -322,7 +319,7 @@ export default {
         }
       } catch (error) {
         console.error('加载任务列表失败:', error)
-        alert('加载任务列表失败')
+        toast.error('加载任务列表失败')
       } finally {
         loading.value = false
       }
@@ -399,7 +396,7 @@ export default {
 
       // 验证
       if (!formData.name || !formData.schedule) {
-        alert('请填写必填字段')
+        toast.warning('请填写必填字段')
         return
       }
 
@@ -417,18 +414,18 @@ export default {
         if (isEditing.value) {
           // 更新任务
           await updateScheduledTask(currentTask.value.id, data)
-          alert('更新任务成功')
+          toast.success('更新任务成功')
         } else {
           // 创建任务
           await createScheduledTask(data)
-          alert('创建任务成功')
+          toast.success('创建任务成功')
         }
 
         closeDialog()
         refreshTasks()
       } catch (error) {
         console.error('提交失败:', error)
-        alert(isEditing.value ? '更新任务失败' : '创建任务失败')
+        toast.error(isEditing.value ? '更新任务失败' : '创建任务失败')
       }
     }
 
@@ -439,25 +436,26 @@ export default {
           enabled: !task.enabled
         })
         if (response.success) {
-          alert(`${task.enabled ? '禁用' : '启用'}任务成功`)
+          toast.success(`${task.enabled ? '禁用' : '启用'}任务成功`)
           refreshTasks()
         }
       } catch (error) {
         console.error('切换任务状态失败:', error)
-        alert('切换任务状态失败: ' + (error.response?.data?.message || error.message))
+        toast.error('切换任务状态失败: ' + (error.response?.data?.message || error.message))
       }
     }
 
     // 立即执行任务
     const runTaskNow = async (task) => {
-      if (!confirm(`确定要立即执行任务 "${task.name}" 吗？`)) {
+      const result = await confirm(`确定要立即执行任务 "${task.name}" 吗？`)
+      if (!result) {
         return
       }
 
       try {
         const response = await runScheduledTaskNow(task.id)
         if (response.success) {
-          alert(`任务 "${task.name}" 已开始执行`)
+          toast.success(`任务 "${task.name}" 已开始执行`)
           // 刷新任务列表以更新最后运行时间
           setTimeout(() => {
             refreshTasks()
@@ -465,25 +463,29 @@ export default {
         }
       } catch (error) {
         console.error('执行任务失败:', error)
-        alert('执行任务失败: ' + (error.response?.data?.message || error.message))
+        toast.error('执行任务失败: ' + (error.response?.data?.message || error.message))
       }
     }
 
     // 确认删除
     const confirmDelete = async (task) => {
-      if (!confirm(`确定要删除任务 "${task.name}" 吗？`)) {
+      const result = await confirm({
+        message: `确定要删除任务 "${task.name}" 吗？`,
+        type: 'danger'
+      })
+      if (!result) {
         return
       }
 
       try {
         const response = await deleteScheduledTask(task.id)
         if (response.success) {
-          alert('删除任务成功')
+          toast.success('删除任务成功')
           refreshTasks()
         }
       } catch (error) {
         console.error('删除任务失败:', error)
-        alert('删除任务失败: ' + (error.response?.data?.message || error.message))
+        toast.error('删除任务失败: ' + (error.response?.data?.message || error.message))
       }
     }
 
@@ -1001,52 +1003,6 @@ tr.huey-task:hover {
 }
 
 /* 对话框 */
-.dialog-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0,0,0,0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-}
-
-.dialog {
-  background: white;
-  border-radius: 8px;
-  width: 90%;
-  max-width: 500px;
-  max-height: 90vh;
-  overflow-y: auto;
-}
-
-.dialog-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 20px;
-  border-bottom: 1px solid #e0e0e0;
-}
-
-.dialog-header h3 {
-  margin: 0;
-  font-size: 18px;
-}
-
-.btn-close {
-  background: none;
-  border: none;
-  font-size: 24px;
-  cursor: pointer;
-  color: #999;
-}
-
-.dialog-body {
-  padding: 20px;
-}
 
 .form-group {
   margin-bottom: 15px;
@@ -1084,14 +1040,6 @@ tr.huey-task:hover {
   padding: 8px 12px;
   border-radius: 4px;
   border-left: 3px solid #ff9800;
-}
-
-.dialog-footer {
-  padding: 20px;
-  border-top: 1px solid #e0e0e0;
-  display: flex;
-  justify-content: flex-end;
-  gap: 10px;
 }
 
 /* 间隔时间配置 */

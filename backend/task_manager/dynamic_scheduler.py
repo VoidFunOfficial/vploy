@@ -212,13 +212,12 @@ class DynamicScheduler:
         """
         执行事件嗅探任务
 
-        每30分钟获取优质事件，过滤后添加到任务队列
+        每30分钟获取优质事件，过滤后创建WAITING状态的任务，等待用户确认
         """
         from ..vlogger import TraceContext
         from ..polymarket_api import GammaMarketsAPI
         from ..filter import EventFilter
-        from .tasks import submit_task
-        from .models import AsyncTask, TaskStage, TaskStatus
+        from .models import AsyncTask, TaskStage, TaskStatus, TaskDatabase
 
         with TraceContext() as trace_id:
             logger.info(
@@ -253,11 +252,12 @@ class DynamicScheduler:
                     trace_id=trace_id
                 )
 
-                # 3. 逐个添加到任务队列
-                submitted_count = 0
+                # 3. 逐个创建WAITING状态的任务(不提交到Huey队列,等待用户确认)
+                db = TaskDatabase()
+                created_count = 0
                 for event in filtered_events:
                     try:
-                        # 创建MARK阶段的任务
+                        # 创建MARK阶段的WAITING状态任务
                         async_task = AsyncTask(
                             stage=TaskStage.MARK,
                             status=TaskStatus.WAITING,
@@ -269,12 +269,13 @@ class DynamicScheduler:
                             }
                         )
 
-                        task_id = submit_task(async_task)
-                        submitted_count += 1
+                        # 只保存到数据库,不提交到Huey队列
+                        task_id = db.create_async_task(async_task)
+                        created_count += 1
 
                         logger.debug(
-                            "DYNAMIC_SCHEDULER.EVENT_SNIFFING.SUBMIT",
-                            msg=f"提交事件任务: {event.title}",
+                            "DYNAMIC_SCHEDULER.EVENT_SNIFFING.CREATE",
+                            msg=f"创建待确认任务: {event.title}",
                             extra={
                                 "task_id": task_id,
                                 "event_id": event.id
@@ -284,8 +285,8 @@ class DynamicScheduler:
 
                     except Exception as e:
                         logger.error(
-                            "DYNAMIC_SCHEDULER.EVENT_SNIFFING.SUBMIT_ERROR",
-                            msg=f"提交事件任务失败: {event.id}",
+                            "DYNAMIC_SCHEDULER.EVENT_SNIFFING.CREATE_ERROR",
+                            msg=f"创建任务失败: {event.id}",
                             error_code="E-DYNAMIC-SCHEDULER-011",
                             extra={
                                 "event_id": event.id,
@@ -300,7 +301,7 @@ class DynamicScheduler:
                     extra={
                         "fetched": len(events),
                         "filtered": len(filtered_events),
-                        "submitted": submitted_count
+                        "created": created_count
                     },
                     trace_id=trace_id
                 )

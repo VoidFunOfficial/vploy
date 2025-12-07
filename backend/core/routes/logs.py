@@ -265,3 +265,80 @@ def export_logs():
             'message': f'导出日志失败: {str(e)}'
         }), 500
 
+
+@logs_bp.route('/notification', methods=['POST'])
+@require_auth
+def log_notification():
+    """
+    记录前端通知日志
+
+    请求体:
+        {
+            "type": "success/error/warning/info/confirm",
+            "title": "标题",
+            "message": "消息内容",
+            "action": "show/confirm/cancel/close",
+            "timestamp": "2025-12-07T12:00:00Z"
+        }
+
+    响应:
+        {
+            "success": true/false
+        }
+    """
+    try:
+        data = request.get_json() or {}
+
+        notification_type = data.get('type', 'info')
+        title = data.get('title', '')
+        message = data.get('message', '')
+        action = data.get('action', 'show')
+        timestamp = data.get('timestamp', '')
+
+        # 构建日志事件
+        event = f"UI.NOTIFICATION.{notification_type.upper()}"
+
+        # 根据通知类型选择日志级别
+        if notification_type == 'error':
+            vlogger.warn(
+                event,
+                msg=f"前端通知: {message}",
+                extra={
+                    "notification_type": notification_type,
+                    "title": title,
+                    "message": message,
+                    "action": action,
+                    "client_timestamp": timestamp
+                }
+            )
+        elif notification_type == 'confirm':
+            vlogger.audit(
+                event,
+                msg=f"用户确认操作: {message} -> {action}",
+                extra={
+                    "notification_type": notification_type,
+                    "title": title,
+                    "message": message,
+                    "action": action,
+                    "client_timestamp": timestamp
+                }
+            )
+        else:
+            vlogger.info(
+                event,
+                msg=f"前端通知: {message}",
+                extra={
+                    "notification_type": notification_type,
+                    "title": title,
+                    "message": message,
+                    "action": action,
+                    "client_timestamp": timestamp
+                }
+            )
+
+        return jsonify({'success': True}), 200
+
+    except Exception as e:
+        # 通知日志记录失败不应影响前端体验，静默处理
+        return jsonify({'success': False}), 200
+

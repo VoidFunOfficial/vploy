@@ -8,7 +8,11 @@ AI 分析模块
 from .coze_api import ai_filter_event, chat_with_coze
 
 # 导入深度分析模块
-from .deep_analysis import AnalysisTaskManager, AnalysisTask, TaskStatus
+from .deep_analysis import AnalysisTaskManager
+from .analysis_tasks import AnalysisStatus
+
+# 导入任务状态（从task_manager）
+from ..task_manager.models import TaskStatus
 
 # 导入 GPT API 相关功能
 from .gpt_api import send_request, get_result, parse_cookie_string
@@ -24,7 +28,7 @@ __all__ = [
 
     # 深度分析相关
     'AnalysisTaskManager',
-    'AnalysisTask',
+    'AnalysisStatus',
     'TaskStatus',
 
     # GPT API 相关

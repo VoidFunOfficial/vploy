@@ -123,6 +123,7 @@ class ConfigManager:
         4. processed_markets: 已处理事件表
         5. config_metadata: 配置元数据表
         6. position_listen_list: 持仓监听列表表
+        7. sys_settings: 系统设置表
         """
         conn = self.get_connection()
         cursor = conn.cursor()
@@ -205,6 +206,19 @@ class ConfigManager:
                 )
             """)
 
+            # 7. 系统设置表
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS sys_settings (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    key TEXT NOT NULL UNIQUE,
+                    value TEXT NOT NULL,
+                    value_type TEXT DEFAULT 'string',
+                    description TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+
             # 创建索引
             cursor.execute("""
                 CREATE INDEX IF NOT EXISTS idx_vlogger_config_key
@@ -229,6 +243,11 @@ class ConfigManager:
             cursor.execute("""
                 CREATE INDEX IF NOT EXISTS idx_position_listen_market_id
                 ON position_listen_list(market_id, is_active)
+            """)
+
+            cursor.execute("""
+                CREATE INDEX IF NOT EXISTS idx_sys_settings_key
+                ON sys_settings(key)
             """)
 
             conn.commit()

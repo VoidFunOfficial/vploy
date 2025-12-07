@@ -88,80 +88,63 @@
     </div>
 
     <!-- 更新 Token 对话框 -->
-    <div v-if="showUpdateDialog" class="dialog-overlay" @click="closeUpdateDialog">
-      <div class="dialog" @click.stop>
-        <div class="dialog-header">
-          <h3>更新 Token</h3>
-          <button class="btn-close" @click="closeUpdateDialog">×</button>
-        </div>
-        <div class="dialog-body">
-          <div class="form-group">
-            <label>Token 类型</label>
-            <input type="text" :value="updateForm.token_type" disabled />
-          </div>
-          <div class="form-group">
-            <label>Token 值</label>
-            <textarea
-              v-model="updateForm.token_value"
-              rows="3"
-              placeholder="输入新的 Token 值"
-            ></textarea>
-          </div>
-          <div class="form-group">
-            <label>
-              <input type="checkbox" v-model="updateForm.custom_expiry" />
-              自定义过期时间
-            </label>
-          </div>
-          <div v-if="updateForm.custom_expiry" class="form-group">
-            <label>过期时间</label>
-            <input type="datetime-local" v-model="updateForm.expires_at" />
-          </div>
-        </div>
-        <div class="dialog-footer">
-          <button class="btn-cancel" @click="closeUpdateDialog">取消</button>
-          <button class="btn-submit" @click="submitUpdate" :disabled="updating">
-            {{ updating ? '更新中...' : '确认更新' }}
-          </button>
-        </div>
+    <Modal
+      v-model:visible="showUpdateDialog"
+      title="更新 Token"
+      confirm-text="确认更新"
+      @confirm="submitUpdate"
+    >
+      <div class="form-group">
+        <label>Token 类型</label>
+        <input type="text" :value="updateForm.token_type" disabled />
       </div>
-    </div>
+      <div class="form-group">
+        <label>Token 值</label>
+        <textarea
+          v-model="updateForm.token_value"
+          rows="3"
+          placeholder="输入新的 Token 值"
+        ></textarea>
+      </div>
+      <div class="form-group">
+        <label>
+          <input type="checkbox" v-model="updateForm.custom_expiry" />
+          自定义过期时间
+        </label>
+      </div>
+      <div v-if="updateForm.custom_expiry" class="form-group">
+        <label>过期时间</label>
+        <input type="datetime-local" v-model="updateForm.expires_at" />
+      </div>
+    </Modal>
 
     <!-- 修改检查间隔对话框 -->
-    <div v-if="showIntervalDialog" class="dialog-overlay" @click="closeIntervalDialog">
-      <div class="dialog" @click.stop>
-        <div class="dialog-header">
-          <h3>修改检查间隔</h3>
-          <button class="btn-close" @click="closeIntervalDialog">×</button>
-        </div>
-        <div class="dialog-body">
-          <div class="form-group">
-            <label>检查间隔（分钟）</label>
-            <input
-              type="number"
-              v-model.number="intervalForm.minutes"
-              min="1"
-              placeholder="输入检查间隔"
-            />
-          </div>
-        </div>
-        <div class="dialog-footer">
-          <button class="btn-cancel" @click="closeIntervalDialog">取消</button>
-          <button class="btn-submit" @click="submitInterval" :disabled="updating">
-            {{ updating ? '更新中...' : '确认修改' }}
-          </button>
-        </div>
+    <Modal
+      v-model:visible="showIntervalDialog"
+      title="修改检查间隔"
+      size="small"
+      confirm-text="确认修改"
+      @confirm="submitInterval"
+    >
+      <div class="form-group">
+        <label>检查间隔（分钟）</label>
+        <input
+          type="number"
+          v-model.number="intervalForm.minutes"
+          min="1"
+          placeholder="输入检查间隔"
+        />
       </div>
-    </div>
+    </Modal>
 
     <!-- 快捷导入对话框 -->
-    <div v-if="showQuickImportDialog" class="dialog-overlay" @click="closeQuickImportDialog">
-      <div class="dialog dialog-large" @click.stop>
-        <div class="dialog-header">
-          <h3>快捷导入 Token</h3>
-          <button class="btn-close" @click="closeQuickImportDialog">×</button>
-        </div>
-        <div class="dialog-body">
+    <Modal
+      v-model:visible="showQuickImportDialog"
+      title="快捷导入 Token"
+      size="large"
+      confirm-text="确认导入"
+      @confirm="submitQuickImport"
+    >
           <div class="form-group">
             <label>粘贴 HTTP Header 或 Cookie 字符串</label>
             <textarea
@@ -201,19 +184,7 @@
           <div v-else-if="quickImportForm.headerString.trim()" class="no-tokens-found">
             未检测到有效的 Token，请检查输入格式
           </div>
-        </div>
-        <div class="dialog-footer">
-          <button class="btn-cancel" @click="closeQuickImportDialog">取消</button>
-          <button
-            class="btn-submit"
-            @click="submitQuickImport"
-            :disabled="updating || quickImportForm.parsedTokens.filter(t => t.selected).length === 0"
-          >
-            {{ updating ? '导入中...' : '确认导入' }}
-          </button>
-        </div>
-      </div>
-    </div>
+    </Modal>
 
     <!-- 消息提示 -->
     <div v-if="message.show" :class="['message', message.type]">
@@ -231,9 +202,13 @@ import {
   expireToken as expireTokenApi,
   setCheckInterval
 } from '@/api/token'
+import { confirm, Modal } from '@/components/Notification'
 
 export default {
   name: 'TokenManagement',
+  components: {
+    Modal
+  },
   setup() {
     // 状态管理
     const loading = ref(false)
@@ -389,7 +364,8 @@ export default {
 
     // 标记过期
     const expireToken = async (tokenType) => {
-      if (!confirm('确定要将此 Token 标记为过期吗？这将立即发送告警邮件。')) {
+      const result = await confirm('确定要将此 Token 标记为过期吗？这将立即发送告警邮件。')
+      if (!result) {
         return
       }
 
@@ -858,64 +834,6 @@ export default {
 }
 
 /* 对话框 */
-.dialog-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-}
-
-.dialog {
-  background: white;
-  width: 90%;
-  max-width: 500px;
-  max-height: 90vh;
-  overflow-y: auto;
-}
-
-.dialog-large {
-  max-width: 700px;
-}
-
-.dialog-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 15px 20px;
-  border-bottom: 1px solid #f0f0f0;
-}
-
-.dialog-header h3 {
-  margin: 0;
-  font-size: 16px;
-  color: #333;
-}
-
-.btn-close {
-  border: none;
-  background: none;
-  font-size: 24px;
-  color: #999;
-  cursor: pointer;
-  padding: 0;
-  width: 30px;
-  height: 30px;
-  line-height: 1;
-}
-
-.btn-close:hover {
-  color: #333;
-}
-
-.dialog-body {
-  padding: 20px;
-}
 
 .form-group {
   margin-bottom: 15px;
@@ -941,43 +859,6 @@ export default {
 
 .form-group input[type="checkbox"] {
   margin-right: 5px;
-}
-
-.dialog-footer {
-  display: flex;
-  justify-content: flex-end;
-  gap: 10px;
-  padding: 15px 20px;
-  border-top: 1px solid #f0f0f0;
-}
-
-.btn-cancel,
-.btn-submit {
-  padding: 8px 20px;
-  border: 1px solid #ddd;
-  background: white;
-  color: #333;
-  cursor: pointer;
-  font-size: 13px;
-}
-
-.btn-cancel:hover {
-  background: #f5f5f5;
-}
-
-.btn-submit {
-  background: #1890ff;
-  color: white;
-  border-color: #1890ff;
-}
-
-.btn-submit:hover {
-  background: #40a9ff;
-}
-
-.btn-submit:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
 }
 
 /* 消息提示 */

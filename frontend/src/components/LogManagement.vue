@@ -255,38 +255,41 @@
     </div>
 
     <!-- 导出对话框 -->
-    <div v-if="showExportDialog" class="modal-overlay" @click="showExportDialog = false">
-      <div class="modal-content" @click.stop>
-        <h3>导出日志</h3>
-        <div class="export-options">
-          <label>
-            <input type="radio" v-model="exportFormat" value="json" />
-            JSON 格式
-          </label>
-          <label>
-            <input type="radio" v-model="exportFormat" value="csv" />
-            CSV 格式
-          </label>
-          <label>
-            <input type="radio" v-model="exportFormat" value="txt" />
-            TXT 格式
-          </label>
-        </div>
-        <div class="modal-actions">
-          <button class="btn-primary" @click="handleExport">确认导出</button>
-          <button class="btn-secondary" @click="showExportDialog = false">取消</button>
-        </div>
+    <Modal
+      v-model:visible="showExportDialog"
+      title="导出日志"
+      size="small"
+      confirm-text="确认导出"
+      @confirm="handleExport"
+    >
+      <div class="export-options">
+        <label>
+          <input type="radio" v-model="exportFormat" value="json" />
+          JSON 格式
+        </label>
+        <label>
+          <input type="radio" v-model="exportFormat" value="csv" />
+          CSV 格式
+        </label>
+        <label>
+          <input type="radio" v-model="exportFormat" value="txt" />
+          TXT 格式
+        </label>
       </div>
-    </div>
+    </Modal>
   </div>
 </template>
 
 <script>
 import { ref, reactive, computed, onMounted } from 'vue'
 import { queryLogs, exportLogs } from '@/api/logs'
+import { toast, Modal } from '@/components/Notification'
 
 export default {
   name: 'LogManagement',
+  components: {
+    Modal
+  },
   setup() {
     const loading = ref(false)
     const allLogs = ref([])
@@ -446,7 +449,7 @@ export default {
         }
       } catch (error) {
         console.error('追踪Trace失败:', error)
-        alert('追踪Trace失败')
+        toast.error('追踪Trace失败')
       } finally {
         loading.value = false
       }
@@ -481,7 +484,7 @@ export default {
         }
       } catch (error) {
         console.error('查询日志失败:', error)
-        alert('查询日志失败')
+        toast.error('查询日志失败')
       } finally {
         loading.value = false
       }
@@ -540,10 +543,10 @@ export default {
         }
 
         showExportDialog.value = false
-        alert('导出成功')
+        toast.success('导出成功')
       } catch (error) {
         console.error('导出日志失败:', error)
-        alert('导出日志失败')
+        toast.error('导出日志失败')
       }
     }
 
@@ -870,7 +873,7 @@ export default {
 
 .log-header {
   display: grid;
-  grid-template-columns: 80px 140px 1fr 100px 2fr 100px;
+  grid-template-columns: 80px 140px minmax(150px, 1.5fr) 120px minmax(200px, 2fr) 100px;
   align-items: center;
   gap: 12px;
   padding: 12px 15px;
@@ -1176,34 +1179,6 @@ export default {
 }
 
 /* 导出对话框 */
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: rgba(0, 0, 0, 0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-  backdrop-filter: blur(2px);
-}
-
-.modal-content {
-  background-color: #fff;
-  padding: 30px;
-  border: 1px solid #ddd;
-  border-radius: 12px;
-  min-width: 400px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
-}
-
-.modal-content h3 {
-  margin: 0 0 20px 0;
-  font-size: 18px;
-  color: #333;
-}
 
 .export-options {
   margin-bottom: 20px;
@@ -1229,12 +1204,6 @@ export default {
   width: 18px;
   height: 18px;
   accent-color: #20a53a;
-}
-
-.modal-actions {
-  display: flex;
-  gap: 10px;
-  justify-content: flex-end;
 }
 
 /* 移动端适配 */

@@ -49,6 +49,13 @@ from .token_refresher import (
     get_token_refresher,
 )
 
+from .sys_settings import (
+    get_setting,
+    get_all_settings,
+    set_setting,
+    delete_setting,
+)
+
 __all__ = [
     # 配置管理器
     "ConfigManager",
@@ -82,5 +89,10 @@ __all__ = [
     "TokenType",
     "TokenConfig",
     "get_token_refresher",
+    # 系统设置
+    "get_setting",
+    "get_all_settings",
+    "set_setting",
+    "delete_setting",
 ]
 

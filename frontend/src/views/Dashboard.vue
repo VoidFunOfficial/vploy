@@ -21,6 +21,12 @@
     <!-- Token 管理 -->
     <TokenManagement v-else-if="activeMenu === 'api'" />
 
+    <!-- 过滤器管理 -->
+    <FilterManagement v-else-if="activeMenu === 'filter'" />
+
+    <!-- 系统设置 -->
+    <SystemSettings v-else-if="activeMenu === 'settings'" />
+
     <!-- 其他菜单项的占位内容 -->
     <div v-else class="placeholder-content">
       <div class="placeholder-card">
@@ -41,6 +47,8 @@ import SchedulerManagement from '@/components/SchedulerManagement.vue'
 import TaskManagement from '@/components/TaskManagement.vue'
 import Analysis from '@/components/Analysis.vue'
 import TokenManagement from '@/components/TokenManagement.vue'
+import FilterManagement from '@/components/FilterManagement.vue'
+import SystemSettings from '@/components/SystemSettings.vue'
 
 export default {
   name: 'Dashboard',
@@ -52,7 +60,9 @@ export default {
     SchedulerManagement,
     TaskManagement,
     Analysis,
-    TokenManagement
+    TokenManagement,
+    FilterManagement,
+    SystemSettings
   },
   setup() {
     const activeMenu = ref('overview')

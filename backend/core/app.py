@@ -15,6 +15,8 @@ from .routes.polymarket import polymarket_bp
 from .routes.token import token_bp
 from .routes.scheduler import scheduler_bp
 from .routes.tasks import tasks_bp
+from .routes.filter import filter_bp
+from .routes.sys_settings import sys_settings_bp
 from .handlers.errors import register_error_handlers
 
 
@@ -43,6 +45,8 @@ def create_app():
     app.register_blueprint(token_bp)
     app.register_blueprint(scheduler_bp)
     app.register_blueprint(tasks_bp)
+    app.register_blueprint(filter_bp)
+    app.register_blueprint(sys_settings_bp)
 
     # 注册错误处理器
     register_error_handlers(app)

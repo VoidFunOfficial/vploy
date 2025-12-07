@@ -4,6 +4,13 @@
     <div class="header">
       <h2>任务管理</h2>
       <div class="header-actions">
+        <button
+          v-if="selectedTasks.length > 0"
+          class="btn-danger"
+          @click="batchDelete"
+        >
+          🗑️ 批量删除 ({{ selectedTasks.length }})
+        </button>
         <button class="btn-primary" @click="showCreateDialog">➕ 新建任务</button>
         <button class="btn-refresh" @click="refreshTasks">🔄 刷新</button>
       </div>
@@ -58,9 +65,17 @@
         <table>
           <thead>
             <tr>
+              <th style="width: 40px;">
+                <input
+                  type="checkbox"
+                  @change="toggleSelectAll"
+                  :checked="isAllSelected"
+                />
+              </th>
               <th>ID</th>
               <th>阶段</th>
               <th>状态</th>
+              <th>详细状态</th>
               <th>元数据</th>
               <th>结果</th>
               <th>错误信息</th>
@@ -71,6 +86,13 @@
           </thead>
           <tbody>
             <tr v-for="task in tasks" :key="task.id">
+              <td>
+                <input
+                  type="checkbox"
+                  :value="task.id"
+                  v-model="selectedTasks"
+                />
+              </td>
               <td>{{ task.id }}</td>
               <td>
                 <span class="badge badge-stage">{{ getStageLabel(task.stage) }}</span>
@@ -81,12 +103,30 @@
                 </span>
               </td>
               <td>
+                <div v-if="task.extended_info" class="extended-info">
+                  <span
+                    v-if="task.extended_info.type === 'analysis'"
+                    class="badge"
+                    :class="getAnalysisStatusClass(task.extended_info.analysis_status)"
+                  >
+                    {{ getAnalysisStatusLabel(task.extended_info.analysis_status) }}
+                  </span>
+                  <div v-if="task.extended_info.conversation_id" class="info-detail">
+                    <small>会话ID: {{ task.extended_info.conversation_id.substring(0, 8) }}...</small>
+                  </div>
+                  <div v-if="task.extended_info.market_count > 0" class="info-detail">
+                    <small>市场数: {{ task.extended_info.market_count }}</small>
+                  </div>
+                </div>
+                <span v-else>-</span>
+              </td>
+              <td>
                 <button class="btn-sm btn-info" @click="showMetadata(task.metadata)">查看</button>
               </td>
               <td>
-                <button 
-                  v-if="task.result" 
-                  class="btn-sm btn-info" 
+                <button
+                  v-if="task.result"
+                  class="btn-sm btn-info"
                   @click="showResult(task.result)"
                 >
                   查看
@@ -100,12 +140,44 @@
               <td>{{ formatTime(task.create_time) }}</td>
               <td>{{ formatTime(task.update_time) }}</td>
               <td class="actions">
-                <button 
+                <button
+                  v-if="task.status === 'waiting'"
+                  class="btn-sm btn-success"
+                  @click="approveTask(task)"
+                  title="同意并开始处理"
+                >
+                  ✓ 同意
+                </button>
+                <button
+                  v-if="task.stage === 'analysis' && task.extended_info && (task.extended_info.analysis_status === 'polling' || task.extended_info.analysis_status === 'requesting')"
+                  class="btn-sm btn-poll"
+                  @click="pollAnalysisOnceHandler(task)"
+                  title="手动轮询一次"
+                >
+                  🔍 轮询
+                </button>
+                <button
+                  v-if="task.stage === 'analysis' && task.extended_info && task.extended_info.analysis_status === 'success' && task.extended_info.market_count > 0"
+                  class="btn-sm btn-split"
+                  @click="splitAnalysisTaskHandler(task)"
+                  title="拆分为decision任务"
+                >
+                  ✂️ 拆分
+                </button>
+                <button
                   v-if="task.status === 'waiting' || task.status === 'processing'"
-                  class="btn-sm btn-warning" 
+                  class="btn-sm btn-warning"
                   @click="cancelTask(task)"
                 >
                   取消
+                </button>
+                <button
+                  v-if="task.status === 'failed' || task.status === 'finished'"
+                  class="btn-sm btn-retry"
+                  @click="retryTaskHandler(task)"
+                  title="重新打回重试"
+                >
+                  🔄 重试
                 </button>
                 <button class="btn-sm btn-danger" @click="confirmDelete(task)">删除</button>
               </td>
@@ -137,89 +209,86 @@
     </div>
 
     <!-- 创建任务对话框 -->
-    <div v-if="createDialogVisible" class="dialog-overlay" @click.self="closeCreateDialog">
-      <div class="dialog">
-        <div class="dialog-header">
-          <h3>新建任务</h3>
-          <button class="btn-close" @click="closeCreateDialog">×</button>
-        </div>
-        <div class="dialog-body">
-          <div class="form-group">
-            <label>任务阶段 *</label>
-            <select v-model="formData.stage">
-              <option value="mark">标记</option>
-              <option value="analysis">分析</option>
-              <option value="decision">决策</option>
-              <option value="trade">交易</option>
-              <option value="listen">监听</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label>任务状态 *</label>
-            <select v-model="formData.status">
-              <option value="waiting">等待中</option>
-              <option value="processing">处理中</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label>元数据 (JSON格式)</label>
-            <textarea 
-              v-model="formData.metadata" 
-              rows="5" 
-              placeholder='{"key": "value"}'
-            ></textarea>
-          </div>
-        </div>
-        <div class="dialog-footer">
-          <button class="btn-secondary" @click="closeCreateDialog">取消</button>
-          <button class="btn-primary" @click="submitCreate">创建</button>
-        </div>
+    <Modal
+      v-model:visible="createDialogVisible"
+      title="新建任务"
+      confirm-text="创建"
+      @confirm="submitCreate"
+    >
+      <div class="form-group">
+        <label>任务阶段 *</label>
+        <select v-model="formData.stage">
+          <option value="mark">标记</option>
+          <option value="analysis">分析</option>
+          <option value="decision">决策</option>
+          <option value="trade">交易</option>
+          <option value="listen">监听</option>
+        </select>
       </div>
-    </div>
+      <div class="form-group">
+        <label>任务状态 *</label>
+        <select v-model="formData.status">
+          <option value="waiting">等待中</option>
+          <option value="processing">处理中</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>元数据 (JSON格式)</label>
+        <textarea
+          v-model="formData.metadata"
+          rows="5"
+          placeholder='{"key": "value"}'
+        ></textarea>
+      </div>
+    </Modal>
 
     <!-- 查看详情对话框 -->
-    <div v-if="detailDialogVisible" class="dialog-overlay" @click.self="closeDetailDialog">
-      <div class="dialog">
-        <div class="dialog-header">
-          <h3>{{ detailTitle }}</h3>
-          <button class="btn-close" @click="closeDetailDialog">×</button>
-        </div>
-        <div class="dialog-body">
-          <pre class="json-view">{{ detailContent }}</pre>
-        </div>
-        <div class="dialog-footer">
-          <button class="btn-secondary" @click="closeDetailDialog">关闭</button>
-        </div>
-      </div>
-    </div>
+    <Modal
+      v-model:visible="detailDialogVisible"
+      :title="detailTitle"
+      :show-footer="false"
+      size="large"
+    >
+      <pre class="json-view">{{ detailContent }}</pre>
+    </Modal>
   </div>
 </template>
 
 <script>
-import { ref, reactive, onMounted } from 'vue'
-import { getTasks, createTask, updateTask, deleteTask } from '@/api/tasks'
+import { ref, reactive, onMounted, computed } from 'vue'
+import { getTasks, createTask, updateTask, deleteTask, batchDeleteTasks, retryTask, pollAnalysisOnce, splitAnalysisTask } from '@/api/tasks'
+import { toast, confirm, Modal } from '@/components/Notification'
 
 export default {
   name: 'TaskManagement',
+  components: {
+    Modal
+  },
   setup() {
     const loading = ref(false)
     const tasks = ref([])
+    const selectedTasks = ref([])
     const createDialogVisible = ref(false)
     const detailDialogVisible = ref(false)
     const detailTitle = ref('')
     const detailContent = ref('')
-    
+
     const filters = reactive({
       stage: '',
       status: '',
       limit: 100,
       offset: 0
     })
-    
+
     const formData = reactive({
       stage: 'mark',
       status: 'waiting',
       metadata: '{}'
+    })
+
+    // 是否全选
+    const isAllSelected = computed(() => {
+      return tasks.value.length > 0 && selectedTasks.value.length === tasks.value.length
     })
 
     // 加载任务列表
@@ -241,7 +310,7 @@ export default {
         }
       } catch (error) {
         console.error('加载任务列表失败:', error)
-        alert('加载任务列表失败: ' + (error.response?.data?.message || error.message))
+        toast.error('加载任务列表失败: ' + (error.response?.data?.message || error.message))
       } finally {
         loading.value = false
       }
@@ -250,6 +319,7 @@ export default {
     // 刷新任务列表
     const refreshTasks = () => {
       filters.offset = 0
+      selectedTasks.value = []
       loadTasks()
     }
 
@@ -257,6 +327,7 @@ export default {
     const prevPage = () => {
       if (filters.offset >= filters.limit) {
         filters.offset -= filters.limit
+        selectedTasks.value = []
         loadTasks()
       }
     }
@@ -264,7 +335,69 @@ export default {
     // 下一页
     const nextPage = () => {
       filters.offset += filters.limit
+      selectedTasks.value = []
       loadTasks()
+    }
+
+    // 全选/取消全选
+    const toggleSelectAll = (event) => {
+      if (event.target.checked) {
+        selectedTasks.value = tasks.value.map(task => task.id)
+      } else {
+        selectedTasks.value = []
+      }
+    }
+
+    // 批量删除
+    const batchDelete = async () => {
+      if (selectedTasks.value.length === 0) {
+        toast.warning('请先选择要删除的任务')
+        return
+      }
+
+      const result = await confirm({
+        message: `确定要删除选中的 ${selectedTasks.value.length} 个任务吗？`,
+        type: 'danger'
+      })
+      if (!result) {
+        return
+      }
+
+      try {
+        const response = await batchDeleteTasks(selectedTasks.value)
+        if (response.success) {
+          const { deleted_count, failed_count } = response.data
+          if (failed_count > 0) {
+            toast.warning(`批量删除完成: 成功${deleted_count}个, 失败${failed_count}个`)
+          } else {
+            toast.success(`批量删除成功: 已删除${deleted_count}个任务`)
+          }
+          selectedTasks.value = []
+          refreshTasks()
+        }
+      } catch (error) {
+        console.error('批量删除任务失败:', error)
+        toast.error('批量删除任务失败: ' + (error.response?.data?.message || error.message))
+      }
+    }
+
+    // 同意任务(将waiting状态变为processing)
+    const approveTask = async (task) => {
+      const result = await confirm(`确定要同意并开始处理任务 #${task.id} 吗？`)
+      if (!result) {
+        return
+      }
+
+      try {
+        const response = await updateTask(task.id, { status: 'processing' })
+        if (response.success) {
+          toast.success('任务已开始处理')
+          refreshTasks()
+        }
+      } catch (error) {
+        console.error('更新任务状态失败:', error)
+        toast.error('更新任务状态失败: ' + (error.response?.data?.message || error.message))
+      }
     }
 
     // 显示创建对话框
@@ -297,13 +430,13 @@ export default {
 
         const response = await createTask(data)
         if (response.success) {
-          alert('创建任务成功')
+          toast.success('创建任务成功')
           closeCreateDialog()
           refreshTasks()
         }
       } catch (error) {
         console.error('创建任务失败:', error)
-        alert('创建任务失败: ' + (error.response?.data?.message || error.message))
+        toast.error('创建任务失败: ' + (error.response?.data?.message || error.message))
       }
     }
 
@@ -328,37 +461,128 @@ export default {
 
     // 取消任务
     const cancelTask = async (task) => {
-      if (!confirm(`确定要取消任务 #${task.id} 吗？`)) {
+      const result = await confirm(`确定要取消任务 #${task.id} 吗？`)
+      if (!result) {
         return
       }
 
       try {
-        const response = await updateTask(task.id, { status: 'cancelled' })
+        const response = await updateTask(task.id, {
+          status: 'failed',
+          error_msg: '用户手动取消'
+        })
         if (response.success) {
-          alert('取消任务成功')
+          toast.success('取消任务成功')
           refreshTasks()
         }
       } catch (error) {
         console.error('取消任务失败:', error)
-        alert('取消任务失败: ' + (error.response?.data?.message || error.message))
+        toast.error('取消任务失败: ' + (error.response?.data?.message || error.message))
       }
     }
 
     // 确认删除
     const confirmDelete = async (task) => {
-      if (!confirm(`确定要删除任务 #${task.id} 吗？`)) {
+      const result = await confirm({
+        message: `确定要删除任务 #${task.id} 吗？`,
+        type: 'danger'
+      })
+      if (!result) {
         return
       }
 
       try {
         const response = await deleteTask(task.id)
         if (response.success) {
-          alert('删除任务成功')
+          toast.success('删除任务成功')
           refreshTasks()
         }
       } catch (error) {
         console.error('删除任务失败:', error)
-        alert('删除任务失败: ' + (error.response?.data?.message || error.message))
+        toast.error('删除任务失败: ' + (error.response?.data?.message || error.message))
+      }
+    }
+
+    // 重试任务
+    const retryTaskHandler = async (task) => {
+      const result = await confirm({
+        message: `确定要重试任务 #${task.id} 吗？\n任务将被重新打回到等待状态并重新执行。`
+      })
+      if (!result) {
+        return
+      }
+
+      try {
+        const response = await retryTask(task.id)
+        if (response.success) {
+          toast.success('任务已重新提交')
+          refreshTasks()
+        }
+      } catch (error) {
+        console.error('重试任务失败:', error)
+        toast.error('重试任务失败: ' + (error.response?.data?.message || error.message))
+      }
+    }
+
+    // 手动轮询一次分析任务
+    const pollAnalysisOnceHandler = async (task) => {
+      try {
+        const response = await pollAnalysisOnce(task.id)
+        if (response.success) {
+          const data = response.data
+
+          if (data.analysis_status === 'success') {
+            // 分析成功
+            toast.success(`✅ 分析完成！成功解析 ${data.market_count} 个市场`)
+            refreshTasks()
+          } else if (data.analysis_status === 'polling') {
+            // 仍在思考
+            toast.info('⏳ AI仍在思考中，请稍后再试')
+          } else if (data.analysis_status === 'failed') {
+            // 分析失败
+            toast.error(`❌ 分析失败: ${data.error || '未知错误'}`)
+            refreshTasks()
+          }
+        } else {
+          toast.error(`轮询失败: ${response.message}`)
+        }
+      } catch (error) {
+        console.error('手动轮询失败:', error)
+        toast.error('手动轮询失败: ' + (error.response?.data?.message || error.message))
+      }
+    }
+
+    // 拆分分析任务为多个decision任务
+    const splitAnalysisTaskHandler = async (task) => {
+      const marketCount = task.extended_info?.market_count || 0
+
+      const result = await confirm({
+        message: `确定要拆分任务 #${task.id} 吗？\n将创建 ${marketCount} 个decision任务，并删除原始analysis任务。`,
+        type: 'warning'
+      })
+      if (!result) {
+        return
+      }
+
+      try {
+        const response = await splitAnalysisTask(task.id)
+
+        if (response.success) {
+          const data = response.data
+          let message = `✅ 拆分成功！总市场数: ${data.total_markets}, 成功创建: ${data.success_count} 个decision任务`
+
+          if (data.failed_count > 0) {
+            message += `, 失败: ${data.failed_count} 个市场`
+          }
+
+          toast.success(message)
+          refreshTasks()
+        } else {
+          toast.error(`❌ 拆分失败: ${response.message}`)
+        }
+      } catch (error) {
+        console.error('拆分任务失败:', error)
+        toast.error('拆分任务失败: ' + (error.response?.data?.message || error.message))
       }
     }
 
@@ -379,9 +603,8 @@ export default {
       const labels = {
         waiting: '等待中',
         processing: '处理中',
-        success: '成功',
-        failed: '失败',
-        cancelled: '已取消'
+        finished: '已完成',
+        failed: '失败'
       }
       return labels[status] || status
     }
@@ -391,11 +614,36 @@ export default {
       const classes = {
         waiting: 'badge-warning',
         processing: 'badge-info',
-        success: 'badge-success',
-        failed: 'badge-danger',
-        cancelled: 'badge-gray'
+        finished: 'badge-success',
+        failed: 'badge-danger'
       }
       return classes[status] || 'badge-gray'
+    }
+
+    // 获取分析状态标签
+    const getAnalysisStatusLabel = (analysisStatus) => {
+      const labels = {
+        pending: '待处理',
+        requesting: '请求中',
+        polling: '轮询中',
+        validating: '验证中',
+        success: '成功',
+        failed: '失败'
+      }
+      return labels[analysisStatus] || analysisStatus || '-'
+    }
+
+    // 获取分析状态样式类
+    const getAnalysisStatusClass = (analysisStatus) => {
+      const classes = {
+        pending: 'badge-gray',
+        requesting: 'badge-info',
+        polling: 'badge-warning',
+        validating: 'badge-info',
+        success: 'badge-success',
+        failed: 'badge-danger'
+      }
+      return classes[analysisStatus] || 'badge-gray'
     }
 
     // 格式化时间
@@ -412,6 +660,8 @@ export default {
     return {
       loading,
       tasks,
+      selectedTasks,
+      isAllSelected,
       filters,
       createDialogVisible,
       detailDialogVisible,
@@ -421,6 +671,9 @@ export default {
       refreshTasks,
       prevPage,
       nextPage,
+      toggleSelectAll,
+      batchDelete,
+      approveTask,
       showCreateDialog,
       closeCreateDialog,
       submitCreate,
@@ -429,9 +682,14 @@ export default {
       closeDetailDialog,
       cancelTask,
       confirmDelete,
+      retryTaskHandler,
+      pollAnalysisOnceHandler,
+      splitAnalysisTaskHandler,
       getStageLabel,
       getStatusLabel,
       getStatusClass,
+      getAnalysisStatusLabel,
+      getAnalysisStatusClass,
       formatTime
     }
   }
@@ -606,6 +864,23 @@ tr:hover {
   color: #757575;
 }
 
+/* 扩展信息 */
+.extended-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.info-detail {
+  color: #666;
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.info-detail small {
+  display: block;
+}
+
 /* 按钮样式省略,与SchedulerManagement相同 */
 .btn-primary, .btn-secondary, .btn-success, .btn-warning, .btn-danger, .btn-refresh, .btn-info {
   padding: 8px 16px;
@@ -656,6 +931,33 @@ tr:hover {
   color: white;
 }
 
+.btn-retry {
+  background: #9c27b0;
+  color: white;
+}
+
+.btn-retry:hover {
+  background: #7b1fa2;
+}
+
+.btn-poll {
+  background: #ff9800;
+  color: white;
+}
+
+.btn-poll:hover {
+  background: #f57c00;
+}
+
+.btn-split {
+  background: #00bcd4;
+  color: white;
+}
+
+.btn-split:hover {
+  background: #0097a7;
+}
+
 .btn-sm {
   padding: 4px 8px;
   font-size: 12px;
@@ -664,53 +966,7 @@ tr:hover {
   cursor: pointer;
 }
 
-/* 对话框样式省略,与SchedulerManagement相同 */
-.dialog-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0,0,0,0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-}
 
-.dialog {
-  background: white;
-  border-radius: 8px;
-  width: 90%;
-  max-width: 600px;
-  max-height: 90vh;
-  overflow-y: auto;
-}
-
-.dialog-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 20px;
-  border-bottom: 1px solid #e0e0e0;
-}
-
-.dialog-header h3 {
-  margin: 0;
-  font-size: 18px;
-}
-
-.btn-close {
-  background: none;
-  border: none;
-  font-size: 24px;
-  cursor: pointer;
-  color: #999;
-}
-
-.dialog-body {
-  padding: 20px;
-}
 
 .form-group {
   margin-bottom: 15px;
@@ -740,14 +996,6 @@ tr:hover {
   overflow-x: auto;
   font-size: 13px;
   line-height: 1.5;
-}
-
-.dialog-footer {
-  padding: 20px;
-  border-top: 1px solid #e0e0e0;
-  display: flex;
-  justify-content: flex-end;
-  gap: 10px;
 }
 </style>
 

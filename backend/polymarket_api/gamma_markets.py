@@ -25,10 +25,7 @@ class Market:
         liquidity: 流动性
         end_date: 结束时间
         tau: 结算剩余天数
-        category: 分类
         tags: 标签列表
-        events: 关联事件列表
-        closedTime: 关闭时间
         marks: 自定义标签集合（用于标记和分类）
         negRisk: 是否为负风险市场
         clobTokenIds: CLOB 代币 ID 列表
@@ -43,10 +40,7 @@ class Market:
     liquidity: Optional[str] = None
     end_date: Optional[str] = None
     tau: Optional[int] = None
-    category: Optional[str] = None
     tags: Optional[List[Dict[str, Any]]] = None
-    events: Optional[List[Dict[str, Any]]] = None
-    closedTime: Optional[str] = None
     marks: Set[str] = field(default_factory=set)
     negRisk: Optional[bool] = None
     clobTokenIds: Optional[List[str]] = None
@@ -76,10 +70,7 @@ class Market:
             liquidity=data.get('liquidity'),
             end_date=data.get('endDate'),
             tau=tau,
-            category=data.get('category'),
             tags=data.get('tags', []),
-            events=data.get('events', []),
-            closedTime=data.get('closedTime'),
             negRisk=data.get('negRisk'),
             clobTokenIds=data.get('clobTokenIds')
         )
@@ -1469,7 +1460,7 @@ def event_summary_readableforai(event: Event) -> str:
         for idx, market_data in enumerate(event.markets, 1):
             idx = market_data.get('id')
             summary_lines.append(f"  Question: {market_data.get('question', '未知')}")
-            summary_lines.append(f"{idx}:")
+            summary_lines.append(f"Market ID:{idx}:")
             outcomes = market_data.get('outcomes')
             outcome_prices = market_data.get('outcomePrices')
             if outcomes and outcome_prices:

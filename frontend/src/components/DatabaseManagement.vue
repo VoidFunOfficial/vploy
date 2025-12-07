@@ -144,6 +144,7 @@
 <script>
 import { ref, computed, onMounted } from 'vue'
 import { getTables, getTableSchema, getTableData, createRow, updateRow, deleteRow as deleteRowAPI } from '@/api/database'
+import { toast } from '@/components/Notification'
 
 export default {
   name: 'DatabaseManagement',
@@ -287,7 +288,7 @@ export default {
         }
       } catch (error) {
         console.error('删除失败:', error)
-        alert('删除失败: ' + error.message)
+        toast.error('删除失败: ' + error.message)
       }
     }
 
@@ -309,7 +310,7 @@ export default {
         }
       } catch (error) {
         console.error('保存失败:', error)
-        alert('保存失败: ' + error.message)
+        toast.error('保存失败: ' + error.message)
       }
     }
 

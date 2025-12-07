@@ -2,96 +2,86 @@
 VLogger 配置管理
 
 提供 VLogger 日志配置和邮件配置的读取/写入接口。
+使用 sys_settings 表存储配置,采用分层命名空间 (logging.*, mail.*)
 """
 
 import json
 from typing import Dict, Any, List, Optional
 from dataclasses import dataclass, field
 
-from .config_manager import get_config_manager
+from .sys_settings import get_setting, set_setting
 
 
 def get_vlogger_config(db_path: str = "backend/sys_configs/system_config.db") -> Dict[str, Any]:
     """
     获取 VLogger 日志配置
-    
+
+    从 sys_settings 表读取 logging.* 命名空间的配置项
+
     参数:
         db_path: 数据库文件路径
-        
+
     返回:
-        Dict[str, Any]: 配置字典
+        Dict[str, Any]: 配置字典 (不带 logging. 前缀的键)
     """
+    from .config_manager import get_config_manager
     config_manager = get_config_manager(db_path)
-    
+
+    # 查询所有 logging.* 配置项
     query = """
-        SELECT config_key, config_value, config_type FROM vlogger_config
+        SELECT key, value, value_type FROM sys_settings
+        WHERE key LIKE 'logging.%'
     """
     rows = config_manager.execute_query(query)
-    
+
     config = {}
     for row in rows:
-        key = row['config_key']
-        value = row['config_value']
-        config_type = row['config_type']
-        
-        # 根据类型转换值
-        if config_type == 'boolean':
-            config[key] = value.lower() == 'true'
-        elif config_type == 'integer':
-            config[key] = int(value)
-        elif config_type == 'float':
-            config[key] = float(value)
-        elif config_type == 'json':
-            config[key] = json.loads(value)
+        full_key = row['key']
+        value_str = row['value']
+        value_type = row['value_type']
+
+        # 移除 logging. 前缀
+        key = full_key.replace('logging.', '', 1)
+
+        # 反序列化值
+        if value_type == 'bool':
+            config[key] = value_str in ('1', 'true', 'True', 'TRUE')
+        elif value_type == 'int':
+            config[key] = int(value_str)
+        elif value_type == 'float':
+            config[key] = float(value_str)
+        elif value_type == 'json':
+            config[key] = json.loads(value_str)
         else:
-            config[key] = value
-    
+            config[key] = value_str
+
     return config
 
 
 def save_vlogger_config(config: Dict[str, Any], db_path: str = "backend/sys_configs/system_config.db") -> bool:
     """
     保存 VLogger 日志配置
-    
+
+    将配置保存到 sys_settings 表的 logging.* 命名空间
+
     参数:
-        config: 配置字典
+        config: 配置字典 (不带 logging. 前缀的键)
         db_path: 数据库文件路径
-        
+
     返回:
         bool: 保存是否成功
     """
-    config_manager = get_config_manager(db_path)
-    
     try:
         for key, value in config.items():
-            # 确定配置类型
-            if isinstance(value, bool):
-                config_type = 'boolean'
-                config_value = 'true' if value else 'false'
-            elif isinstance(value, int):
-                config_type = 'integer'
-                config_value = str(value)
-            elif isinstance(value, float):
-                config_type = 'float'
-                config_value = str(value)
-            elif isinstance(value, (dict, list)):
-                config_type = 'json'
-                config_value = json.dumps(value, ensure_ascii=False)
-            else:
-                config_type = 'string'
-                config_value = str(value)
-            
-            # 更新或插入配置
-            query = """
-                INSERT INTO vlogger_config (config_key, config_value, config_type, updated_at)
-                VALUES (?, ?, ?, CURRENT_TIMESTAMP)
-                ON CONFLICT(config_key) DO UPDATE SET
-                    config_value = excluded.config_value,
-                    config_type = excluded.config_type,
-                    updated_at = CURRENT_TIMESTAMP
-            """
-            config_manager.execute_update(query, (key, config_value, config_type))
-        
+            # 添加 logging. 前缀
+            full_key = f"logging.{key}"
+
+            # 使用 sys_settings 的 set_setting 函数
+            success = set_setting(full_key, value, db_path=db_path)
+            if not success:
+                print(f"[VLoggerConfig] 保存配置项失败: {key}")
+                return False
+
         return True
     except Exception as e:
         print(f"[VLoggerConfig] 保存配置失败: {str(e)}")
@@ -101,84 +91,73 @@ def save_vlogger_config(config: Dict[str, Any], db_path: str = "backend/sys_conf
 def get_email_config(db_path: str = "backend/sys_configs/system_config.db") -> Dict[str, Any]:
     """
     获取邮件配置
-    
+
+    从 sys_settings 表读取 mail.* 命名空间的配置项
+
     参数:
         db_path: 数据库文件路径
-        
+
     返回:
-        Dict[str, Any]: 邮件配置字典
+        Dict[str, Any]: 邮件配置字典 (不带 mail. 前缀的键)
     """
+    from .config_manager import get_config_manager
     config_manager = get_config_manager(db_path)
-    
+
+    # 查询所有 mail.* 配置项
     query = """
-        SELECT config_key, config_value, config_type FROM email_config
+        SELECT key, value, value_type FROM sys_settings
+        WHERE key LIKE 'mail.%'
     """
     rows = config_manager.execute_query(query)
-    
+
     config = {}
     for row in rows:
-        key = row['config_key']
-        value = row['config_value']
-        config_type = row['config_type']
-        
-        # 根据类型转换值
-        if config_type == 'boolean':
-            config[key] = value.lower() == 'true'
-        elif config_type == 'integer':
-            config[key] = int(value)
-        elif config_type == 'float':
-            config[key] = float(value)
-        elif config_type == 'json':
-            config[key] = json.loads(value)
+        full_key = row['key']
+        value_str = row['value']
+        value_type = row['value_type']
+
+        # 移除 mail. 前缀
+        key = full_key.replace('mail.', '', 1)
+
+        # 反序列化值
+        if value_type == 'bool':
+            config[key] = value_str in ('1', 'true', 'True', 'TRUE')
+        elif value_type == 'int':
+            config[key] = int(value_str)
+        elif value_type == 'float':
+            config[key] = float(value_str)
+        elif value_type == 'json':
+            config[key] = json.loads(value_str)
         else:
-            config[key] = value
-    
+            config[key] = value_str
+
     return config
 
 
 def save_email_config(config: Dict[str, Any], db_path: str = "backend/sys_configs/system_config.db") -> bool:
     """
     保存邮件配置
-    
+
+    将配置保存到 sys_settings 表的 mail.* 命名空间
+
     参数:
-        config: 邮件配置字典
+        config: 邮件配置字典 (不带 mail. 前缀的键)
         db_path: 数据库文件路径
-        
+
     返回:
         bool: 保存是否成功
     """
-    config_manager = get_config_manager(db_path)
-    
     try:
         for key, value in config.items():
-            # 确定配置类型
-            if isinstance(value, bool):
-                config_type = 'boolean'
-                config_value = 'true' if value else 'false'
-            elif isinstance(value, int):
-                config_type = 'integer'
-                config_value = str(value)
-            elif isinstance(value, float):
-                config_type = 'float'
-                config_value = str(value)
-            elif isinstance(value, (dict, list)):
-                config_type = 'json'
-                config_value = json.dumps(value, ensure_ascii=False)
-            else:
-                config_type = 'string'
-                config_value = str(value)
-            
-            # 更新或插入配置
-            query = """
-                INSERT INTO email_config (config_key, config_value, config_type, updated_at)
-                VALUES (?, ?, ?, CURRENT_TIMESTAMP)
-                ON CONFLICT(config_key) DO UPDATE SET
-                    config_value = excluded.config_value,
-                    config_type = excluded.config_type,
-                    updated_at = CURRENT_TIMESTAMP
-            """
-            config_manager.execute_update(query, (key, config_value, config_type))
-        
+            # 添加 mail. 前缀
+            full_key = f"mail.{key}"
+
+            # 使用 sys_settings 的 set_setting 函数
+            success = set_setting(full_key, value, db_path=db_path)
+            if not success:
+                print(f"[EmailConfig] 保存配置项失败: {key}")
+                return False
+
         return True
     except Exception as e:
         print(f"[EmailConfig] 保存配置失败: {str(e)}")

@@ -70,3 +70,69 @@ export function deleteTask(taskId) {
   })
 }
 
+/**
+ * 重试任务
+ * @param {number} taskId - 任务ID
+ */
+export function retryTask(taskId) {
+  return request({
+    url: `/tasks/${taskId}/retry`,
+    method: 'post'
+  })
+}
+
+/**
+ * 批量删除任务
+ * @param {Array<number>} taskIds - 任务ID列表
+ */
+export function batchDeleteTasks(taskIds) {
+  return request({
+    url: '/tasks/batch-delete',
+    method: 'post',
+    data: { task_ids: taskIds }
+  })
+}
+
+/**
+ * 获取分析任务的详细状态
+ * @param {number} taskId - 任务ID
+ */
+export function getAnalysisStatus(taskId) {
+  return request({
+    url: `/tasks/${taskId}/analysis-status`,
+    method: 'get'
+  })
+}
+
+/**
+ * 获取分析任务的结果
+ * @param {number} taskId - 任务ID
+ */
+export function getAnalysisResult(taskId) {
+  return request({
+    url: `/tasks/${taskId}/analysis-result`,
+    method: 'get'
+  })
+}
+
+/**
+ * 手动轮询一次分析任务的结果
+ * @param {number} taskId - 任务ID
+ */
+export function pollAnalysisOnce(taskId) {
+  return request({
+    url: `/tasks/${taskId}/poll-once`,
+    method: 'post'
+  })
+}
+
+/**
+ * 拆分成功的analysis任务为多个decision任务
+ * @param {number} taskId - 任务ID
+ */
+export function splitAnalysisTask(taskId) {
+  return request({
+    url: `/tasks/${taskId}/split`,
+    method: 'post'
+  })
+}
