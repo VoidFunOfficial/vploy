@@ -428,7 +428,7 @@ best_theta, df_log = evolutionary_search_theta(
     T_days=T_days_search,
     mean_new_markets=mean_new_markets,
     trials_per_theta=2,
-    seed=2132
+    seed=2025
 )
 
 print("Best theta found:", best_theta)

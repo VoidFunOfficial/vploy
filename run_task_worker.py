@@ -43,11 +43,28 @@ def main():
     # 这里只需要保持进程运行
     try:
         from backend.task_manager.tasks import huey
-        
+        from backend.task_manager.config import get_config
+
+        # 获取配置
+        config = get_config()
+
         # 使用Huey的consumer来运行worker
         from huey.consumer import Consumer
-        
-        consumer = Consumer(huey)
+
+        # 创建Consumer并指定worker数量以支持并发
+        consumer = Consumer(
+            huey,
+            workers=config.workers,  # 使用配置的worker数量(默认4个)
+            scheduler_interval=1,     # 调度器检查间隔(秒)
+            worker_type='thread'      # 使用线程模式(也可以用'process'或'greenlet')
+        )
+
+        logger.info(
+            "TASK_WORKER.CONSUMER_CONFIG",
+            msg=f"Consumer配置: workers={config.workers}, worker_type=thread",
+            extra={"workers": config.workers}
+        )
+
         consumer.run()
         
     except KeyboardInterrupt:

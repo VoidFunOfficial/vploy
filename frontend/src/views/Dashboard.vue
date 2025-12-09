@@ -18,11 +18,20 @@
     <!-- 分析界面 -->
     <Analysis v-else-if="activeMenu === 'analysis'" />
 
+    <!-- 决策界面 -->
+    <Decision v-else-if="activeMenu === 'decision'" />
+
+    <!-- 交易界面 -->
+    <Trade v-else-if="activeMenu === 'trade'" />
+
     <!-- Token 管理 -->
     <TokenManagement v-else-if="activeMenu === 'api'" />
 
     <!-- 过滤器管理 -->
     <FilterManagement v-else-if="activeMenu === 'filter'" />
+
+    <!-- 盈亏情况 -->
+    <ProfitChart v-else-if="activeMenu === 'profit'" />
 
     <!-- 系统设置 -->
     <SystemSettings v-else-if="activeMenu === 'settings'" />
@@ -46,8 +55,11 @@ import DatabaseManagement from '@/components/DatabaseManagement.vue'
 import SchedulerManagement from '@/components/SchedulerManagement.vue'
 import TaskManagement from '@/components/TaskManagement.vue'
 import Analysis from '@/components/Analysis.vue'
+import Decision from '@/components/Decision.vue'
+import Trade from '@/components/Trade.vue'
 import TokenManagement from '@/components/TokenManagement.vue'
 import FilterManagement from '@/components/FilterManagement.vue'
+import ProfitChart from '@/components/ProfitChart.vue'
 import SystemSettings from '@/components/SystemSettings.vue'
 
 export default {
@@ -60,8 +72,11 @@ export default {
     SchedulerManagement,
     TaskManagement,
     Analysis,
+    Decision,
+    Trade,
     TokenManagement,
     FilterManagement,
+    ProfitChart,
     SystemSettings
   },
   setup() {
@@ -75,6 +90,7 @@ export default {
       tasks: '任务管理',
       filter: '过滤',
       analysis: '分析',
+      decision: '决策',
       trade: '交易',
       monitor: '监控',
       logs: '日志管理',

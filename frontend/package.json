@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "axios": "latest",
+    "echarts": "latest",
     "voidpoly-admin": "link:",
     "vue": "latest",
     "vue-router": "latest"

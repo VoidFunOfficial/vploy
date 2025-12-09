@@ -910,3 +910,463 @@ def split_analysis_task_route(task_id):
             'success': False,
             'message': f'拆分任务失败: {str(e)}'
         }), 500
+
+
+@tasks_bp.route('/decision/pending', methods=['GET'])
+def get_pending_decision_tasks():
+    """
+    获取所有待决策的任务
+
+    返回:
+        {
+            "success": true,
+            "data": {
+                "tasks": [...],  # 待决策任务列表
+                "total": 5       # 总数
+            }
+        }
+    """
+    try:
+        # 查询decision阶段且waiting状态的任务
+        tasks = db.query_async_tasks(
+            stage=TaskStage.DECISION,
+            status=TaskStatus.WAITING,
+            limit=100
+        )
+
+        # 转换为字典格式
+        tasks_data = [task.to_dict() for task in tasks]
+
+        logger.info(
+            "TASKS.API.DECISION.PENDING",
+            msg=f"获取待决策任务: {len(tasks_data)}个",
+            extra={"count": len(tasks_data)}
+        )
+
+        return jsonify({
+            'success': True,
+            'data': {
+                'tasks': tasks_data,
+                'total': len(tasks_data)
+            }
+        }), 200
+
+    except Exception as e:
+        logger.error(
+            "TASKS.API.DECISION.PENDING.ERROR",
+            msg="获取待决策任务失败",
+            error_code="E-TASKS-API-015",
+            extra={"error": str(e)}
+        )
+        return jsonify({
+            'success': False,
+            'message': f'获取待决策任务失败: {str(e)}'
+        }), 500
+
+
+@tasks_bp.route('/trade/pending', methods=['GET'])
+def get_pending_trade_tasks():
+    """
+    获取所有待交易的任务
+
+    返回:
+        {
+            "success": true,
+            "data": {
+                "tasks": [...],  # 待交易任务列表
+                "total": 5       # 总数
+            }
+        }
+    """
+    try:
+        # 查询trade阶段且waiting状态的任务
+        tasks = db.query_async_tasks(
+            stage=TaskStage.TRADE,
+            status=TaskStatus.WAITING,
+            limit=100
+        )
+
+        # 转换为字典格式
+        tasks_data = [task.to_dict() for task in tasks]
+
+        logger.info(
+            "TASKS.API.TRADE.PENDING",
+            msg=f"获取待交易任务: {len(tasks_data)}个",
+            extra={"count": len(tasks_data)}
+        )
+
+        return jsonify({
+            'success': True,
+            'data': {
+                'tasks': tasks_data,
+                'total': len(tasks_data)
+            }
+        }), 200
+
+    except Exception as e:
+        logger.error(
+            "TASKS.API.TRADE.PENDING.ERROR",
+            msg="获取待交易任务失败",
+            error_code="E-TASKS-API-027",
+            extra={"error": str(e)}
+        )
+        return jsonify({
+            'success': False,
+            'message': f'获取待交易任务失败: {str(e)}'
+        }), 500
+
+
+@tasks_bp.route('/decision/execute', methods=['POST'])
+def execute_decision():
+    """
+    执行决策处理 - 批量处理所有待决策任务
+
+    处理流程:
+    1. 获取所有待决策任务
+    2. 提取每个任务的market和analysis数据
+    3. 调用position_manager进行仓位分配
+    4. 将分配结果写回各任务的result字段
+    5. 更新任务状态为finished
+
+    返回:
+        {
+            "success": true/false,
+            "message": "消息",
+            "data": {
+                "processed_count": 5,
+                "allocations": [...],  # 仓位分配结果
+                "summary": {...}       # 汇总信息
+            }
+        }
+    """
+    try:
+        from ...auto_decision import allocate, Market
+        from ...purse import get_purse
+        import json
+
+        logger.info(
+            "TASKS.API.DECISION.EXECUTE.START",
+            msg="开始执行决策处理"
+        )
+
+        # 1. 获取所有待决策任务
+        pending_tasks = db.query_async_tasks(
+            stage=TaskStage.DECISION,
+            status=TaskStatus.WAITING,
+            limit=100
+        )
+
+        if not pending_tasks:
+            return jsonify({
+                'success': False,
+                'message': '没有待决策的任务'
+            }), 400
+
+        # 2. 构建Market列表和任务映射
+        markets = []
+        task_map = {}  # market_id -> task
+        now_day = 0  # 当前天索引
+
+        for task in pending_tasks:
+            metadata = task.metadata
+            market_data = metadata.get('market')
+            analysis_data = metadata.get('analysis')
+
+            # 严格验证：不使用默认值
+            if not market_data:
+                logger.error(
+                    "TASKS.API.DECISION.SKIP",
+                    msg=f"任务缺少market数据，跳过: {task.id}",
+                    error_code="E-TASKS-API-017",
+                    extra={"task_id": task.id}
+                )
+                continue
+
+            if not analysis_data:
+                logger.error(
+                    "TASKS.API.DECISION.SKIP",
+                    msg=f"任务缺少analysis数据，跳过: {task.id}",
+                    error_code="E-TASKS-API-018",
+                    extra={"task_id": task.id}
+                )
+                continue
+
+            market_id = market_data.get('id')
+            if not market_id:
+                logger.error(
+                    "TASKS.API.DECISION.SKIP",
+                    msg=f"任务缺少market_id，跳过: {task.id}",
+                    error_code="E-TASKS-API-019",
+                    extra={"task_id": task.id}
+                )
+                continue
+
+            # 严格解析outcome_prices - 不使用默认值
+            outcome_prices_str = market_data.get('outcome_prices')
+            if not outcome_prices_str:
+                logger.error(
+                    "TASKS.API.DECISION.SKIP",
+                    msg=f"任务缺少outcome_prices，跳过: {task.id}",
+                    error_code="E-TASKS-API-020",
+                    extra={"task_id": task.id, "market_id": market_id}
+                )
+                continue
+
+            try:
+                if isinstance(outcome_prices_str, str):
+                    outcome_prices = json.loads(outcome_prices_str)
+                else:
+                    outcome_prices = outcome_prices_str
+
+                if not outcome_prices or len(outcome_prices) < 1:
+                    raise ValueError("outcome_prices为空或长度不足")
+
+                yes_price = float(outcome_prices[0])
+            except Exception as e:
+                logger.error(
+                    "TASKS.API.DECISION.SKIP",
+                    msg=f"解析outcome_prices失败，跳过: {task.id}",
+                    error_code="E-TASKS-API-021",
+                    extra={"task_id": task.id, "market_id": market_id, "error": str(e)}
+                )
+                continue
+
+            # 严格解析end_date计算结算天数 - 不使用默认值
+            end_date_str = market_data.get('end_date')
+            if not end_date_str:
+                logger.error(
+                    "TASKS.API.DECISION.SKIP",
+                    msg=f"任务缺少end_date，跳过: {task.id}",
+                    error_code="E-TASKS-API-022",
+                    extra={"task_id": task.id, "market_id": market_id}
+                )
+                continue
+
+            try:
+                from datetime import datetime
+                end_date = datetime.strptime(end_date_str, "%Y-%m-%dT%H:%M:%SZ")
+                tau = max(1, (end_date - datetime.now()).days)
+            except Exception as e:
+                logger.error(
+                    "TASKS.API.DECISION.SKIP",
+                    msg=f"解析end_date失败，跳过: {task.id}",
+                    error_code="E-TASKS-API-023",
+                    extra={"task_id": task.id, "market_id": market_id, "error": str(e)}
+                )
+                continue
+
+            # 严格获取分析结果 - 不使用默认值
+            p_predict = analysis_data.get('p')  # AI预测的YES概率
+            p_no_predict = analysis_data.get('n')  # AI预测的NO概率
+            a = analysis_data.get('a')  # 风险因子
+
+            if p_predict is None:
+                logger.error(
+                    "TASKS.API.DECISION.SKIP",
+                    msg=f"任务缺少分析结果p，跳过: {task.id}",
+                    error_code="E-TASKS-API-024",
+                    extra={"task_id": task.id, "market_id": market_id}
+                )
+                continue
+
+            if p_no_predict is None:
+                logger.error(
+                    "TASKS.API.DECISION.SKIP",
+                    msg=f"任务缺少分析结果n，跳过: {task.id}",
+                    error_code="E-TASKS-API-025",
+                    extra={"task_id": task.id, "market_id": market_id}
+                )
+                continue
+
+            if a is None:
+                logger.error(
+                    "TASKS.API.DECISION.SKIP",
+                    msg=f"任务缺少风险因子a，跳过: {task.id}",
+                    error_code="E-TASKS-API-026",
+                    extra={"task_id": task.id, "market_id": market_id}
+                )
+                continue
+
+            # 使用风险因子a进行概率放缩
+            # 公式: p = pmarket + a*(p_predict - pmarket)
+            p_yes = yes_price + a * (p_predict - yes_price)
+            p_no = (1.0 - yes_price) + a * (p_no_predict - (1.0 - yes_price))
+
+            logger.info(
+                "TASKS.API.DECISION.PROB_SCALING",
+                msg=f"概率放缩: {task.id}",
+                extra={
+                    "task_id": task.id,
+                    "market_id": market_id,
+                    "pmarket": yes_price,
+                    "p_predict": p_predict,
+                    "a": a,
+                    "p_scaled": p_yes,
+                    "p_no_predict": p_no_predict,
+                    "p_no_scaled": p_no
+                }
+            )
+
+            # 创建Market对象
+            market = Market(
+                id=market_id,
+                m=yes_price,
+                p_yes=p_yes,
+                d=now_day + tau,  # 结算日期 = 当前天 + 剩余天数
+                p_no=p_no
+            )
+            markets.append(market)
+            task_map[market_id] = task
+
+        if not markets:
+            return jsonify({
+                'success': False,
+                'message': '没有有效的市场数据'
+            }), 400
+
+        logger.info(
+            "TASKS.API.DECISION.MARKETS",
+            msg=f"待决策市场: {len(markets)}个",
+            extra={"market_count": len(markets), "market_ids": [m.id for m in markets]}
+        )
+
+        # 3. 从purse获取资金状态并调用仓位分配
+        purse = get_purse()
+        wealth = purse.get_total_fund()
+        locked_value = purse.get_locked_fund()
+
+        logger.info(
+            "TASKS.API.DECISION.PURSE_STATUS",
+            msg="从purse获取资金状态",
+            extra={"wealth": wealth, "locked_value": locked_value}
+        )
+
+        # 策略参数
+        theta_params = {
+            "lambda_time": 0.0,   # 久期贴现系数（0表示不贴现）
+            "c_fraction": 0.5,    # 分数Kelly系数（0.5表示半Kelly）
+            "f_cap": 0.95         # 单市场仓位上限
+        }
+        k = 0.6  # 最大锁仓占比
+
+        allocations = allocate(
+            markets_today=markets,
+            wealth=wealth,
+            locked_value_now=locked_value,
+            now_day=now_day,
+            k=k,
+            theta=theta_params
+        )
+
+        # 4. 将分配结果写回任务（过滤投入金额少于5*side_price的decision）
+        allocation_map = {alloc['id']: alloc for alloc in allocations}
+
+        processed_count = 0
+        filtered_count = 0  # 被过滤掉的任务数
+
+        for market_id, task in task_map.items():
+            alloc = allocation_map.get(market_id)
+
+            if alloc:
+                # 有分配结果，检查投入金额是否满足最小阈值
+                side_price = alloc['price']  # 交易方向的价格
+                min_invest = 5.0 * side_price  # 最小投入金额阈值
+
+                if alloc['invest'] < min_invest:
+                    # 投入金额不足，过滤掉
+                    task.result = {
+                        'decision': 'skip',
+                        'reason': f'投入金额${alloc["invest"]:.2f}低于最小阈值${min_invest:.2f} (5*{side_price:.2f})',
+                        'wealth': wealth,
+                        'filtered': True,
+                        'original_allocation': {
+                            'side': alloc['side'],
+                            'dollars': alloc['invest'],
+                            'shares': alloc['shares'],
+                            'cost': alloc['price']
+                        }
+                    }
+                    filtered_count += 1
+
+                    logger.info(
+                        "TASKS.API.DECISION.FILTERED",
+                        msg=f"过滤低投入任务: {task.id}",
+                        extra={
+                            "task_id": task.id,
+                            "market_id": market_id,
+                            "invest": alloc['invest'],
+                            "min_invest": min_invest,
+                            "side_price": side_price
+                        }
+                    )
+                else:
+                    # 投入金额满足要求
+                    # 计算评分（基于投资金额占总资金的比例）
+                    score = alloc['invest'] / wealth if wealth > 0 else 0.0
+
+                    task.result = {
+                        'decision': 'trade',
+                        'allocation': {
+                            'side': alloc['side'],
+                            'score': score,
+                            'fraction_of_gross': alloc['f'],
+                            'dollars': alloc['invest'],
+                            'shares': alloc['shares'],
+                            'cost': alloc['price']
+                        },
+                        'wealth': wealth,
+                        'locked_value': locked_value
+                    }
+            else:
+                # 无分配（不值得交易）
+                task.result = {
+                    'decision': 'skip',
+                    'reason': '根据Kelly准则，当前市场不值得交易',
+                    'wealth': wealth
+                }
+            task.stage = TaskStage.TRADE
+            task.status = TaskStatus.WAITING
+            db.update_async_task(task)
+            processed_count += 1
+
+        logger.info(
+            "TASKS.API.DECISION.EXECUTE.SUCCESS",
+            msg=f"决策处理完成: {processed_count}个任务, 过滤{filtered_count}个低投入任务",
+            extra={
+                "processed_count": processed_count,
+                "allocation_count": len(allocations),
+                "filtered_count": filtered_count,
+                "actual_trade_count": processed_count - filtered_count - (len(task_map) - len(allocations))
+            }
+        )
+
+        return jsonify({
+            'success': True,
+            'message': f'决策处理完成，处理了{processed_count}个任务，过滤了{filtered_count}个低投入任务',
+            'data': {
+                'processed_count': processed_count,
+                'filtered_count': filtered_count,
+                'allocations': allocations,
+                'summary': {
+                    'total_tasks': len(pending_tasks),
+                    'valid_markets': len(markets),
+                    'tradable_markets': len(allocations),
+                    'filtered_markets': filtered_count,
+                    'actual_trade_markets': len([a for a in allocations if a['invest'] >= 5.0 * a['price']]),
+                    'wealth': wealth,
+                    'locked_value': locked_value
+                }
+            }
+        }), 200
+
+    except Exception as e:
+        logger.error(
+            "TASKS.API.DECISION.EXECUTE.ERROR",
+            msg="决策处理失败",
+            error_code="E-TASKS-API-016",
+            extra={"error": str(e)}
+        )
+        return jsonify({
+            'success': False,
+            'message': f'决策处理失败: {str(e)}'
+        }), 500

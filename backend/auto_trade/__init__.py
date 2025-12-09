@@ -6,6 +6,7 @@
 - 订单簿分析
 - 滑点控制
 - 限价单执行
+- 智能扫单交易
 """
 
 from .auto_trade import (
@@ -17,6 +18,11 @@ from .auto_trade import (
     get_execution_summary,
 )
 
+from .auto_trade_exec import (
+    scan_orderbook,
+    trade,
+)
+
 __all__ = [
     "AutoTrader",
     "OrderBookAnalysis",
@@ -24,5 +30,7 @@ __all__ = [
     "TradeExecution",
     "execute_auto_trading",
     "get_execution_summary",
+    "scan_orderbook",
+    "trade",
 ]
 

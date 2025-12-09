@@ -17,6 +17,7 @@ from .routes.scheduler import scheduler_bp
 from .routes.tasks import tasks_bp
 from .routes.filter import filter_bp
 from .routes.sys_settings import sys_settings_bp
+from .routes.purse import purse_bp
 from .handlers.errors import register_error_handlers
 
 
@@ -31,6 +32,10 @@ def create_app():
 
     # 允许跨域请求(开发环境)
     CORS(app)
+
+    # 初始化配置数据库（确保所有表都存在）
+    from ..sys_configs import init_config_database
+    init_config_database()
 
     # 初始化任务管理器
     from ..task_manager import init_task_manager
@@ -47,6 +52,7 @@ def create_app():
     app.register_blueprint(tasks_bp)
     app.register_blueprint(filter_bp)
     app.register_blueprint(sys_settings_bp)
+    app.register_blueprint(purse_bp)
 
     # 注册错误处理器
     register_error_handlers(app)

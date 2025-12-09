@@ -71,6 +71,7 @@ export default {
       { id: 'tasks', name: '任务管理', icon: '📋' },
       { id: 'filter', name: '过滤', icon: '🔍' },
       { id: 'analysis', name: '分析', icon: '📈' },
+      { id: 'decision', name: '决策', icon: '🎯' },
       { id: 'trade', name: '交易', icon: '💱' },
       { id: 'monitor', name: '监控', icon: '👁️' },
       { id: 'logs', name: '日志管理', icon: '📝' },

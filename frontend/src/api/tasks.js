@@ -136,3 +136,33 @@ export function splitAnalysisTask(taskId) {
     method: 'post'
   })
 }
+
+/**
+ * 获取待决策任务列表
+ */
+export function getPendingDecisionTasks() {
+  return request({
+    url: '/tasks/decision/pending',
+    method: 'get'
+  })
+}
+
+/**
+ * 执行决策处理
+ */
+export function executeDecision() {
+  return request({
+    url: '/tasks/decision/execute',
+    method: 'post'
+  })
+}
+
+/**
+ * 获取待交易任务列表
+ */
+export function getPendingTradeTasks() {
+  return request({
+    url: '/tasks/trade/pending',
+    method: 'get'
+  })
+}

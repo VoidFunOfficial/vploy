@@ -1272,6 +1272,8 @@ class GammaMarketsAPI:
 
 # ==================== 便捷函数 ====================
 
+
+
 def get_active_markets(timeout: int = 30, proxy: str = None, limit: Optional[int] = None) -> List[Market]:
     """
     获取活跃市场的便捷函数

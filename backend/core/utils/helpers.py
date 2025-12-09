@@ -37,10 +37,10 @@ def event_to_dict(event) -> Dict[str, Any]:
 def market_to_dict(market) -> Dict[str, Any]:
     """
     将 Market 对象转换为字典
-    
+
     参数:
         market: Market 对象
-        
+
     返回:
         dict: Market 对象的字典表示
     """
@@ -54,10 +54,8 @@ def market_to_dict(market) -> Dict[str, Any]:
         'volume': market.volume,
         'liquidity': market.liquidity,
         'end_date': market.end_date,
-        'category': market.category,
+        'tau': market.tau,
         'tags': market.tags,
-        'events': market.events,
-        'closedTime': market.closedTime,
         'marks': list(market.marks) if market.marks else [],
         'negRisk': market.negRisk,
         'clobTokenIds': market.clobTokenIds

@@ -217,6 +217,19 @@ def register_all_events():
     register_error("E-POSITION-007", "RECORD_ERROR", "处理监听记录时发生异常", "error", overwrite=True)
     register_error("E-POSITION-008", "CHECK_ERROR", "检查持仓监听列表时发生异常", "error", overwrite=True)
     register_error("E-POSITION-009", "INVALID_SHARES", "shares参数无效", "error", overwrite=True)
+
+    # EVT-TRADE-xxx 系列事件
+    register_event("EVT-TRADE-001", "TRADE.SCAN.START", "开始扫描订单簿", overwrite=True)
+    register_event("EVT-TRADE-002", "TRADE.SCAN.ORDERBOOK", "获取订单簿成功", overwrite=True)
+    register_event("EVT-TRADE-003", "TRADE.SCAN.SUCCESS", "订单簿扫描成功", overwrite=True)
+    register_event("EVT-TRADE-004", "TRADE.ORDER.CREATE", "创建限价单", overwrite=True)
+    register_event("EVT-TRADE-005", "TRADE.EXECUTE.START", "开始执行交易", overwrite=True)
+    register_event("EVT-TRADE-006", "TRADE.EXECUTE.SUCCESS", "交易执行成功", overwrite=True)
+
+    # E-TRADE-xxx 系列错误码
+    register_error("E-TRADE-001", "SCAN_ERROR", "扫描订单簿失败", "error", overwrite=True)
+    register_error("E-TRADE-002", "EXECUTE_ERROR", "交易执行失败", "error", overwrite=True)
+
 def register_need_to_alert():
     register_alert_rule(AlertRule("E-TOKEN-001", AlertLevel.P0, enabled=True))
 # 在模块导入时自动注册所有事件
