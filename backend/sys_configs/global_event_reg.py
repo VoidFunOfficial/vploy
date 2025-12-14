@@ -4,7 +4,7 @@
 统一管理所有模块的事件注册码和错误码，提供全局 VLogger 实例。
 """
 
-from ..vlogger import get_logger, register_event, register_error
+from ..vlogger import get_logger, register_event, register_error, register_alert_rule, AlertRule, AlertLevel
 
 # 创建全局 VLogger 实例
 vlogger = get_logger("voidpoly")
@@ -231,9 +231,79 @@ def register_all_events():
     register_error("E-TRADE-002", "EXECUTE_ERROR", "交易执行失败", "error", overwrite=True)
 
 def register_need_to_alert():
-    register_alert_rule(AlertRule("E-TOKEN-001", AlertLevel.P0, enabled=True))
+    """注册所有需要告警的错误码"""
+
+    # 所有错误码列表（从error_codes.json提取）
+    error_codes = [
+        "E-ANALYSIS-001", "E-ANALYSIS-002", "E-ANALYSIS-003", "E-ANALYSIS-007",
+        "E-API-001", "E-API-002", "E-API-003", "E-API-004", "E-API-005", "E-API-006",
+        "E-API-007", "E-API-008", "E-API-009", "E-API-010", "E-API-011", "E-API-012",
+        "E-API-013", "E-API-014", "E-API-015", "E-API-016", "E-API-017", "E-API-018",
+        "E-API-PURSE-001", "E-API-PURSE-002", "E-API-PURSE-003", "E-API-PURSE-004",
+        "E-API-PURSE-005", "E-API-PURSE-006", "E-API-PURSE-007", "E-API-PURSE-008",
+        "E-APPROVE-001", "E-APPROVE-002", "E-APPROVE-003",
+        "E-AT-CONFIG-001", "E-AT-CONFIG-002", "E-AT-CONFIG-003", "E-AT-CONFIG-004",
+        "E-AT-CONFIG-005", "E-AT-CONFIG-006",
+        "E-CLOB-001",
+        "E-COZE-001", "E-COZE-002", "E-COZE-003", "E-COZE-004",
+        "E-DATA-001",
+        "E-DYNAMIC-SCHEDULER-001", "E-DYNAMIC-SCHEDULER-002", "E-DYNAMIC-SCHEDULER-003",
+        "E-DYNAMIC-SCHEDULER-004", "E-DYNAMIC-SCHEDULER-005", "E-DYNAMIC-SCHEDULER-006",
+        "E-DYNAMIC-SCHEDULER-007", "E-DYNAMIC-SCHEDULER-008", "E-DYNAMIC-SCHEDULER-009",
+        "E-DYNAMIC-SCHEDULER-010", "E-DYNAMIC-SCHEDULER-011", "E-DYNAMIC-SCHEDULER-012",
+        "E-DYNAMIC-SCHEDULER-013",
+        "E-FILTER-005",
+        "E-ICEBERG-001", "E-ICEBERG-002", "E-ICEBERG-003", "E-ICEBERG-004", "E-ICEBERG-005",
+        "E-MANAGER-001", "E-MANAGER-003",
+        "E-MARK-001", "E-MARK-002", "E-MARK-003",
+        "E-OB-001", "E-OB-002", "E-OB-003",
+        "E-PLDB-001",
+        "E-PM-001", "E-PM-002", "E-PM-003", "E-PM-005", "E-PM-006", "E-PM-007",
+        "E-POLL-001", "E-POLL-002", "E-POLL-003", "E-POLL-004", "E-POLL-005",
+        "E-POLL-006", "E-POLL-007", "E-POLL-008",
+        "E-PURSE-001", "E-PURSE-002", "E-PURSE-003", "E-PURSE-004", "E-PURSE-005",
+        "E-PURSE-006", "E-PURSE-007", "E-PURSE-008", "E-PURSE-009", "E-PURSE-010",
+        "E-PURSE-012", "E-PURSE-013", "E-PURSE-014", "E-PURSE-015", "E-PURSE-016",
+        "E-PURSE-017",
+        "E-REPORT-001",
+        "E-RETRY-001", "E-RETRY-002", "E-RETRY-003", "E-RETRY-004",
+        "E-SCHEDULER-001", "E-SCHEDULER-002", "E-SCHEDULER-003", "E-SCHEDULER-004",
+        "E-SCHEDULER-005", "E-SCHEDULER-006", "E-SCHEDULER-007",
+        "E-SCHEDULER-API-001", "E-SCHEDULER-API-002", "E-SCHEDULER-API-003",
+        "E-SCHEDULER-API-004", "E-SCHEDULER-API-005", "E-SCHEDULER-API-006",
+        "E-SPLIT-001", "E-SPLIT-002",
+        "E-SUBMIT-001", "E-SUBMIT-002", "E-SUBMIT-003", "E-SUBMIT-004", "E-SUBMIT-005",
+        "E-SYS-001", "E-SYS-004",
+        "E-TASK-001", "E-TASK-002",
+        "E-TASK-MANAGER-001",
+        "E-TASKS-API-001", "E-TASKS-API-002", "E-TASKS-API-003", "E-TASKS-API-004",
+        "E-TASKS-API-005", "E-TASKS-API-006", "E-TASKS-API-007", "E-TASKS-API-008",
+        "E-TASKS-API-009", "E-TASKS-API-010", "E-TASKS-API-011", "E-TASKS-API-012",
+        "E-TASKS-API-013", "E-TASKS-API-014", "E-TASKS-API-015", "E-TASKS-API-016",
+        "E-TASKS-API-017", "E-TASKS-API-018", "E-TASKS-API-019", "E-TASKS-API-020",
+        "E-TASKS-API-021", "E-TASKS-API-022", "E-TASKS-API-023", "E-TASKS-API-024",
+        "E-TASKS-API-025", "E-TASKS-API-026", "E-TASKS-API-027",
+        "E-TOKEN-001",
+        "E-TRADE-001", "E-TRADE-002", "E-TRADE-003", "E-TRADE-004", "E-TRADE-005",
+        "E-TRADE-006", "E-TRADE-007", "E-TRADE-008",
+        "E-WS-001", "E-WS-003", "E-WS-004", "E-WS-005", "E-WS-008", "E-WS-009"
+    ]
+
+    # 批量注册告警规则（默认P1级别）
+    for error_code in error_codes:
+        register_alert_rule(AlertRule(
+            event_code=error_code,
+            level=AlertLevel.P1,
+            enabled=True,
+            dedup_window_seconds=60,
+            throttle_max_per_minute=2
+        ))
+
+    vlogger.info("EVT-1004", msg="错误码告警规则注册完成", extra={"total_codes": len(error_codes)})
+
 # 在模块导入时自动注册所有事件
 register_all_events()
+register_need_to_alert()
 
 # 记录初始化完成
-vlogger.info("EVT-1003", msg="全局事件注册完成", extra={"total_events": "70+", "total_errors": "39+"})
+vlogger.info("EVT-1003", msg="全局事件和告警规则注册完成", extra={"total_events": "70+", "total_errors": "39+", "total_alert_rules": 175})

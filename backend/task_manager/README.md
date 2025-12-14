@@ -110,15 +110,27 @@ huey_consumer backend.task_manager.tasks.huey
 
 ### 任务阶段（TaskStage）
 
-- `MARK`: 标记阶段 - 需要用户手动确认的任务
-- `ANALYSIS`: 分析阶段 - AI 分析和数据处理
-- `DECISION`: 决策阶段 - 自动决策和策略选择
-- `TRADE`: 交易阶段 - 执行交易操作
-- `LISTEN`: 监听阶段 - 监听市场变化和事件
+任务按以下顺序流转：
+
+- `ANALYSIS`: 分析阶段 - AI 分析和数据处理（第一阶段）
+- `DECISION`: 决策阶段 - 自动决策和策略选择（第二阶段）
+- `MARK`: 标记阶段 - 事件标记处理（第三阶段）
+- `TRADE`: 交易阶段 - 执行交易操作（第四阶段）
+- `LISTEN`: 监听阶段 - 监听市场变化和事件（第五阶段）
+
+### 完整工作流程
+
+```
+event_sniffing → ANALYSIS(WAITING) → [用户批准] → ANALYSIS(PROCESSING)
+→ [自动拆分] → DECISION(WAITING) → [用户批准] → DECISION(PROCESSING)
+→ MARK(WAITING) → [用户批准] → MARK(PROCESSING)
+→ TRADE(WAITING) → [用户批准] → TRADE(PROCESSING)
+→ LISTEN(WAITING) → LISTEN(PROCESSING)
+```
 
 ### 任务状态（TaskStatus）
 
-- `WAITING`: 等待中 - 任务已创建，等待处理
+- `WAITING`: 等待中 - 任务已创建，等待用户批准
 - `PROCESSING`: 处理中 - 任务正在执行
 - `FINISHED`: 已完成 - 任务成功完成
 - `FAILED`: 失败 - 任务执行失败
@@ -129,18 +141,18 @@ huey_consumer backend.task_manager.tasks.huey
 
 ### 已注册的处理函数
 
-| Stage | Status | 处理函数 | 说明 |
-|-------|--------|---------|------|
-| MARK | WAITING | `handle_mark_waiting` | 等待用户确认 |
-| MARK | PROCESSING | `handle_mark_processing` | 执行标记处理 |
-| ANALYSIS | WAITING | `handle_analysis_waiting` | 准备开始分析 |
-| ANALYSIS | PROCESSING | `handle_analysis_processing` | 执行分析处理 |
-| DECISION | WAITING | `handle_decision_waiting` | 准备开始决策 |
-| DECISION | PROCESSING | `handle_decision_processing` | 执行决策处理 |
-| TRADE | WAITING | `handle_trade_waiting` | 准备开始交易 |
-| TRADE | PROCESSING | `handle_trade_processing` | 执行交易处理 |
-| LISTEN | WAITING | `handle_listen_waiting` | 准备开始监听 |
-| LISTEN | PROCESSING | `handle_listen_processing` | 执行监听处理 |
+| Stage | Status | 处理函数 | 说明 | 完成后转换 |
+|-------|--------|---------|------|-----------|
+| ANALYSIS | WAITING | `handle_analysis_waiting` | 等待用户批准开始分析 | 保持WAITING |
+| ANALYSIS | PROCESSING | `handle_analysis_processing` | 执行分析处理，自动拆分为decision任务 | 自动拆分 |
+| DECISION | WAITING | `handle_decision_waiting` | 等待用户批准开始决策 | 保持WAITING |
+| DECISION | PROCESSING | `handle_decision_processing` | 执行决策处理 | MARK+WAITING |
+| MARK | WAITING | `handle_mark_waiting` | 等待用户批准开始标记 | 保持WAITING |
+| MARK | PROCESSING | `handle_mark_processing` | 执行标记处理 | TRADE+WAITING |
+| TRADE | WAITING | `handle_trade_waiting` | 等待用户批准开始交易 | 保持WAITING |
+| TRADE | PROCESSING | `handle_trade_processing` | 执行交易处理 | LISTEN+WAITING |
+| LISTEN | WAITING | `handle_listen_waiting` | 等待开始监听 | 保持WAITING |
+| LISTEN | PROCESSING | `handle_listen_processing` | 执行监听处理 | FINISHED |
 
 ### 自定义处理函数
 

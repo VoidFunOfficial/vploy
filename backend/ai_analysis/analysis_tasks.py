@@ -506,24 +506,7 @@ def poll_gpt_result(
                 )
                 return
 
-            # 检查conversation_id
-            conversation_id = task.result.get("conversation_id")
-            if not conversation_id:
-                error_msg = "缺少conversation_id，无法轮询结果"
-                task.error_msg = error_msg
-                task.result["analysis_status"] = AnalysisStatus.FAILED.value
-                task.result["error"] = error_msg
-                db.update_async_task(task)
-                logger.error(
-                    "ANALYSIS.POLL.NO_CONVERSATION_ID",
-                    msg=error_msg,
-                    error_code="E-POLL-002",
-                    extra={"async_task_id": async_task_id},
-                    trace_id=trace_id
-                )
-                return
-
-            # 获取Cookie
+            # 获取Cookie（提前准备，避免在延迟后才发现token问题）
             token_refresher = get_token_refresher()
             access_token_status = token_refresher.get_token_status(TokenType.ACCESS_TOKEN.value)
             auth_token_status = token_refresher.get_token_status(TokenType.AUTH_TOKEN.value)
@@ -564,14 +547,42 @@ def poll_gpt_result(
             cookie_string = f"__Secure-access_token={access_token};__Secure-auth_token={auth_token}"
             cookies_dict = parse_cookie_string(cookie_string)
 
-            # 等待初始延迟
+            # 等待初始延迟（让submit_gpt_request有时间完成）
             logger.info(
                 "ANALYSIS.POLL.WAITING",
-                msg=f"等待初始延迟 {initial_delay} 秒",
+                msg=f"等待初始延迟 {initial_delay} 秒（等待GPT请求提交完成）",
                 extra={"async_task_id": async_task_id, "delay": initial_delay},
                 trace_id=trace_id
             )
             time.sleep(initial_delay)
+
+            # 延迟后重新获取任务，检查conversation_id
+            task = db.get_async_task(async_task_id)
+            if not task:
+                logger.error(
+                    "ANALYSIS.POLL.NOT_FOUND_AFTER_DELAY",
+                    msg=f"延迟后任务不存在: {async_task_id}",
+                    error_code="E-POLL-001",
+                    extra={"async_task_id": async_task_id},
+                    trace_id=trace_id
+                )
+                return
+
+            conversation_id = task.result.get("conversation_id")
+            if not conversation_id:
+                error_msg = "等待初始延迟后仍缺少conversation_id，GPT请求可能失败"
+                task.error_msg = error_msg
+                task.result["analysis_status"] = AnalysisStatus.FAILED.value
+                task.result["error"] = error_msg
+                db.update_async_task(task)
+                logger.error(
+                    "ANALYSIS.POLL.NO_CONVERSATION_ID",
+                    msg=error_msg,
+                    error_code="E-POLL-002",
+                    extra={"async_task_id": async_task_id},
+                    trace_id=trace_id
+                )
+                return
 
             # 轮询结果
             start_time = time.time()
@@ -626,10 +637,10 @@ def poll_gpt_result(
                         task.metadata["analysis_result"] = parsed_json
                         task.metadata["market_ids"] = list(parsed_json.keys())
                         db.update_async_task(task)
-                        
+
                         logger.info(
                             "ANALYSIS.POLL.SUCCESS",
-                            msg="分析完成",
+                            msg="分析完成,准备自动拆分为decision任务",
                             extra={
                                 "async_task_id": async_task_id,
                                 "market_count": len(parsed_json),
@@ -638,6 +649,44 @@ def poll_gpt_result(
                             },
                             trace_id=trace_id
                         )
+
+                        # 自动拆分为decision任务
+                        try:
+                            split_result = split_analysis_task(async_task_id)
+                            if split_result.get("success"):
+                                logger.info(
+                                    "ANALYSIS.POLL.AUTO_SPLIT_SUCCESS",
+                                    msg=f"自动拆分成功,创建了{split_result.get('success_count')}个decision任务",
+                                    extra={
+                                        "async_task_id": async_task_id,
+                                        "created_tasks": split_result.get("created_tasks"),
+                                        "success_count": split_result.get("success_count")
+                                    },
+                                    trace_id=trace_id
+                                )
+                            else:
+                                logger.error(
+                                    "ANALYSIS.POLL.AUTO_SPLIT_FAILED",
+                                    msg=f"自动拆分失败: {split_result.get('message')}",
+                                    error_code="E-POLL-007",
+                                    extra={
+                                        "async_task_id": async_task_id,
+                                        "error": split_result.get("message")
+                                    },
+                                    trace_id=trace_id
+                                )
+                        except Exception as split_error:
+                            logger.error(
+                                "ANALYSIS.POLL.AUTO_SPLIT_EXCEPTION",
+                                msg=f"自动拆分异常: {str(split_error)}",
+                                error_code="E-POLL-008",
+                                extra={
+                                    "async_task_id": async_task_id,
+                                    "exception": str(split_error)
+                                },
+                                trace_id=trace_id
+                            )
+
                         return
                     else:
                         # 验证失败，直接标记为失败（不再重新请求）

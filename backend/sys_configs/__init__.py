@@ -33,15 +33,6 @@ from .auth_config import (
     get_auth_config,
 )
 
-from .position_listen_config import (
-    add_position_listen,
-    get_position_listen_list,
-    update_position_listen,
-    remove_position_listen,
-    deactivate_position_listen,
-    clear_position_listen_list,
-)
-
 from .token_refresher import (
     TokenRefresher,
     TokenType,
@@ -77,13 +68,6 @@ __all__ = [
     # 认证配置
     "AuthConfig",
     "get_auth_config",
-    # 持仓监听配置
-    "add_position_listen",
-    "get_position_listen_list",
-    "update_position_listen",
-    "remove_position_listen",
-    "deactivate_position_listen",
-    "clear_position_listen_list",
     # Token 刷新管理
     "TokenRefresher",
     "TokenType",

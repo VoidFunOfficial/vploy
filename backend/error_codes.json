@@ -1,0 +1,1493 @@
+{
+  "summary": {
+    "total_unique_codes": 175,
+    "total_occurrences": 218
+  },
+  "error_codes": [
+    "E-ANALYSIS-001",
+    "E-ANALYSIS-002",
+    "E-ANALYSIS-003",
+    "E-ANALYSIS-007",
+    "E-API-001",
+    "E-API-002",
+    "E-API-003",
+    "E-API-004",
+    "E-API-005",
+    "E-API-006",
+    "E-API-007",
+    "E-API-008",
+    "E-API-009",
+    "E-API-010",
+    "E-API-011",
+    "E-API-012",
+    "E-API-013",
+    "E-API-014",
+    "E-API-015",
+    "E-API-016",
+    "E-API-017",
+    "E-API-018",
+    "E-API-PURSE-001",
+    "E-API-PURSE-002",
+    "E-API-PURSE-003",
+    "E-API-PURSE-004",
+    "E-API-PURSE-005",
+    "E-API-PURSE-006",
+    "E-API-PURSE-007",
+    "E-API-PURSE-008",
+    "E-APPROVE-001",
+    "E-APPROVE-002",
+    "E-APPROVE-003",
+    "E-AT-CONFIG-001",
+    "E-AT-CONFIG-002",
+    "E-AT-CONFIG-003",
+    "E-AT-CONFIG-004",
+    "E-AT-CONFIG-005",
+    "E-AT-CONFIG-006",
+    "E-CLOB-001",
+    "E-COZE-001",
+    "E-COZE-002",
+    "E-COZE-003",
+    "E-COZE-004",
+    "E-DATA-001",
+    "E-DYNAMIC-SCHEDULER-001",
+    "E-DYNAMIC-SCHEDULER-002",
+    "E-DYNAMIC-SCHEDULER-003",
+    "E-DYNAMIC-SCHEDULER-004",
+    "E-DYNAMIC-SCHEDULER-005",
+    "E-DYNAMIC-SCHEDULER-006",
+    "E-DYNAMIC-SCHEDULER-007",
+    "E-DYNAMIC-SCHEDULER-008",
+    "E-DYNAMIC-SCHEDULER-009",
+    "E-DYNAMIC-SCHEDULER-010",
+    "E-DYNAMIC-SCHEDULER-011",
+    "E-DYNAMIC-SCHEDULER-012",
+    "E-DYNAMIC-SCHEDULER-013",
+    "E-FILTER-005",
+    "E-ICEBERG-001",
+    "E-ICEBERG-002",
+    "E-ICEBERG-003",
+    "E-ICEBERG-004",
+    "E-ICEBERG-005",
+    "E-MANAGER-001",
+    "E-MANAGER-003",
+    "E-MARK-001",
+    "E-MARK-002",
+    "E-MARK-003",
+    "E-OB-001",
+    "E-OB-002",
+    "E-OB-003",
+    "E-PLDB-001",
+    "E-PM-001",
+    "E-PM-002",
+    "E-PM-003",
+    "E-PM-005",
+    "E-PM-006",
+    "E-PM-007",
+    "E-POLL-001",
+    "E-POLL-002",
+    "E-POLL-003",
+    "E-POLL-004",
+    "E-POLL-005",
+    "E-POLL-006",
+    "E-POLL-007",
+    "E-POLL-008",
+    "E-PURSE-001",
+    "E-PURSE-002",
+    "E-PURSE-003",
+    "E-PURSE-004",
+    "E-PURSE-005",
+    "E-PURSE-006",
+    "E-PURSE-007",
+    "E-PURSE-008",
+    "E-PURSE-009",
+    "E-PURSE-010",
+    "E-PURSE-012",
+    "E-PURSE-013",
+    "E-PURSE-014",
+    "E-PURSE-015",
+    "E-PURSE-016",
+    "E-PURSE-017",
+    "E-REPORT-001",
+    "E-RETRY-001",
+    "E-RETRY-002",
+    "E-RETRY-003",
+    "E-RETRY-004",
+    "E-SCHEDULER-001",
+    "E-SCHEDULER-002",
+    "E-SCHEDULER-003",
+    "E-SCHEDULER-004",
+    "E-SCHEDULER-005",
+    "E-SCHEDULER-006",
+    "E-SCHEDULER-007",
+    "E-SCHEDULER-API-001",
+    "E-SCHEDULER-API-002",
+    "E-SCHEDULER-API-003",
+    "E-SCHEDULER-API-004",
+    "E-SCHEDULER-API-005",
+    "E-SCHEDULER-API-006",
+    "E-SPLIT-001",
+    "E-SPLIT-002",
+    "E-SUBMIT-001",
+    "E-SUBMIT-002",
+    "E-SUBMIT-003",
+    "E-SUBMIT-004",
+    "E-SUBMIT-005",
+    "E-SYS-001",
+    "E-SYS-004",
+    "E-TASK-001",
+    "E-TASK-002",
+    "E-TASK-MANAGER-001",
+    "E-TASKS-API-001",
+    "E-TASKS-API-002",
+    "E-TASKS-API-003",
+    "E-TASKS-API-004",
+    "E-TASKS-API-005",
+    "E-TASKS-API-006",
+    "E-TASKS-API-007",
+    "E-TASKS-API-008",
+    "E-TASKS-API-009",
+    "E-TASKS-API-010",
+    "E-TASKS-API-011",
+    "E-TASKS-API-012",
+    "E-TASKS-API-013",
+    "E-TASKS-API-014",
+    "E-TASKS-API-015",
+    "E-TASKS-API-016",
+    "E-TASKS-API-017",
+    "E-TASKS-API-018",
+    "E-TASKS-API-019",
+    "E-TASKS-API-020",
+    "E-TASKS-API-021",
+    "E-TASKS-API-022",
+    "E-TASKS-API-023",
+    "E-TASKS-API-024",
+    "E-TASKS-API-025",
+    "E-TASKS-API-026",
+    "E-TASKS-API-027",
+    "E-TOKEN-001",
+    "E-TRADE-001",
+    "E-TRADE-002",
+    "E-TRADE-003",
+    "E-TRADE-004",
+    "E-TRADE-005",
+    "E-TRADE-006",
+    "E-TRADE-007",
+    "E-TRADE-008",
+    "E-WS-001",
+    "E-WS-003",
+    "E-WS-004",
+    "E-WS-005",
+    "E-WS-008",
+    "E-WS-009"
+  ],
+  "details": [
+    {
+      "file": "ai_analysis\\ai_mark.py",
+      "line": 21,
+      "error_code": "E-MARK-001",
+      "event": "EVT-8065"
+    },
+    {
+      "file": "ai_analysis\\analysis_tasks.py",
+      "line": 323,
+      "error_code": "E-SUBMIT-001",
+      "event": "ANALYSIS.SUBMIT.NOT_FOUND"
+    },
+    {
+      "file": "ai_analysis\\analysis_tasks.py",
+      "line": 343,
+      "error_code": "E-SUBMIT-002",
+      "event": "ANALYSIS.SUBMIT.NO_TOKEN"
+    },
+    {
+      "file": "ai_analysis\\analysis_tasks.py",
+      "line": 358,
+      "error_code": "E-SUBMIT-003",
+      "event": "ANALYSIS.SUBMIT.TOKEN_EXPIRED"
+    },
+    {
+      "file": "ai_analysis\\analysis_tasks.py",
+      "line": 385,
+      "error_code": "E-SUBMIT-004",
+      "event": "ANALYSIS.SUBMIT.NO_PROMPT"
+    },
+    {
+      "file": "ai_analysis\\analysis_tasks.py",
+      "line": 419,
+      "error_code": "E-SUBMIT-005",
+      "event": "ANALYSIS.SUBMIT.REQUEST_FAILED"
+    },
+    {
+      "file": "ai_analysis\\analysis_tasks.py",
+      "line": 500,
+      "error_code": "E-POLL-001",
+      "event": "ANALYSIS.POLL.NOT_FOUND"
+    },
+    {
+      "file": "ai_analysis\\analysis_tasks.py",
+      "line": 517,
+      "error_code": "E-POLL-002",
+      "event": "ANALYSIS.POLL.NO_CONVERSATION_ID"
+    },
+    {
+      "file": "ai_analysis\\analysis_tasks.py",
+      "line": 537,
+      "error_code": "E-POLL-003",
+      "event": "ANALYSIS.POLL.NO_TOKEN"
+    },
+    {
+      "file": "ai_analysis\\analysis_tasks.py",
+      "line": 552,
+      "error_code": "E-POLL-004",
+      "event": "ANALYSIS.POLL.TOKEN_EXPIRED"
+    },
+    {
+      "file": "ai_analysis\\analysis_tasks.py",
+      "line": 590,
+      "error_code": "E-POLL-005",
+      "event": "ANALYSIS.POLL.TIMEOUT"
+    },
+    {
+      "file": "ai_analysis\\analysis_tasks.py",
+      "line": 688,
+      "error_code": "E-POLL-006",
+      "event": "ANALYSIS.POLL.VALIDATION_FAILED"
+    },
+    {
+      "file": "ai_analysis\\analysis_tasks.py",
+      "line": 721,
+      "error_code": "E-POLL-007",
+      "event": "ANALYSIS.POLL.QUERY_FAILED"
+    },
+    {
+      "file": "ai_analysis\\analysis_tasks.py",
+      "line": 748,
+      "error_code": "E-POLL-008",
+      "event": "ANALYSIS.POLL.EXCEPTION"
+    },
+    {
+      "file": "ai_analysis\\analysis_tasks.py",
+      "line": 788,
+      "error_code": "E-TASK-002",
+      "event": "ANALYSIS.TASK.NOT_FOUND"
+    },
+    {
+      "file": "ai_analysis\\analysis_tasks.py",
+      "line": 845,
+      "error_code": "E-RETRY-001",
+      "event": "ANALYSIS.RETRY.NOT_FOUND"
+    },
+    {
+      "file": "ai_analysis\\analysis_tasks.py",
+      "line": 856,
+      "error_code": "E-RETRY-002",
+      "event": "ANALYSIS.RETRY.NO_SUMMARY"
+    },
+    {
+      "file": "ai_analysis\\analysis_tasks.py",
+      "line": 1067,
+      "error_code": "E-SPLIT-001",
+      "event": "ANALYSIS.SPLIT.MARKET_ERROR"
+    },
+    {
+      "file": "ai_analysis\\analysis_tasks.py",
+      "line": 1112,
+      "error_code": "E-SPLIT-002",
+      "event": "ANALYSIS.SPLIT.ALL_FAILED"
+    },
+    {
+      "file": "ai_analysis\\coze_api.py",
+      "line": 27,
+      "error_code": "E-COZE-002",
+      "event": "EVT-8065"
+    },
+    {
+      "file": "ai_analysis\\coze_api.py",
+      "line": 31,
+      "error_code": "E-COZE-003",
+      "event": "EVT-8066"
+    },
+    {
+      "file": "ai_analysis\\coze_api.py",
+      "line": 36,
+      "error_code": "E-COZE-004",
+      "event": "EVT-8067"
+    },
+    {
+      "file": "ai_analysis\\coze_api.py",
+      "line": 63,
+      "error_code": "E-COZE-001",
+      "event": "EVT-8064"
+    },
+    {
+      "file": "ai_analysis\\coze_api.py",
+      "line": 144,
+      "error_code": "E-FILTER-005",
+      "event": "EVT-8063"
+    },
+    {
+      "file": "ai_analysis\\deep_analysis.py",
+      "line": 111,
+      "error_code": "E-MANAGER-001",
+      "event": "ANALYSIS.MANAGER.SUBMIT_FAILED"
+    },
+    {
+      "file": "ai_analysis\\deep_analysis.py",
+      "line": 149,
+      "error_code": "E-MANAGER-003",
+      "event": "ANALYSIS.MANAGER.RETRY_FAILED"
+    },
+    {
+      "file": "auto_trade\\auto_trade_exec.py",
+      "line": 177,
+      "error_code": "E-TRADE-001",
+      "event": "TRADE.SCAN.ERROR"
+    },
+    {
+      "file": "auto_trade\\auto_trade_exec.py",
+      "line": 286,
+      "error_code": "E-TRADE-002",
+      "event": "TRADE.EXECUTE.ERROR"
+    },
+    {
+      "file": "core\\api_server.py",
+      "line": 141,
+      "error_code": "E-API-001",
+      "event": "AUTH.LOGIN.ERROR"
+    },
+    {
+      "file": "core\\api_server.py",
+      "line": 178,
+      "error_code": "E-API-002",
+      "event": "AUTH.LOGOUT.ERROR"
+    },
+    {
+      "file": "core\\api_server.py",
+      "line": 217,
+      "error_code": "E-API-003",
+      "event": "AUTH.VERIFY.ERROR"
+    },
+    {
+      "file": "core\\api_server.py",
+      "line": 275,
+      "error_code": "E-API-004",
+      "event": "MONITOR.SYSTEM.ERROR"
+    },
+    {
+      "file": "core\\api_server.py",
+      "line": 400,
+      "error_code": "E-API-005",
+      "event": "LOGS.QUERY.ERROR"
+    },
+    {
+      "file": "core\\api_server.py",
+      "line": 526,
+      "error_code": "E-API-006",
+      "event": "LOGS.EXPORT.ERROR"
+    },
+    {
+      "file": "core\\api_server.py",
+      "line": 584,
+      "error_code": "E-API-007",
+      "event": "DB.TABLES.ERROR"
+    },
+    {
+      "file": "core\\api_server.py",
+      "line": 649,
+      "error_code": "E-API-008",
+      "event": "DB.SCHEMA.ERROR"
+    },
+    {
+      "file": "core\\api_server.py",
+      "line": 738,
+      "error_code": "E-API-009",
+      "event": "DB.DATA.ERROR"
+    },
+    {
+      "file": "core\\api_server.py",
+      "line": 808,
+      "error_code": "E-API-010",
+      "event": "DB.ROW.CREATE.ERROR"
+    },
+    {
+      "file": "core\\api_server.py",
+      "line": 876,
+      "error_code": "E-API-011",
+      "event": "DB.ROW.UPDATE.ERROR"
+    },
+    {
+      "file": "core\\api_server.py",
+      "line": 922,
+      "error_code": "E-API-012",
+      "event": "DB.ROW.DELETE.ERROR"
+    },
+    {
+      "file": "core\\api_server.py",
+      "line": 990,
+      "error_code": "E-API-013",
+      "event": "API.POLYMARKET.EVENT.ERROR"
+    },
+    {
+      "file": "core\\api_server.py",
+      "line": 1055,
+      "error_code": "E-API-013",
+      "event": "API.POLYMARKET.EVENT.ERROR"
+    },
+    {
+      "file": "core\\api_server.py",
+      "line": 1124,
+      "error_code": "E-API-014",
+      "event": "API.POLYMARKET.MARKET.ERROR"
+    },
+    {
+      "file": "core\\api_server.py",
+      "line": 1192,
+      "error_code": "E-API-014",
+      "event": "API.POLYMARKET.MARKET.ERROR"
+    },
+    {
+      "file": "core\\routes\\auth.py",
+      "line": 97,
+      "error_code": "E-API-001",
+      "event": "AUTH.LOGIN.ERROR"
+    },
+    {
+      "file": "core\\routes\\auth.py",
+      "line": 134,
+      "error_code": "E-API-002",
+      "event": "AUTH.LOGOUT.ERROR"
+    },
+    {
+      "file": "core\\routes\\auth.py",
+      "line": 173,
+      "error_code": "E-API-003",
+      "event": "AUTH.VERIFY.ERROR"
+    },
+    {
+      "file": "core\\routes\\database.py",
+      "line": 70,
+      "error_code": "E-API-007",
+      "event": "DB.TABLES.ERROR"
+    },
+    {
+      "file": "core\\routes\\database.py",
+      "line": 135,
+      "error_code": "E-API-008",
+      "event": "DB.SCHEMA.ERROR"
+    },
+    {
+      "file": "core\\routes\\database.py",
+      "line": 243,
+      "error_code": "E-API-009",
+      "event": "DB.DATA.ERROR"
+    },
+    {
+      "file": "core\\routes\\database.py",
+      "line": 313,
+      "error_code": "E-API-010",
+      "event": "DB.ROW.CREATE.ERROR"
+    },
+    {
+      "file": "core\\routes\\database.py",
+      "line": 381,
+      "error_code": "E-API-011",
+      "event": "DB.ROW.UPDATE.ERROR"
+    },
+    {
+      "file": "core\\routes\\database.py",
+      "line": 427,
+      "error_code": "E-API-012",
+      "event": "DB.ROW.DELETE.ERROR"
+    },
+    {
+      "file": "core\\routes\\logs.py",
+      "line": 135,
+      "error_code": "E-API-005",
+      "event": "LOGS.QUERY.ERROR"
+    },
+    {
+      "file": "core\\routes\\logs.py",
+      "line": 261,
+      "error_code": "E-API-006",
+      "event": "LOGS.EXPORT.ERROR"
+    },
+    {
+      "file": "core\\routes\\monitor.py",
+      "line": 58,
+      "error_code": "E-API-004",
+      "event": "MONITOR.SYSTEM.ERROR"
+    },
+    {
+      "file": "core\\routes\\polymarket.py",
+      "line": 61,
+      "error_code": "E-API-013",
+      "event": "API.POLYMARKET.EVENT.ERROR"
+    },
+    {
+      "file": "core\\routes\\polymarket.py",
+      "line": 112,
+      "error_code": "E-API-013",
+      "event": "API.POLYMARKET.EVENT.ERROR"
+    },
+    {
+      "file": "core\\routes\\polymarket.py",
+      "line": 164,
+      "error_code": "E-API-014",
+      "event": "API.POLYMARKET.MARKET.ERROR"
+    },
+    {
+      "file": "core\\routes\\polymarket.py",
+      "line": 215,
+      "error_code": "E-API-014",
+      "event": "API.POLYMARKET.MARKET.ERROR"
+    },
+    {
+      "file": "core\\routes\\purse.py",
+      "line": 54,
+      "error_code": "E-API-PURSE-001",
+      "event": "PURSE.STATUS.ERROR"
+    },
+    {
+      "file": "core\\routes\\purse.py",
+      "line": 94,
+      "error_code": "E-API-PURSE-002",
+      "event": "PURSE.SUMMARY.ERROR"
+    },
+    {
+      "file": "core\\routes\\purse.py",
+      "line": 153,
+      "error_code": "E-API-PURSE-008",
+      "event": "PURSE.STATUS.UPDATE.ERROR"
+    },
+    {
+      "file": "core\\routes\\purse.py",
+      "line": 209,
+      "error_code": "E-API-PURSE-003",
+      "event": "PURSE.DAILY.GET.ERROR"
+    },
+    {
+      "file": "core\\routes\\purse.py",
+      "line": 259,
+      "error_code": "E-API-PURSE-004",
+      "event": "PURSE.DAILY.GET.ERROR"
+    },
+    {
+      "file": "core\\routes\\purse.py",
+      "line": 327,
+      "error_code": "E-API-PURSE-005",
+      "event": "PURSE.DAILY.ADD.ERROR"
+    },
+    {
+      "file": "core\\routes\\purse.py",
+      "line": 394,
+      "error_code": "E-API-PURSE-006",
+      "event": "PURSE.DAILY.UPDATE.ERROR"
+    },
+    {
+      "file": "core\\routes\\purse.py",
+      "line": 432,
+      "error_code": "E-API-PURSE-007",
+      "event": "PURSE.DAILY.DELETE.ERROR"
+    },
+    {
+      "file": "core\\routes\\scheduler.py",
+      "line": 72,
+      "error_code": "E-SCHEDULER-API-001",
+      "event": "SCHEDULER.API.LIST.ERROR"
+    },
+    {
+      "file": "core\\routes\\scheduler.py",
+      "line": 113,
+      "error_code": "E-SCHEDULER-API-002",
+      "event": "SCHEDULER.API.GET.ERROR"
+    },
+    {
+      "file": "core\\routes\\scheduler.py",
+      "line": 188,
+      "error_code": "E-SCHEDULER-API-003",
+      "event": "SCHEDULER.API.CREATE.ERROR"
+    },
+    {
+      "file": "core\\routes\\scheduler.py",
+      "line": 258,
+      "error_code": "E-SCHEDULER-API-004",
+      "event": "SCHEDULER.API.UPDATE.ERROR"
+    },
+    {
+      "file": "core\\routes\\scheduler.py",
+      "line": 297,
+      "error_code": "E-SCHEDULER-API-005",
+      "event": "SCHEDULER.API.DELETE.ERROR"
+    },
+    {
+      "file": "core\\routes\\scheduler.py",
+      "line": 352,
+      "error_code": "E-SCHEDULER-API-006",
+      "event": "SCHEDULER.API.RUN_NOW.ERROR"
+    },
+    {
+      "file": "core\\routes\\sys_settings.py",
+      "line": 64,
+      "error_code": "E-API-014",
+      "event": "SYS_SETTINGS.GET_ALL.ERROR"
+    },
+    {
+      "file": "core\\routes\\sys_settings.py",
+      "line": 120,
+      "error_code": "E-API-015",
+      "event": "SYS_SETTINGS.GET.ERROR"
+    },
+    {
+      "file": "core\\routes\\sys_settings.py",
+      "line": 182,
+      "error_code": "E-API-016",
+      "event": "SYS_SETTINGS.CREATE.ERROR"
+    },
+    {
+      "file": "core\\routes\\sys_settings.py",
+      "line": 245,
+      "error_code": "E-API-017",
+      "event": "SYS_SETTINGS.UPDATE.ERROR"
+    },
+    {
+      "file": "core\\routes\\sys_settings.py",
+      "line": 288,
+      "error_code": "E-API-018",
+      "event": "SYS_SETTINGS.DELETE.ERROR"
+    },
+    {
+      "file": "core\\routes\\tasks.py",
+      "line": 88,
+      "error_code": "E-TASKS-API-001",
+      "event": "TASKS.API.LIST.ERROR"
+    },
+    {
+      "file": "core\\routes\\tasks.py",
+      "line": 118,
+      "error_code": "E-TASKS-API-002",
+      "event": "TASKS.API.GET.ERROR"
+    },
+    {
+      "file": "core\\routes\\tasks.py",
+      "line": 192,
+      "error_code": "E-TASKS-API-003",
+      "event": "TASKS.API.CREATE.ERROR"
+    },
+    {
+      "file": "core\\routes\\tasks.py",
+      "line": 287,
+      "error_code": "E-TASKS-API-004",
+      "event": "TASKS.API.UPDATE.ERROR"
+    },
+    {
+      "file": "core\\routes\\tasks.py",
+      "line": 326,
+      "error_code": "E-TASKS-API-005",
+      "event": "TASKS.API.DELETE.ERROR"
+    },
+    {
+      "file": "core\\routes\\tasks.py",
+      "line": 370,
+      "error_code": "E-TASKS-API-006",
+      "event": "TASKS.API.BATCH_DELETE.ITEM_ERROR"
+    },
+    {
+      "file": "core\\routes\\tasks.py",
+      "line": 399,
+      "error_code": "E-TASKS-API-007",
+      "event": "TASKS.API.BATCH_DELETE.ERROR"
+    },
+    {
+      "file": "core\\routes\\tasks.py",
+      "line": 474,
+      "error_code": "E-TASKS-API-008",
+      "event": "TASKS.API.RETRY.ERROR"
+    },
+    {
+      "file": "core\\routes\\tasks.py",
+      "line": 536,
+      "error_code": "E-TASKS-API-009",
+      "event": "TASKS.API.ANALYSIS_STATUS.ERROR"
+    },
+    {
+      "file": "core\\routes\\tasks.py",
+      "line": 605,
+      "error_code": "E-TASKS-API-010",
+      "event": "TASKS.API.ANALYSIS_RESULT.ERROR"
+    },
+    {
+      "file": "core\\routes\\tasks.py",
+      "line": 758,
+      "error_code": "E-TASKS-API-011",
+      "event": "TASKS.API.POLL_ONCE.VALIDATION_FAILED"
+    },
+    {
+      "file": "core\\routes\\tasks.py",
+      "line": 799,
+      "error_code": "E-TASKS-API-012",
+      "event": "TASKS.API.POLL_ONCE.QUERY_FAILED"
+    },
+    {
+      "file": "core\\routes\\tasks.py",
+      "line": 812,
+      "error_code": "E-TASKS-API-013",
+      "event": "TASKS.API.POLL_ONCE.ERROR"
+    },
+    {
+      "file": "core\\routes\\tasks.py",
+      "line": 910,
+      "error_code": "E-TASKS-API-014",
+      "event": "TASKS.API.SPLIT.ERROR"
+    },
+    {
+      "file": "core\\routes\\tasks.py",
+      "line": 962,
+      "error_code": "E-TASKS-API-015",
+      "event": "TASKS.API.DECISION.PENDING.ERROR"
+    },
+    {
+      "file": "core\\routes\\tasks.py",
+      "line": 1014,
+      "error_code": "E-TASKS-API-027",
+      "event": "TASKS.API.TRADE.PENDING.ERROR"
+    },
+    {
+      "file": "core\\routes\\tasks.py",
+      "line": 1084,
+      "error_code": "E-TASKS-API-017",
+      "event": "TASKS.API.DECISION.SKIP"
+    },
+    {
+      "file": "core\\routes\\tasks.py",
+      "line": 1093,
+      "error_code": "E-TASKS-API-018",
+      "event": "TASKS.API.DECISION.SKIP"
+    },
+    {
+      "file": "core\\routes\\tasks.py",
+      "line": 1103,
+      "error_code": "E-TASKS-API-019",
+      "event": "TASKS.API.DECISION.SKIP"
+    },
+    {
+      "file": "core\\routes\\tasks.py",
+      "line": 1114,
+      "error_code": "E-TASKS-API-020",
+      "event": "TASKS.API.DECISION.SKIP"
+    },
+    {
+      "file": "core\\routes\\tasks.py",
+      "line": 1133,
+      "error_code": "E-TASKS-API-021",
+      "event": "TASKS.API.DECISION.SKIP"
+    },
+    {
+      "file": "core\\routes\\tasks.py",
+      "line": 1144,
+      "error_code": "E-TASKS-API-022",
+      "event": "TASKS.API.DECISION.SKIP"
+    },
+    {
+      "file": "core\\routes\\tasks.py",
+      "line": 1157,
+      "error_code": "E-TASKS-API-023",
+      "event": "TASKS.API.DECISION.SKIP"
+    },
+    {
+      "file": "core\\routes\\tasks.py",
+      "line": 1171,
+      "error_code": "E-TASKS-API-024",
+      "event": "TASKS.API.DECISION.SKIP"
+    },
+    {
+      "file": "core\\routes\\tasks.py",
+      "line": 1180,
+      "error_code": "E-TASKS-API-025",
+      "event": "TASKS.API.DECISION.SKIP"
+    },
+    {
+      "file": "core\\routes\\tasks.py",
+      "line": 1189,
+      "error_code": "E-TASKS-API-026",
+      "event": "TASKS.API.DECISION.SKIP"
+    },
+    {
+      "file": "core\\routes\\tasks.py",
+      "line": 1370,
+      "error_code": "E-TASKS-API-016",
+      "event": "TASKS.API.DECISION.EXECUTE.ERROR"
+    },
+    {
+      "file": "core\\routes\\token.py",
+      "line": 72,
+      "error_code": "E-API-001",
+      "event": "TOKEN.API.STATUS.ERROR"
+    },
+    {
+      "file": "core\\routes\\token.py",
+      "line": 155,
+      "error_code": "E-API-001",
+      "event": "TOKEN.API.UPDATE.ERROR"
+    },
+    {
+      "file": "core\\routes\\token.py",
+      "line": 196,
+      "error_code": "E-API-001",
+      "event": "TOKEN.API.CHECK.ERROR"
+    },
+    {
+      "file": "core\\routes\\token.py",
+      "line": 258,
+      "error_code": "E-API-001",
+      "event": "TOKEN.API.EXPIRE.ERROR"
+    },
+    {
+      "file": "core\\routes\\token.py",
+      "line": 320,
+      "error_code": "E-API-001",
+      "event": "TOKEN.API.INTERVAL.ERROR"
+    },
+    {
+      "file": "mark\\auto_mark.py",
+      "line": 29,
+      "error_code": "E-MARK-001",
+      "event": "MARK.ERROR"
+    },
+    {
+      "file": "polymarket_api\\clob_api.py",
+      "line": 97,
+      "error_code": "E-CLOB-001",
+      "event": "CLOB.CLIENT.INIT_ERROR"
+    },
+    {
+      "file": "polymarket_api\\easy_trade.py",
+      "line": 214,
+      "error_code": "E-ICEBERG-001",
+      "event": "ICEBERG.WS.CONNECT_ERROR"
+    },
+    {
+      "file": "polymarket_api\\easy_trade.py",
+      "line": 310,
+      "error_code": "E-ICEBERG-002",
+      "event": "ICEBERG.WS.ERROR"
+    },
+    {
+      "file": "polymarket_api\\easy_trade.py",
+      "line": 391,
+      "error_code": "E-ICEBERG-003",
+      "event": "ICEBERG.SLICE.SUBMIT_ERROR"
+    },
+    {
+      "file": "polymarket_api\\easy_trade.py",
+      "line": 467,
+      "error_code": "E-ICEBERG-004",
+      "event": "ICEBERG.ORDER.ERROR"
+    },
+    {
+      "file": "polymarket_api\\easy_trade.py",
+      "line": 649,
+      "error_code": "E-ICEBERG-005",
+      "event": "ICEBERG.ORDER.CANCEL_ERROR"
+    },
+    {
+      "file": "polymarket_api\\gamma_markets.py",
+      "line": 478,
+      "error_code": "E-PM-002",
+      "event": "API.REQUEST.ERROR"
+    },
+    {
+      "file": "polymarket_api\\gamma_markets.py",
+      "line": 486,
+      "error_code": "E-PM-001",
+      "event": "API.REQUEST.ERROR"
+    },
+    {
+      "file": "polymarket_api\\gamma_markets.py",
+      "line": 495,
+      "error_code": "E-PM-003",
+      "event": "API.REQUEST.ERROR"
+    },
+    {
+      "file": "polymarket_api\\gamma_markets.py",
+      "line": 503,
+      "error_code": "E-PM-001",
+      "event": "API.REQUEST.ERROR"
+    },
+    {
+      "file": "polymarket_api\\orderbook_api.py",
+      "line": 170,
+      "error_code": "E-OB-002",
+      "event": "ORDERBOOK.REQUEST.ERROR"
+    },
+    {
+      "file": "polymarket_api\\orderbook_api.py",
+      "line": 179,
+      "error_code": "E-OB-001",
+      "event": "ORDERBOOK.REQUEST.ERROR"
+    },
+    {
+      "file": "polymarket_api\\orderbook_api.py",
+      "line": 189,
+      "error_code": "E-OB-003",
+      "event": "ORDERBOOK.REQUEST.ERROR"
+    },
+    {
+      "file": "polymarket_api\\orderbook_api.py",
+      "line": 198,
+      "error_code": "E-OB-001",
+      "event": "ORDERBOOK.REQUEST.ERROR"
+    },
+    {
+      "file": "polymarket_api\\wss_client.py",
+      "line": 196,
+      "error_code": "E-WS-001",
+      "event": "INGEST.WS.CALLBACK_ERROR"
+    },
+    {
+      "file": "polymarket_api\\wss_client.py",
+      "line": 251,
+      "error_code": "E-WS-003",
+      "event": "INGEST.WS.CALLBACK_ERROR"
+    },
+    {
+      "file": "polymarket_api\\wss_client.py",
+      "line": 434,
+      "error_code": "E-WS-004",
+      "event": "INGEST.WS.SEND_FAILED"
+    },
+    {
+      "file": "polymarket_api\\wss_client.py",
+      "line": 453,
+      "error_code": "E-DATA-001",
+      "event": "INGEST.WS.PARSE_ERROR"
+    },
+    {
+      "file": "polymarket_api\\wss_client.py",
+      "line": 460,
+      "error_code": "E-WS-005",
+      "event": "INGEST.WS.HANDLE_ERROR"
+    },
+    {
+      "file": "polymarket_api\\wss_client.py",
+      "line": 517,
+      "error_code": "E-WS-008",
+      "event": "INGEST.WS.CALLBACK_ERROR"
+    },
+    {
+      "file": "polymarket_api\\wss_client.py",
+      "line": 526,
+      "error_code": "E-WS-009",
+      "event": "INGEST.WS.CALLBACK_ERROR"
+    },
+    {
+      "file": "position_listener\\database.py",
+      "line": 67,
+      "error_code": "E-PLDB-001",
+      "event": "POSITION_LISTENER_DB.ERROR"
+    },
+    {
+      "file": "position_listener\\position_monitor.py",
+      "line": 28,
+      "error_code": "E-PM-001",
+      "event": "POSITION_MONITOR.GET_MARKET_ERROR"
+    },
+    {
+      "file": "position_listener\\position_monitor.py",
+      "line": 156,
+      "error_code": "E-PM-005",
+      "event": "POSITION_MONITOR.MARKET_DATA_ERROR"
+    },
+    {
+      "file": "position_listener\\position_monitor.py",
+      "line": 182,
+      "error_code": "E-PM-006",
+      "event": "POSITION_MONITOR.UPDATE_FAILED"
+    },
+    {
+      "file": "position_listener\\position_monitor.py",
+      "line": 234,
+      "error_code": "E-PM-007",
+      "event": "POSITION_MONITOR.UPDATE_ERROR"
+    },
+    {
+      "file": "purse\\purse.py",
+      "line": 107,
+      "error_code": "E-PURSE-001",
+      "event": "PURSE.DB.ERROR"
+    },
+    {
+      "file": "purse\\purse.py",
+      "line": 194,
+      "error_code": "E-PURSE-002",
+      "event": "PURSE.INIT.INVALID"
+    },
+    {
+      "file": "purse\\purse.py",
+      "line": 272,
+      "error_code": "E-PURSE-003",
+      "event": "PURSE.LOCK.INVALID"
+    },
+    {
+      "file": "purse\\purse.py",
+      "line": 290,
+      "error_code": "E-PURSE-004",
+      "event": "PURSE.LOCK.INSUFFICIENT"
+    },
+    {
+      "file": "purse\\purse.py",
+      "line": 326,
+      "error_code": "E-PURSE-005",
+      "event": "PURSE.UNLOCK.INVALID"
+    },
+    {
+      "file": "purse\\purse.py",
+      "line": 344,
+      "error_code": "E-PURSE-006",
+      "event": "PURSE.UNLOCK.INSUFFICIENT"
+    },
+    {
+      "file": "purse\\purse.py",
+      "line": 381,
+      "error_code": "E-PURSE-007",
+      "event": "PURSE.PROFIT.INVALID"
+    },
+    {
+      "file": "purse\\purse.py",
+      "line": 399,
+      "error_code": "E-PURSE-008",
+      "event": "PURSE.PROFIT.INSUFFICIENT"
+    },
+    {
+      "file": "purse\\purse.py",
+      "line": 439,
+      "error_code": "E-PURSE-009",
+      "event": "PURSE.LOSS.INVALID"
+    },
+    {
+      "file": "purse\\purse.py",
+      "line": 457,
+      "error_code": "E-PURSE-010",
+      "event": "PURSE.LOSS.INSUFFICIENT"
+    },
+    {
+      "file": "purse\\purse.py",
+      "line": 664,
+      "error_code": "E-PURSE-012",
+      "event": "PURSE.ADD.INVALID"
+    },
+    {
+      "file": "purse\\purse.py",
+      "line": 702,
+      "error_code": "E-PURSE-013",
+      "event": "PURSE.WITHDRAW.INVALID"
+    },
+    {
+      "file": "purse\\purse.py",
+      "line": 720,
+      "error_code": "E-PURSE-014",
+      "event": "PURSE.WITHDRAW.INSUFFICIENT"
+    },
+    {
+      "file": "purse\\purse.py",
+      "line": 873,
+      "error_code": "E-PURSE-015",
+      "event": "PURSE.DAILY.ADD.DUPLICATE"
+    },
+    {
+      "file": "purse\\purse.py",
+      "line": 946,
+      "error_code": "E-PURSE-016",
+      "event": "PURSE.DAILY.UPDATE.NOTFOUND"
+    },
+    {
+      "file": "purse\\purse.py",
+      "line": 982,
+      "error_code": "E-PURSE-017",
+      "event": "PURSE.DAILY.DELETE.NOTFOUND"
+    },
+    {
+      "file": "sys_configs\\auto_trade_config.py",
+      "line": 89,
+      "error_code": "E-AT-CONFIG-001",
+      "event": "AUTO_TRADE.CONFIG.TABLE_ERROR"
+    },
+    {
+      "file": "sys_configs\\auto_trade_config.py",
+      "line": 121,
+      "error_code": "E-AT-CONFIG-002",
+      "event": "AUTO_TRADE.CONFIG.LOAD_ERROR"
+    },
+    {
+      "file": "sys_configs\\auto_trade_config.py",
+      "line": 173,
+      "error_code": "E-AT-CONFIG-003",
+      "event": "AUTO_TRADE.CONFIG.SAVE_ERROR"
+    },
+    {
+      "file": "sys_configs\\auto_trade_config.py",
+      "line": 207,
+      "error_code": "E-AT-CONFIG-004",
+      "event": "AUTO_TRADE.CONFIG.UPDATE_ERROR"
+    },
+    {
+      "file": "sys_configs\\auto_trade_config.py",
+      "line": 225,
+      "error_code": "E-AT-CONFIG-005",
+      "event": "AUTO_TRADE.CONFIG.GET_ERROR"
+    },
+    {
+      "file": "sys_configs\\auto_trade_config.py",
+      "line": 255,
+      "error_code": "E-AT-CONFIG-006",
+      "event": "AUTO_TRADE.CONFIG.DB_LOAD_ERROR"
+    },
+    {
+      "file": "sys_configs\\token_refresher.py",
+      "line": 167,
+      "error_code": "E-SYS-004",
+      "event": "TOKEN.REFRESHER.TABLE_INIT_ERROR"
+    },
+    {
+      "file": "sys_configs\\token_refresher.py",
+      "line": 211,
+      "error_code": "E-SYS-004",
+      "event": "TOKEN.REFRESHER.CONFIG_INIT_ERROR"
+    },
+    {
+      "file": "sys_configs\\token_refresher.py",
+      "line": 261,
+      "error_code": "E-SYS-004",
+      "event": "TOKEN.REFRESHER.INTERVAL_UPDATE_ERROR"
+    },
+    {
+      "file": "sys_configs\\token_refresher.py",
+      "line": 306,
+      "error_code": "E-SYS-004",
+      "event": "TOKEN.REFRESHER.TYPE_ADD_ERROR"
+    },
+    {
+      "file": "sys_configs\\token_refresher.py",
+      "line": 378,
+      "error_code": "E-SYS-004",
+      "event": "TOKEN.REFRESHER.TOKEN_UPDATE_ERROR"
+    },
+    {
+      "file": "sys_configs\\token_refresher.py",
+      "line": 420,
+      "error_code": "E-SYS-004",
+      "event": "TOKEN.REFRESHER.STATUS_GET_ERROR"
+    },
+    {
+      "file": "sys_configs\\token_refresher.py",
+      "line": 467,
+      "error_code": "E-SYS-004",
+      "event": "TOKEN.REFRESHER.EXPIRE_ERROR"
+    },
+    {
+      "file": "sys_configs\\token_refresher.py",
+      "line": 498,
+      "error_code": "E-TOKEN-001",
+      "event": "TOKEN.REFRESHER.TOKEN_EXPIRED"
+    },
+    {
+      "file": "sys_configs\\token_refresher.py",
+      "line": 579,
+      "error_code": "E-SYS-004",
+      "event": "TOKEN.REFRESHER.CHECK_ERROR"
+    },
+    {
+      "file": "sys_configs\\token_refresher.py",
+      "line": 605,
+      "error_code": "E-SYS-001",
+      "event": "TOKEN.REFRESHER.LOOP_ERROR"
+    },
+    {
+      "file": "sys_configs\\token_refresher.py",
+      "line": 700,
+      "error_code": "E-SYS-004",
+      "event": "TOKEN.REFRESHER.GET_ALL_STATUS_ERROR"
+    },
+    {
+      "file": "task_manager\\__init__.py",
+      "line": 145,
+      "error_code": "E-TASK-MANAGER-001",
+      "event": "TASK_MANAGER.INIT.FAILED"
+    },
+    {
+      "file": "task_manager\\dynamic_scheduler.py",
+      "line": 89,
+      "error_code": "E-DYNAMIC-SCHEDULER-001",
+      "event": "DYNAMIC_SCHEDULER.HEALTH_CHECK_EMAIL.FAILED"
+    },
+    {
+      "file": "task_manager\\dynamic_scheduler.py",
+      "line": 97,
+      "error_code": "E-DYNAMIC-SCHEDULER-002",
+      "event": "DYNAMIC_SCHEDULER.HEALTH_CHECK_EMAIL.ERROR"
+    },
+    {
+      "file": "task_manager\\dynamic_scheduler.py",
+      "line": 136,
+      "error_code": "E-DYNAMIC-SCHEDULER-003",
+      "event": "DYNAMIC_SCHEDULER.HEALTH_REPORT.FAILED"
+    },
+    {
+      "file": "task_manager\\dynamic_scheduler.py",
+      "line": 144,
+      "error_code": "E-DYNAMIC-SCHEDULER-004",
+      "event": "DYNAMIC_SCHEDULER.HEALTH_REPORT.ERROR"
+    },
+    {
+      "file": "task_manager\\dynamic_scheduler.py",
+      "line": 167,
+      "error_code": "E-DYNAMIC-SCHEDULER-005",
+      "event": "DYNAMIC_SCHEDULER.PROFIT_EMAIL.ERROR"
+    },
+    {
+      "file": "task_manager\\dynamic_scheduler.py",
+      "line": 204,
+      "error_code": "E-DYNAMIC-SCHEDULER-006",
+      "event": "DYNAMIC_SCHEDULER.PERIODIC_CHECK.ERROR"
+    },
+    {
+      "file": "task_manager\\dynamic_scheduler.py",
+      "line": 288,
+      "error_code": "E-DYNAMIC-SCHEDULER-011",
+      "event": "DYNAMIC_SCHEDULER.EVENT_SNIFFING.CREATE_ERROR"
+    },
+    {
+      "file": "task_manager\\dynamic_scheduler.py",
+      "line": 311,
+      "error_code": "E-DYNAMIC-SCHEDULER-012",
+      "event": "DYNAMIC_SCHEDULER.EVENT_SNIFFING.ERROR"
+    },
+    {
+      "file": "task_manager\\dynamic_scheduler.py",
+      "line": 347,
+      "error_code": "E-DYNAMIC-SCHEDULER-013",
+      "event": "DYNAMIC_SCHEDULER.POSITION_MONITOR.ERROR"
+    },
+    {
+      "file": "task_manager\\dynamic_scheduler.py",
+      "line": 373,
+      "error_code": "E-DYNAMIC-SCHEDULER-007",
+      "event": "DYNAMIC_SCHEDULER.CALC_NEXT_RUN.CRON_ERROR"
+    },
+    {
+      "file": "task_manager\\dynamic_scheduler.py",
+      "line": 387,
+      "error_code": "E-DYNAMIC-SCHEDULER-008",
+      "event": "DYNAMIC_SCHEDULER.CALC_NEXT_RUN.INTERVAL_ERROR"
+    },
+    {
+      "file": "task_manager\\dynamic_scheduler.py",
+      "line": 437,
+      "error_code": "E-DYNAMIC-SCHEDULER-009",
+      "event": "DYNAMIC_SCHEDULER.EXECUTE_ERROR"
+    },
+    {
+      "file": "task_manager\\dynamic_scheduler.py",
+      "line": 461,
+      "error_code": "E-DYNAMIC-SCHEDULER-010",
+      "event": "DYNAMIC_SCHEDULER.RUN_ERROR"
+    },
+    {
+      "file": "task_manager\\email_report.py",
+      "line": 143,
+      "error_code": "E-REPORT-001",
+      "event": "EMAIL_REPORT.CHART.FAILED"
+    },
+    {
+      "file": "task_manager\\scheduler.py",
+      "line": 102,
+      "error_code": "E-SCHEDULER-001",
+      "event": "SCHEDULER.TASK.NOT_FOUND"
+    },
+    {
+      "file": "task_manager\\scheduler.py",
+      "line": 202,
+      "error_code": "E-SCHEDULER-004",
+      "event": "SCHEDULER.PERIODIC_CHECK.FAILED"
+    },
+    {
+      "file": "task_manager\\scheduler.py",
+      "line": 254,
+      "error_code": "E-SCHEDULER-005",
+      "event": "SCHEDULER.HEALTH_CHECK.EMAIL_FAILED"
+    },
+    {
+      "file": "task_manager\\scheduler.py",
+      "line": 262,
+      "error_code": "E-SCHEDULER-002",
+      "event": "SCHEDULER.HEALTH_CHECK.FAILED"
+    },
+    {
+      "file": "task_manager\\scheduler.py",
+      "line": 314,
+      "error_code": "E-SCHEDULER-006",
+      "event": "SCHEDULER.HEALTH_REPORT.EMAIL_FAILED"
+    },
+    {
+      "file": "task_manager\\scheduler.py",
+      "line": 322,
+      "error_code": "E-SCHEDULER-007",
+      "event": "SCHEDULER.HEALTH_REPORT.FAILED"
+    },
+    {
+      "file": "task_manager\\scheduler.py",
+      "line": 363,
+      "error_code": "E-SCHEDULER-003",
+      "event": "SCHEDULER.PROFIT.FAILED"
+    },
+    {
+      "file": "task_manager\\tasks.py",
+      "line": 104,
+      "error_code": "E-TASK-001",
+      "event": "TASK.PROCESS.NOT_FOUND"
+    },
+    {
+      "file": "task_manager\\tasks.py",
+      "line": 195,
+      "error_code": "E-TASK-002",
+      "event": "TASK.PROCESS.FAILED"
+    },
+    {
+      "file": "task_manager\\tasks.py",
+      "line": 268,
+      "error_code": "E-APPROVE-001",
+      "event": "TASK.APPROVE.NOT_FOUND"
+    },
+    {
+      "file": "task_manager\\tasks.py",
+      "line": 279,
+      "error_code": "E-APPROVE-002",
+      "event": "TASK.APPROVE.INVALID_STATE"
+    },
+    {
+      "file": "task_manager\\tasks.py",
+      "line": 313,
+      "error_code": "E-APPROVE-003",
+      "event": "TASK.APPROVE.FAILED"
+    },
+    {
+      "file": "task_manager\\tasks.py",
+      "line": 347,
+      "error_code": "E-RETRY-001",
+      "event": "TASK.RETRY.NOT_FOUND"
+    },
+    {
+      "file": "task_manager\\tasks.py",
+      "line": 358,
+      "error_code": "E-RETRY-002",
+      "event": "TASK.RETRY.INVALID_STAGE"
+    },
+    {
+      "file": "task_manager\\tasks.py",
+      "line": 381,
+      "error_code": "E-RETRY-003",
+      "event": "TASK.RETRY.FAILED"
+    },
+    {
+      "file": "task_manager\\tasks.py",
+      "line": 392,
+      "error_code": "E-RETRY-004",
+      "event": "TASK.RETRY.EXCEPTION"
+    },
+    {
+      "file": "task_manager\\tasks.py",
+      "line": 454,
+      "error_code": "E-MARK-001",
+      "event": "TASK.MARK.ERROR"
+    },
+    {
+      "file": "task_manager\\tasks.py",
+      "line": 466,
+      "error_code": "E-MARK-002",
+      "event": "TASK.MARK.ERROR"
+    },
+    {
+      "file": "task_manager\\tasks.py",
+      "line": 480,
+      "error_code": "E-MARK-003",
+      "event": "TASK.MARK.ERROR"
+    },
+    {
+      "file": "task_manager\\tasks.py",
+      "line": 534,
+      "error_code": "E-MARK-003",
+      "event": "TASK.MARK.EXCEPTION"
+    },
+    {
+      "file": "task_manager\\tasks.py",
+      "line": 607,
+      "error_code": "E-ANALYSIS-001",
+      "event": "TASK.ANALYSIS.ERROR"
+    },
+    {
+      "file": "task_manager\\tasks.py",
+      "line": 621,
+      "error_code": "E-ANALYSIS-002",
+      "event": "TASK.ANALYSIS.ERROR"
+    },
+    {
+      "file": "task_manager\\tasks.py",
+      "line": 658,
+      "error_code": "E-ANALYSIS-003",
+      "event": "TASK.ANALYSIS.ERROR"
+    },
+    {
+      "file": "task_manager\\tasks.py",
+      "line": 689,
+      "error_code": "E-ANALYSIS-007",
+      "event": "TASK.ANALYSIS.EXCEPTION"
+    },
+    {
+      "file": "task_manager\\tasks.py",
+      "line": 817,
+      "error_code": "E-TRADE-001",
+      "event": "TASK.TRADE.ERROR"
+    },
+    {
+      "file": "task_manager\\tasks.py",
+      "line": 831,
+      "error_code": "E-TRADE-002",
+      "event": "TASK.TRADE.ERROR"
+    },
+    {
+      "file": "task_manager\\tasks.py",
+      "line": 860,
+      "error_code": "E-TRADE-003",
+      "event": "TASK.TRADE.ERROR"
+    },
+    {
+      "file": "task_manager\\tasks.py",
+      "line": 872,
+      "error_code": "E-TRADE-004",
+      "event": "TASK.TRADE.ERROR"
+    },
+    {
+      "file": "task_manager\\tasks.py",
+      "line": 885,
+      "error_code": "E-TRADE-005",
+      "event": "TASK.TRADE.ERROR"
+    },
+    {
+      "file": "task_manager\\tasks.py",
+      "line": 901,
+      "error_code": "E-TRADE-006",
+      "event": "TASK.TRADE.ERROR"
+    },
+    {
+      "file": "task_manager\\tasks.py",
+      "line": 993,
+      "error_code": "E-TRADE-008",
+      "event": "TASK.TRADE.POSITION_ERROR"
+    },
+    {
+      "file": "task_manager\\tasks.py",
+      "line": 1009,
+      "error_code": "E-TRADE-007",
+      "event": "TASK.TRADE.EXCEPTION"
+    }
+  ]
+}

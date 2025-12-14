@@ -15,9 +15,9 @@ from .config import get_config
 
 class TaskStage(str, Enum):
     """任务阶段枚举"""
-    MARK = "mark"           # 标记阶段
     ANALYSIS = "analysis"   # 分析阶段
     DECISION = "decision"   # 决策阶段
+    MARK = "mark"           # 标记阶段
     TRADE = "trade"         # 交易阶段
     LISTEN = "listen"       # 监听阶段
 

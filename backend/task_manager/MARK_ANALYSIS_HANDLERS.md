@@ -1,19 +1,25 @@
-# MARK 和 ANALYSIS 处理函数文档
+# 任务处理流程文档
 
 ## 概述
 
-本文档描述了任务管理系统中 MARK 和 ANALYSIS 阶段的处理函数实现。
+本文档描述了任务管理系统的完整工作流程和各阶段的处理函数实现。
 
-## 工作流程
+## 完整工作流程
 
 ```
-Event ID → MARK (PROCESSING) → ANALYSIS (WAITING) → [用户批准] → ANALYSIS (PROCESSING) → 完成
+event_sniffing → ANALYSIS(WAITING) → [用户批准] → ANALYSIS(PROCESSING)
+→ [自动拆分] → DECISION(WAITING) → [用户批准] → DECISION(PROCESSING)
+→ MARK(WAITING) → [用户批准] → MARK(PROCESSING)
+→ TRADE(WAITING) → [用户批准] → TRADE(PROCESSING)
+→ LISTEN(WAITING) → LISTEN(PROCESSING) → FINISHED
 ```
 
 **关键点**:
-- MARK 成功后，任务会自动转换为 ANALYSIS+WAITING 状态
-- ANALYSIS+WAITING 状态需要用户手动批准才会开始处理
-- 使用 `approve_analysis(task_id)` 函数批准任务
+- event_sniffing 创建 ANALYSIS+WAITING 任务
+- ANALYSIS 成功后自动拆分为多个 DECISION 任务
+- DECISION 完成后转换为 MARK+WAITING 状态
+- MARK 完成后转换为 TRADE+WAITING 状态
+- 每个阶段的 WAITING 状态都需要用户手动批准
 
 ### 1. MARK 阶段 (PROCESSING)
 

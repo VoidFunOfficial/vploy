@@ -510,13 +510,32 @@ def send_request(
         return result
 
 def process_result(result):
-    if result["success"]:
-        # 从 events 字段提取第一个元素的 conversation_id
-        conversation_id = result["events"][0]["conversation_id"]
-        return conversation_id
-    else:
-        print(f"错误: {result['error']}")
-        print(result)
+    """
+    处理GPT请求结果，提取conversation_id
+
+    参数:
+        result: send_request返回的结果字典
+
+    返回:
+        str: conversation_id
+
+    异常:
+        ValueError: 当请求失败或无法提取conversation_id时抛出
+    """
+    if not result.get("success"):
+        error_msg = result.get("error", "未知错误")
+        raise ValueError(f"GPT请求失败: {error_msg}")
+
+    # 从 events 字段提取第一个元素的 conversation_id
+    events = result.get("events", [])
+    if not events or len(events) == 0:
+        raise ValueError("GPT响应中缺少events字段")
+
+    conversation_id = events[0].get("conversation_id")
+    if not conversation_id:
+        raise ValueError("GPT响应中缺少conversation_id")
+
+    return conversation_id
 
 def get_result(
     conversation_id: str,

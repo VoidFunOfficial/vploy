@@ -191,22 +191,7 @@ class ConfigManager:
                 )
             """)
 
-            # 6. 持仓监听列表表
-            cursor.execute("""
-                CREATE TABLE IF NOT EXISTS position_listen_list (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    market_id TEXT NOT NULL,
-                    marks TEXT,
-                    buy_price REAL NOT NULL,
-                    buy_side TEXT NOT NULL,
-                    shares REAL,
-                    is_active INTEGER DEFAULT 1,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )
-            """)
-
-            # 7. 系统设置表
+            # 6. 系统设置表
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS sys_settings (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,

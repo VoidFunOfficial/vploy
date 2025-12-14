@@ -525,6 +525,33 @@ def init_default_scheduled_tasks():
             extra={"task_id": task_id, "next_run": event_sniffing_next.isoformat()}
         )
 
+    # 仓位监听任务（每5分钟）
+    position_monitor_cron = "*/5 * * * *"  # 每5分钟
+    position_monitor_next = croniter(position_monitor_cron, now).get_next(datetime)
+
+    task_id = add_scheduled_task(
+        name="position_monitor",
+        task_type="cron",
+        schedule=position_monitor_cron,
+        enabled=True,
+        metadata={
+            "description": "仓位监听任务 - 每5分钟更新所有活跃仓位的价格和状态",
+            "auto_created": True,
+            "huey_task": False  # 由动态调度器执行
+        }
+    )
+
+    # 更新下次运行时间
+    task = db.get_scheduled_task(task_id)
+    if task and not task.next_run:
+        task.next_run = position_monitor_next
+        db.update_scheduled_task(task)
+        logger.info(
+            "SCHEDULER.INIT.POSITION_MONITOR",
+            msg=f"仓位监听任务已初始化，下次运行: {position_monitor_next}",
+            extra={"task_id": task_id, "next_run": position_monitor_next.isoformat()}
+        )
+
     logger.info(
         "SCHEDULER.INIT.SUCCESS",
         msg="预定义定时任务初始化完成"

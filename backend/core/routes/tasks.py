@@ -210,9 +210,13 @@ def update_task(task_id):
         status: 任务状态 (可选)
         result: 任务结果 (可选)
         error_msg: 错误信息 (可选)
+        metadata: 任务元数据 (可选)
 
     特殊逻辑:
         当状态从waiting变为processing时,自动提交任务到Huey队列进行处理
+
+    注意:
+        仅更新metadata或result时不会触发任务状态变更和队列提交
     """
     try:
         data = request.get_json()
@@ -244,11 +248,14 @@ def update_task(task_id):
         if 'error_msg' in data:
             task.error_msg = data['error_msg']
 
+        if 'metadata' in data:
+            task.metadata = data['metadata']
+
         # 保存更新
         db.update_async_task(task)
 
-        # 特殊处理: 如果状态从waiting变为processing,提交到Huey队列
-        if old_status == TaskStatus.WAITING and task.status == TaskStatus.PROCESSING:
+        # 特殊处理: 仅当明确更新了status字段且状态从waiting变为processing时,才提交到Huey队列
+        if 'status' in data and old_status == TaskStatus.WAITING and task.status == TaskStatus.PROCESSING:
             from ...task_manager import process_async_task
 
             logger.info(

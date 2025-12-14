@@ -2,17 +2,27 @@
   <div class="task-management">
     <!-- 标题栏 -->
     <div class="header">
-      <h2>任务管理</h2>
+      <div class="header-left">
+        <h2>📋 任务管理</h2>
+        <span class="task-count">共 {{ tasks.length }} 条任务</span>
+      </div>
       <div class="header-actions">
         <button
           v-if="selectedTasks.length > 0"
-          class="btn-danger"
+          class="btn btn-danger"
           @click="batchDelete"
         >
-          🗑️ 批量删除 ({{ selectedTasks.length }})
+          <span class="btn-icon">🗑️</span>
+          批量删除 ({{ selectedTasks.length }})
         </button>
-        <button class="btn-primary" @click="showCreateDialog">➕ 新建任务</button>
-        <button class="btn-refresh" @click="refreshTasks">🔄 刷新</button>
+        <button class="btn btn-primary" @click="showCreateDialog">
+          <span class="btn-icon">➕</span>
+          新建任务
+        </button>
+        <button class="btn btn-refresh" @click="refreshTasks">
+          <span class="btn-icon">🔄</span>
+          刷新
+        </button>
       </div>
     </div>
 
@@ -20,34 +30,33 @@
     <div class="filter-section">
       <div class="filter-row">
         <div class="filter-item">
-          <label>阶段:</label>
+          <label>阶段</label>
           <select v-model="filters.stage" @change="refreshTasks">
-            <option value="">全部</option>
-            <option value="mark">标记</option>
-            <option value="analysis">分析</option>
-            <option value="decision">决策</option>
-            <option value="trade">交易</option>
-            <option value="listen">监听</option>
+            <option value="">全部阶段</option>
+            <option value="mark">📌 标记</option>
+            <option value="analysis">🔍 分析</option>
+            <option value="decision">🎯 决策</option>
+            <option value="trade">💱 交易</option>
+            <option value="listen">👂 监听</option>
           </select>
         </div>
         <div class="filter-item">
-          <label>状态:</label>
+          <label>状态</label>
           <select v-model="filters.status" @change="refreshTasks">
-            <option value="">全部</option>
-            <option value="waiting">等待中</option>
-            <option value="processing">处理中</option>
-            <option value="success">成功</option>
-            <option value="failed">失败</option>
-            <option value="cancelled">已取消</option>
+            <option value="">全部状态</option>
+            <option value="waiting">⏳ 等待中</option>
+            <option value="processing">⚙️ 处理中</option>
+            <option value="finished">✅ 已完成</option>
+            <option value="failed">❌ 失败</option>
           </select>
         </div>
         <div class="filter-item">
-          <label>显示数量:</label>
+          <label>显示数量</label>
           <select v-model="filters.limit" @change="refreshTasks">
-            <option :value="50">50</option>
-            <option :value="100">100</option>
-            <option :value="200">200</option>
-            <option :value="500">500</option>
+            <option :value="50">50 条</option>
+            <option :value="100">100 条</option>
+            <option :value="200">200 条</option>
+            <option :value="500">500 条</option>
           </select>
         </div>
       </div>
@@ -55,131 +64,164 @@
 
     <!-- 任务列表 -->
     <div class="tasks-section">
-      <div v-if="loading" class="loading">加载中...</div>
-      
-      <div v-else-if="tasks.length === 0" class="empty-state">
-        <p>暂无任务</p>
+      <div v-if="loading" class="loading">
+        <div class="loading-spinner"></div>
+        <p>加载中...</p>
       </div>
 
-      <div v-else class="tasks-table">
-        <table>
+      <div v-else-if="tasks.length === 0" class="empty-state">
+        <div class="empty-icon">📭</div>
+        <p>暂无任务数据</p>
+        <button class="btn btn-primary" @click="showCreateDialog">创建第一个任务</button>
+      </div>
+
+      <div v-else class="tasks-table-wrapper">
+        <table class="tasks-table">
           <thead>
             <tr>
-              <th style="width: 40px;">
+              <th class="th-checkbox">
                 <input
                   type="checkbox"
                   @change="toggleSelectAll"
                   :checked="isAllSelected"
                 />
               </th>
-              <th>ID</th>
-              <th>阶段</th>
-              <th>状态</th>
-              <th>详细状态</th>
-              <th>元数据</th>
-              <th>结果</th>
-              <th>错误信息</th>
-              <th>创建时间</th>
-              <th>更新时间</th>
-              <th>操作</th>
+              <th class="th-id">ID</th>
+              <th class="th-stage">阶段</th>
+              <th class="th-status">状态</th>
+              <th class="th-extended">详细状态</th>
+              <th class="th-data">元数据</th>
+              <th class="th-data">结果</th>
+              <th class="th-error">错误信息</th>
+              <th class="th-time">创建时间</th>
+              <th class="th-time">更新时间</th>
+              <th class="th-actions">操作</th>
             </tr>
           </thead>
           <tbody>
-            <tr v-for="task in tasks" :key="task.id">
-              <td>
+            <tr v-for="task in tasks" :key="task.id" class="task-row">
+              <td class="td-checkbox">
                 <input
                   type="checkbox"
                   :value="task.id"
                   v-model="selectedTasks"
                 />
               </td>
-              <td>{{ task.id }}</td>
-              <td>
-                <span class="badge badge-stage">{{ getStageLabel(task.stage) }}</span>
+              <td class="td-id">
+                <span class="task-id">#{{ task.id }}</span>
               </td>
-              <td>
+              <td class="td-stage">
+                <span class="badge badge-stage" :class="'badge-stage-' + task.stage">
+                  {{ getStageLabel(task.stage) }}
+                </span>
+              </td>
+              <td class="td-status">
                 <span class="badge" :class="getStatusClass(task.status)">
                   {{ getStatusLabel(task.status) }}
                 </span>
               </td>
-              <td>
+              <td class="td-extended">
                 <div v-if="task.extended_info" class="extended-info">
                   <span
                     v-if="task.extended_info.type === 'analysis'"
-                    class="badge"
+                    class="badge badge-sm"
                     :class="getAnalysisStatusClass(task.extended_info.analysis_status)"
                   >
                     {{ getAnalysisStatusLabel(task.extended_info.analysis_status) }}
                   </span>
                   <div v-if="task.extended_info.conversation_id" class="info-detail">
-                    <small>会话ID: {{ task.extended_info.conversation_id.substring(0, 8) }}...</small>
+                    <small>会话: {{ task.extended_info.conversation_id.substring(0, 8) }}...</small>
                   </div>
                   <div v-if="task.extended_info.market_count > 0" class="info-detail">
-                    <small>市场数: {{ task.extended_info.market_count }}</small>
+                    <small>市场: {{ task.extended_info.market_count }}</small>
                   </div>
                 </div>
-                <span v-else>-</span>
+                <span v-else class="text-muted">-</span>
               </td>
-              <td>
-                <button class="btn-sm btn-info" @click="showMetadata(task.metadata)">查看</button>
+              <td class="td-data">
+                <div class="btn-group">
+                  <button class="btn-sm btn-view" @click="showMetadata(task.metadata)" title="查看元数据">
+                    👁️
+                  </button>
+                  <button class="btn-sm btn-edit" @click="editMetadata(task)" title="编辑元数据">
+                    ✏️
+                  </button>
+                </div>
               </td>
-              <td>
-                <button
-                  v-if="task.result"
-                  class="btn-sm btn-info"
-                  @click="showResult(task.result)"
-                >
-                  查看
-                </button>
-                <span v-else>-</span>
+              <td class="td-data">
+                <div class="btn-group">
+                  <button
+                    v-if="task.result && Object.keys(task.result).length > 0"
+                    class="btn-sm btn-view"
+                    @click="showResult(task.result)"
+                    title="查看结果"
+                  >
+                    👁️
+                  </button>
+                  <span v-else class="text-muted">-</span>
+                  <button class="btn-sm btn-edit" @click="editResult(task)" title="编辑结果">
+                    ✏️
+                  </button>
+                </div>
               </td>
-              <td>
-                <span v-if="task.error_msg" class="error-text">{{ task.error_msg }}</span>
-                <span v-else>-</span>
+              <td class="td-error">
+                <span v-if="task.error_msg" class="error-text" :title="task.error_msg">
+                  {{ task.error_msg.length > 30 ? task.error_msg.substring(0, 30) + '...' : task.error_msg }}
+                </span>
+                <span v-else class="text-muted">-</span>
               </td>
-              <td>{{ formatTime(task.create_time) }}</td>
-              <td>{{ formatTime(task.update_time) }}</td>
-              <td class="actions">
-                <button
-                  v-if="task.status === 'waiting'"
-                  class="btn-sm btn-success"
-                  @click="approveTask(task)"
-                  title="同意并开始处理"
-                >
-                  ✓ 同意
-                </button>
-                <button
-                  v-if="task.stage === 'analysis' && task.extended_info && (task.extended_info.analysis_status === 'polling' || task.extended_info.analysis_status === 'requesting')"
-                  class="btn-sm btn-poll"
-                  @click="pollAnalysisOnceHandler(task)"
-                  title="手动轮询一次"
-                >
-                  🔍 轮询
-                </button>
-                <button
-                  v-if="task.stage === 'analysis' && task.extended_info && task.extended_info.analysis_status === 'success' && task.extended_info.market_count > 0"
-                  class="btn-sm btn-split"
-                  @click="splitAnalysisTaskHandler(task)"
-                  title="拆分为decision任务"
-                >
-                  ✂️ 拆分
-                </button>
-                <button
-                  v-if="task.status === 'waiting' || task.status === 'processing'"
-                  class="btn-sm btn-warning"
-                  @click="cancelTask(task)"
-                >
-                  取消
-                </button>
-                <button
-                  v-if="task.status === 'failed' || task.status === 'finished'"
-                  class="btn-sm btn-retry"
-                  @click="retryTaskHandler(task)"
-                  title="重新打回重试"
-                >
-                  🔄 重试
-                </button>
-                <button class="btn-sm btn-danger" @click="confirmDelete(task)">删除</button>
+              <td class="td-time">
+                <span class="time-text">{{ formatTime(task.create_time) }}</span>
+              </td>
+              <td class="td-time">
+                <span class="time-text">{{ formatTime(task.update_time) }}</span>
+              </td>
+              <td class="td-actions">
+                <div class="action-buttons">
+                  <button
+                    v-if="task.status === 'waiting'"
+                    class="btn-sm btn-success"
+                    @click="approveTask(task)"
+                    title="同意并开始处理"
+                  >
+                    ✓
+                  </button>
+                  <button
+                    v-if="task.stage === 'analysis' && task.extended_info && (task.extended_info.analysis_status === 'polling' || task.extended_info.analysis_status === 'requesting')"
+                    class="btn-sm btn-poll"
+                    @click="pollAnalysisOnceHandler(task)"
+                    title="手动轮询一次"
+                  >
+                    🔍
+                  </button>
+                  <button
+                    v-if="task.stage === 'analysis' && task.extended_info && task.extended_info.analysis_status === 'success' && task.extended_info.market_count > 0"
+                    class="btn-sm btn-split"
+                    @click="splitAnalysisTaskHandler(task)"
+                    title="拆分为decision任务"
+                  >
+                    ✂️
+                  </button>
+                  <button
+                    v-if="task.status === 'waiting' || task.status === 'processing'"
+                    class="btn-sm btn-cancel"
+                    @click="cancelTask(task)"
+                    title="取消任务"
+                  >
+                    ⏸️
+                  </button>
+                  <button
+                    v-if="task.status === 'failed' || task.status === 'finished'"
+                    class="btn-sm btn-retry"
+                    @click="retryTaskHandler(task)"
+                    title="重新打回重试"
+                  >
+                    🔄
+                  </button>
+                  <button class="btn-sm btn-delete" @click="confirmDelete(task)" title="删除任务">
+                    🗑️
+                  </button>
+                </div>
               </td>
             </tr>
           </tbody>
@@ -251,6 +293,42 @@
     >
       <pre class="json-view">{{ detailContent }}</pre>
     </Modal>
+
+    <!-- 编辑元数据对话框 -->
+    <Modal
+      v-model:visible="editMetadataDialogVisible"
+      title="编辑元数据"
+      confirm-text="保存"
+      @confirm="submitMetadataEdit"
+    >
+      <div class="form-group">
+        <label>元数据 (JSON格式) *</label>
+        <textarea
+          v-model="editFormData.metadata"
+          rows="15"
+          placeholder='{"key": "value"}'
+          class="json-editor"
+        ></textarea>
+      </div>
+    </Modal>
+
+    <!-- 编辑结果对话框 -->
+    <Modal
+      v-model:visible="editResultDialogVisible"
+      title="编辑任务结果"
+      confirm-text="保存"
+      @confirm="submitResultEdit"
+    >
+      <div class="form-group">
+        <label>任务结果 (JSON格式) *</label>
+        <textarea
+          v-model="editFormData.result"
+          rows="15"
+          placeholder='{"key": "value"}'
+          class="json-editor"
+        ></textarea>
+      </div>
+    </Modal>
   </div>
 </template>
 
@@ -272,6 +350,8 @@ export default {
     const detailDialogVisible = ref(false)
     const detailTitle = ref('')
     const detailContent = ref('')
+    const editMetadataDialogVisible = ref(false)
+    const editResultDialogVisible = ref(false)
 
     const filters = reactive({
       stage: '',
@@ -284,6 +364,12 @@ export default {
       stage: 'mark',
       status: 'waiting',
       metadata: '{}'
+    })
+
+    const editFormData = reactive({
+      taskId: null,
+      metadata: '{}',
+      result: '{}'
     })
 
     // 是否全选
@@ -457,6 +543,64 @@ export default {
     // 关闭详情对话框
     const closeDetailDialog = () => {
       detailDialogVisible.value = false
+    }
+
+    // 编辑元数据
+    const editMetadata = (task) => {
+      editFormData.taskId = task.id
+      editFormData.metadata = JSON.stringify(task.metadata || {}, null, 2)
+      editMetadataDialogVisible.value = true
+    }
+
+    // 提交元数据编辑
+    const submitMetadataEdit = async () => {
+      try {
+        // 解析JSON
+        const metadata = JSON.parse(editFormData.metadata)
+
+        const response = await updateTask(editFormData.taskId, { metadata })
+        if (response.success) {
+          toast.success('更新元数据成功')
+          editMetadataDialogVisible.value = false
+          refreshTasks()
+        }
+      } catch (error) {
+        if (error instanceof SyntaxError) {
+          toast.error('JSON格式错误: ' + error.message)
+        } else {
+          console.error('更新元数据失败:', error)
+          toast.error('更新元数据失败: ' + (error.response?.data?.message || error.message))
+        }
+      }
+    }
+
+    // 编辑结果
+    const editResult = (task) => {
+      editFormData.taskId = task.id
+      editFormData.result = JSON.stringify(task.result || {}, null, 2)
+      editResultDialogVisible.value = true
+    }
+
+    // 提交结果编辑
+    const submitResultEdit = async () => {
+      try {
+        // 解析JSON
+        const result = JSON.parse(editFormData.result)
+
+        const response = await updateTask(editFormData.taskId, { result })
+        if (response.success) {
+          toast.success('更新任务结果成功')
+          editResultDialogVisible.value = false
+          refreshTasks()
+        }
+      } catch (error) {
+        if (error instanceof SyntaxError) {
+          toast.error('JSON格式错误: ' + error.message)
+        } else {
+          console.error('更新任务结果失败:', error)
+          toast.error('更新任务结果失败: ' + (error.response?.data?.message || error.message))
+        }
+      }
     }
 
     // 取消任务
@@ -667,7 +811,10 @@ export default {
       detailDialogVisible,
       detailTitle,
       detailContent,
+      editMetadataDialogVisible,
+      editResultDialogVisible,
       formData,
+      editFormData,
       refreshTasks,
       prevPage,
       nextPage,
@@ -680,6 +827,10 @@ export default {
       showMetadata,
       showResult,
       closeDetailDialog,
+      editMetadata,
+      submitMetadataEdit,
+      editResult,
+      submitResultEdit,
       cancelTask,
       confirmDelete,
       retryTaskHandler,
@@ -712,9 +863,24 @@ export default {
   margin-bottom: 20px;
 }
 
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
 .header h2 {
   font-size: 20px;
   color: #333;
+  margin: 0;
+}
+
+.task-count {
+  padding: 4px 10px;
+  background: #f0f0f0;
+  border-radius: 12px;
+  font-size: 12px;
+  color: #666;
 }
 
 .header-actions {
@@ -763,26 +929,59 @@ export default {
   overflow: hidden;
 }
 
-.loading, .empty-state {
+/* 加载状态 */
+.loading {
   padding: 40px;
   text-align: center;
   color: #999;
 }
 
-.tasks-table {
+.loading-spinner {
+  width: 40px;
+  height: 40px;
+  margin: 0 auto 16px;
+  border: 4px solid #f0f0f0;
+  border-top-color: #2196f3;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* 空状态 */
+.empty-state {
+  padding: 40px;
+  text-align: center;
+}
+
+.empty-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+}
+
+.empty-state p {
+  color: #999;
+  font-size: 16px;
+  margin-bottom: 20px;
+}
+
+/* 表格 */
+.tasks-table-wrapper {
   overflow-x: auto;
 }
 
-table {
+.tasks-table {
   width: 100%;
   border-collapse: collapse;
 }
 
-thead {
+.tasks-table thead {
   background: #f5f5f5;
 }
 
-th {
+.tasks-table th {
   padding: 12px;
   text-align: left;
   font-weight: 500;
@@ -791,18 +990,41 @@ th {
   white-space: nowrap;
 }
 
-td {
+.tasks-table td {
   padding: 12px;
   border-bottom: 1px solid #f0f0f0;
 }
 
-tr:hover {
+.task-row:hover {
   background: #fafafa;
 }
 
-.actions {
-  display: flex;
-  gap: 8px;
+/* 列宽度 */
+.th-checkbox, .td-checkbox { width: 40px; text-align: center; }
+.th-id, .td-id { width: 60px; }
+.th-stage, .td-stage { width: 80px; }
+.th-status, .td-status { width: 90px; }
+.th-extended, .td-extended { width: 140px; }
+.th-data, .td-data { width: 100px; }
+.th-error, .td-error { max-width: 200px; }
+.th-time, .td-time { width: 140px; }
+.th-actions, .td-actions { width: 180px; }
+
+/* 任务ID */
+.task-id {
+  font-family: 'Courier New', monospace;
+  font-weight: 600;
+  color: #2196f3;
+}
+
+/* 文本样式 */
+.text-muted {
+  color: #999;
+}
+
+.time-text {
+  font-size: 13px;
+  color: #666;
 }
 
 .error-text {
@@ -834,11 +1056,43 @@ tr:hover {
   font-weight: 500;
 }
 
+.badge-sm {
+  padding: 3px 6px;
+  font-size: 11px;
+}
+
+/* 阶段徽章 */
 .badge-stage {
   background: #e3f2fd;
   color: #1976d2;
 }
 
+.badge-stage-mark {
+  background: #fce4ec;
+  color: #c2185b;
+}
+
+.badge-stage-analysis {
+  background: #e1f5fe;
+  color: #0277bd;
+}
+
+.badge-stage-decision {
+  background: #e8f5e9;
+  color: #388e3c;
+}
+
+.badge-stage-trade {
+  background: #fff3e0;
+  color: #f57c00;
+}
+
+.badge-stage-listen {
+  background: #f3e5f5;
+  color: #7b1fa2;
+}
+
+/* 状态徽章 */
 .badge-success {
   background: #e8f5e9;
   color: #2e7d32;
@@ -881,8 +1135,8 @@ tr:hover {
   display: block;
 }
 
-/* 按钮样式省略,与SchedulerManagement相同 */
-.btn-primary, .btn-secondary, .btn-success, .btn-warning, .btn-danger, .btn-refresh, .btn-info {
+/* 按钮基础样式 */
+.btn {
   padding: 8px 16px;
   border: none;
   border-radius: 4px;
@@ -891,9 +1145,17 @@ tr:hover {
   transition: all 0.3s;
 }
 
+.btn-icon {
+  margin-right: 4px;
+}
+
 .btn-primary {
   background: #20a53a;
   color: white;
+}
+
+.btn-primary:hover {
+  background: #1a8c31;
 }
 
 .btn-secondary {
@@ -901,19 +1163,13 @@ tr:hover {
   color: #333;
 }
 
+.btn-secondary:hover {
+  background: #d0d0d0;
+}
+
 .btn-secondary:disabled {
   opacity: 0.5;
   cursor: not-allowed;
-}
-
-.btn-success {
-  background: #4caf50;
-  color: white;
-}
-
-.btn-warning {
-  background: #ff9800;
-  color: white;
 }
 
 .btn-danger {
@@ -921,13 +1177,64 @@ tr:hover {
   color: white;
 }
 
+.btn-danger:hover {
+  background: #d32f2f;
+}
+
 .btn-refresh {
   background: #2196f3;
   color: white;
 }
 
-.btn-info {
-  background: #00bcd4;
+.btn-refresh:hover {
+  background: #1976d2;
+}
+
+/* 小按钮 */
+.btn-sm {
+  padding: 4px 8px;
+  font-size: 12px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-sm:hover {
+  opacity: 0.8;
+}
+
+/* 按钮组 */
+.btn-group {
+  display: flex;
+  gap: 5px;
+  align-items: center;
+}
+
+/* 操作按钮 */
+.action-buttons {
+  display: flex;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+
+.btn-view {
+  background: #e1f5fe;
+  color: #0277bd;
+}
+
+.btn-edit {
+  background: #fff3e0;
+  color: #f57c00;
+}
+
+.btn-success {
+  background: #4caf50;
+  color: white;
+}
+
+.btn-cancel {
+  background: #ff9800;
   color: white;
 }
 
@@ -936,17 +1243,9 @@ tr:hover {
   color: white;
 }
 
-.btn-retry:hover {
-  background: #7b1fa2;
-}
-
 .btn-poll {
   background: #ff9800;
   color: white;
-}
-
-.btn-poll:hover {
-  background: #f57c00;
 }
 
 .btn-split {
@@ -954,48 +1253,113 @@ tr:hover {
   color: white;
 }
 
-.btn-split:hover {
-  background: #0097a7;
+.btn-delete {
+  background: #f44336;
+  color: white;
 }
 
-.btn-sm {
-  padding: 4px 8px;
-  font-size: 12px;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
+.btn-info {
+  background: #00bcd4;
+  color: white;
 }
 
 
 
+/* 表单样式 */
 .form-group {
-  margin-bottom: 15px;
+  margin-bottom: 20px;
 }
 
 .form-group label {
   display: block;
-  margin-bottom: 5px;
-  font-weight: 500;
-  color: #666;
+  margin-bottom: 8px;
+  font-weight: 600;
+  font-size: 13px;
+  color: #475569;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 .form-group select,
 .form-group textarea {
   width: 100%;
-  padding: 8px 12px;
-  border: 1px solid #ddd;
-  border-radius: 4px;
+  padding: 12px 16px;
+  border: 2px solid #e2e8f0;
+  border-radius: 8px;
   font-size: 14px;
   box-sizing: border-box;
+  transition: all 0.2s;
+  background: white;
 }
 
+.form-group select:focus,
+.form-group textarea:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+/* JSON查看器 */
 .json-view {
-  background: #f5f5f5;
-  padding: 15px;
-  border-radius: 4px;
+  background: #1e293b;
+  color: #e2e8f0;
+  padding: 20px;
+  border-radius: 8px;
   overflow-x: auto;
   font-size: 13px;
-  line-height: 1.5;
+  line-height: 1.6;
+  font-family: 'Courier New', monospace;
+  max-height: 500px;
+  overflow-y: auto;
+}
+
+/* JSON编辑器 */
+.json-editor {
+  font-family: 'Courier New', 'Monaco', monospace;
+  background: #1e293b;
+  color: #e2e8f0;
+  border: 2px solid #334155;
+  border-radius: 8px;
+  padding: 16px;
+  font-size: 13px;
+  line-height: 1.8;
+  resize: vertical;
+  min-height: 300px;
+}
+
+.json-editor:focus {
+  outline: none;
+  border-color: #3b82f6;
+  background: #0f172a;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+/* 滚动条美化 */
+.json-view::-webkit-scrollbar,
+.json-editor::-webkit-scrollbar,
+.tasks-table-wrapper::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.json-view::-webkit-scrollbar-track,
+.json-editor::-webkit-scrollbar-track,
+.tasks-table-wrapper::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 4px;
+}
+
+.json-view::-webkit-scrollbar-thumb,
+.json-editor::-webkit-scrollbar-thumb,
+.tasks-table-wrapper::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+
+.json-view::-webkit-scrollbar-thumb:hover,
+.json-editor::-webkit-scrollbar-thumb:hover,
+.tasks-table-wrapper::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
 }
 </style>
 

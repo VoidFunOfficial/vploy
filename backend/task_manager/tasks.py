@@ -429,7 +429,7 @@ def handle_mark_processing(task: AsyncTask) -> Dict[str, Any]:
     处理MARK阶段的PROCESSING状态任务
 
     使用auto_mark.py处理事件标记，将mark写到result里，
-    然后将metadata的event_id提交到analysis的waiting状态
+    然后转换到TRADE+WAITING状态
 
     参数:
         task: 任务实例
@@ -447,14 +447,26 @@ def handle_mark_processing(task: AsyncTask) -> Dict[str, Any]:
     )
 
     try:
-        # 从metadata中获取event_id
-        event_id = task.metadata.get("event_id")
-        if not event_id:
-            error_msg = "metadata中缺少event_id"
+        # 从metadata中获取market信息(由decision阶段传递过来)
+        market_data = task.metadata.get("market")
+        if not market_data:
+            error_msg = "metadata中缺少market信息"
             logger.error(
                 "TASK.MARK.ERROR",
                 msg=error_msg,
                 error_code="E-MARK-001",
+                extra={"task_id": task.id}
+            )
+            return {"status": "failed", "message": error_msg}
+
+        # 获取event_id
+        event_id = market_data.get("event_id")
+        if not event_id:
+            error_msg = "market中缺少event_id"
+            logger.error(
+                "TASK.MARK.ERROR",
+                msg=error_msg,
+                error_code="E-MARK-002",
                 extra={"task_id": task.id}
             )
             return {"status": "failed", "message": error_msg}
@@ -468,7 +480,7 @@ def handle_mark_processing(task: AsyncTask) -> Dict[str, Any]:
             logger.error(
                 "TASK.MARK.ERROR",
                 msg=error_msg,
-                error_code="E-MARK-002",
+                error_code="E-MARK-003",
                 extra={"task_id": task.id, "event_id": event_id}
             )
             return {"status": "failed", "message": error_msg}
@@ -490,7 +502,8 @@ def handle_mark_processing(task: AsyncTask) -> Dict[str, Any]:
         result = {
             "mark": mark_result,
             "event_id": event_id,
-            "event_title": event.title
+            "event_title": event.title,
+            "market_id": market_data.get("id")
         }
 
         # 将当前任务的metadata更新，添加mark结果
@@ -498,8 +511,8 @@ def handle_mark_processing(task: AsyncTask) -> Dict[str, Any]:
         task.metadata["event_title"] = event.title
 
         logger.info(
-            "TASK.MARK.TO_ANALYSIS_WAITING",
-            msg="标记完成，转换为ANALYSIS+WAITING状态，等待用户批准",
+            "TASK.MARK.TO_TRADE_WAITING",
+            msg="标记完成，转换为TRADE+WAITING状态，等待用户批准",
             extra={
                 "task_id": task.id,
                 "event_id": event_id,
@@ -507,12 +520,12 @@ def handle_mark_processing(task: AsyncTask) -> Dict[str, Any]:
             }
         )
 
-        # 返回结果，指示任务应该转换为ANALYSIS+WAITING状态
+        # 返回结果，指示任务应该转换为TRADE+WAITING状态
         return {
             "status": "processed",
-            "message": "标记处理完成，等待用户批准开始分析",
+            "message": "标记处理完成，等待用户批准开始交易",
             "result": result,
-            "next_stage": TaskStage.ANALYSIS.value,
+            "next_stage": TaskStage.TRADE.value,
             "next_status": TaskStatus.WAITING.value
         }
 
@@ -709,6 +722,8 @@ def handle_decision_processing(task: AsyncTask) -> Dict[str, Any]:
     """
     处理DECISION阶段的PROCESSING状态任务
 
+    决策完成后转换到MARK+WAITING阶段
+
     参数:
         task: 任务实例
 
@@ -718,10 +733,37 @@ def handle_decision_processing(task: AsyncTask) -> Dict[str, Any]:
     logger.info(
         "TASK.DECISION.PROCESSING",
         msg="处理DECISION阶段任务",
-        extra={"task_id": task.id}
+        extra={"task_id": task.id, "metadata": task.metadata}
     )
+
     # TODO: 实现决策处理逻辑
-    return {"status": "decided", "message": "决策完成"}
+    # 这里应该实现具体的决策算法
+
+    # 将决策结果保存到result中
+    decision_result = {
+        "decision": "TEMP_DECISION",  # 临时决策结果,待实现真正的决策逻辑
+        "timestamp": datetime.now().isoformat()
+    }
+
+    task.result["decision"] = decision_result
+
+    logger.info(
+        "TASK.DECISION.TO_MARK_WAITING",
+        msg="决策完成,转换为MARK+WAITING状态,等待用户批准",
+        extra={
+            "task_id": task.id,
+            "decision": decision_result
+        }
+    )
+
+    # 返回结果,指示任务应该转换为MARK+WAITING状态
+    return {
+        "status": "processed",
+        "message": "决策处理完成,等待用户批准开始标记",
+        "result": decision_result,
+        "next_stage": TaskStage.MARK.value,
+        "next_status": TaskStatus.WAITING.value
+    }
 
 
 @register_handler(TaskStage.TRADE, TaskStatus.WAITING)
@@ -749,19 +791,230 @@ def handle_trade_processing(task: AsyncTask) -> Dict[str, Any]:
     """
     处理TRADE阶段的PROCESSING状态任务
 
+    根据任务的metadata和result进行自动挂单，并添加到仓位监听
+
     参数:
         task: 任务实例
 
     返回:
         Dict[str, Any]: 处理结果
     """
+    from ..auto_trade.auto_trade_exec import trade
+    from ..position_listener.database import get_db
+    import json
+
     logger.info(
         "TASK.TRADE.PROCESSING",
         msg="处理TRADE阶段任务",
-        extra={"task_id": task.id}
+        extra={"task_id": task.id, "metadata": task.metadata, "result": task.result}
     )
-    # TODO: 实现交易处理逻辑
-    return {"status": "traded", "message": "交易完成"}
+
+    try:
+        # 从metadata中获取市场信息
+        market = task.metadata.get("market")
+        if not market:
+            error_msg = "metadata中缺少market信息"
+            logger.error(
+                "TASK.TRADE.ERROR",
+                msg=error_msg,
+                error_code="E-TRADE-001",
+                extra={"task_id": task.id}
+            )
+            return {"status": "failed", "message": error_msg}
+
+        # 从result中获取决策信息
+        decision = task.result.get("decision")
+        allocation = task.result.get("allocation")
+
+        if not decision or not allocation:
+            error_msg = "result中缺少decision或allocation信息"
+            logger.error(
+                "TASK.TRADE.ERROR",
+                msg=error_msg,
+                error_code="E-TRADE-002",
+                extra={"task_id": task.id}
+            )
+            return {"status": "failed", "message": error_msg}
+
+        # 检查是否需要交易
+        if decision != "trade":
+            logger.info(
+                "TASK.TRADE.SKIP",
+                msg=f"决策为{decision}，跳过交易",
+                extra={"task_id": task.id, "decision": decision}
+            )
+            return {
+                "status": "skipped",
+                "message": f"决策为{decision}，跳过交易",
+                "decision": decision
+            }
+
+        # 提取交易参数
+        side = allocation.get("side")  # "YES" 或 "NO"
+        dollars = allocation.get("dollars")  # 投入金额
+        shares = allocation.get("shares")  # 购买份额
+        cost = allocation.get("cost")  # 成本（价格）
+
+        if not side or dollars is None or cost is None:
+            error_msg = "allocation中缺少必要的交易参数"
+            logger.error(
+                "TASK.TRADE.ERROR",
+                msg=error_msg,
+                error_code="E-TRADE-003",
+                extra={"task_id": task.id, "allocation": allocation}
+            )
+            return {"status": "failed", "message": error_msg}
+
+        # 获取clobTokenIds
+        clob_token_ids_str = market.get("clobTokenIds")
+        if not clob_token_ids_str:
+            error_msg = "market中缺少clobTokenIds"
+            logger.error(
+                "TASK.TRADE.ERROR",
+                msg=error_msg,
+                error_code="E-TRADE-004",
+                extra={"task_id": task.id, "market_id": market.get("id")}
+            )
+            return {"status": "failed", "message": error_msg}
+
+        # 解析clobTokenIds (JSON数组字符串)
+        try:
+            clob_token_ids = json.loads(clob_token_ids_str)
+        except json.JSONDecodeError:
+            error_msg = f"clobTokenIds解析失败: {clob_token_ids_str}"
+            logger.error(
+                "TASK.TRADE.ERROR",
+                msg=error_msg,
+                error_code="E-TRADE-005",
+                extra={"task_id": task.id}
+            )
+            return {"status": "failed", "message": error_msg}
+
+        # 根据side选择token_id
+        # clobTokenIds[0] 是 YES token, clobTokenIds[1] 是 NO token
+        if side == "YES":
+            clobtoken = clob_token_ids[0]
+        elif side == "NO":
+            clobtoken = clob_token_ids[1]
+        else:
+            error_msg = f"无效的side值: {side}"
+            logger.error(
+                "TASK.TRADE.ERROR",
+                msg=error_msg,
+                error_code="E-TRADE-006",
+                extra={"task_id": task.id, "side": side}
+            )
+            return {"status": "failed", "message": error_msg}
+
+        # 获取negRisk标志
+        neg_risk = market.get("negRisk", False)
+
+        logger.info(
+            "TASK.TRADE.EXECUTE",
+            msg="开始执行交易",
+            extra={
+                "task_id": task.id,
+                "market_id": market.get("id"),
+                "market_question": market.get("question"),
+                "side": side,
+                "dollars": dollars,
+                "cost": cost,
+                "shares": shares,
+                "clobtoken": clobtoken,
+                "neg_risk": neg_risk
+            }
+        )
+
+        # 调用auto_trade_exec.trade()进行自动挂单
+        # 目标: 达到预期shares且花费不超过dollars
+        trade_result = trade(
+            side="BUY",  # 我们总是买入(BUY)，买入YES或NO token
+            target_shares=shares,  # 目标购买数量
+            max_cost=dollars,  # 最大允许成本
+            clobtoken=clobtoken,  # token ID
+            neg_risk=neg_risk  # 是否为负风险市场
+        )
+
+        logger.info(
+            "TASK.TRADE.SUCCESS",
+            msg="交易执行成功",
+            extra={
+                "task_id": task.id,
+                "market_id": market.get("id"),
+                "trade_result": trade_result
+            }
+        )
+
+        # 添加到仓位监听
+        try:
+            db = get_db()
+
+            # 准备marks信息
+            marks = task.metadata.get("marks", [])
+            marks_str = json.dumps(marks) if marks else None
+
+            # 添加仓位监听记录
+            position_id = db.add_position(
+                market_id=market.get("id"),
+                buy_price=cost,  # 买入价格
+                buy_side=side,  # 买入方向 (YES/NO)
+                marks=marks_str,  # 标记信息
+                shares=shares,  # 持仓份额
+                threshold_config=None  # 暂不设置阈值配置
+            )
+
+            logger.info(
+                "TASK.TRADE.POSITION_ADDED",
+                msg="已添加到仓位监听",
+                extra={
+                    "task_id": task.id,
+                    "position_id": position_id,
+                    "market_id": market.get("id"),
+                    "buy_price": cost,
+                    "buy_side": side,
+                    "shares": shares
+                }
+            )
+
+            # 返回成功结果
+            return {
+                "status": "traded",
+                "message": "交易完成并已添加到仓位监听",
+                "trade_result": trade_result,
+                "position_id": position_id,
+                "market_id": market.get("id"),
+                "market_question": market.get("question"),
+                "side": side,
+                "dollars": dollars,
+                "cost": cost,
+                "shares": shares
+            }
+
+        except Exception as e:
+            error_msg = f"添加仓位监听失败: {str(e)}"
+            logger.error(
+                "TASK.TRADE.POSITION_ERROR",
+                msg=error_msg,
+                error_code="E-TRADE-008",
+                extra={"task_id": task.id, "exception": str(e)}
+            )
+            # 即使添加仓位监听失败，交易已经完成，所以返回部分成功
+            return {
+                "status": "traded_with_warning",
+                "message": f"交易完成但添加仓位监听失败: {str(e)}",
+                "trade_result": trade_result,
+                "warning": error_msg
+            }
+
+    except Exception as e:
+        error_msg = f"交易处理异常: {str(e)}"
+        logger.error(
+            "TASK.TRADE.EXCEPTION",
+            msg=error_msg,
+            error_code="E-TRADE-007",
+            extra={"task_id": task.id, "exception": str(e)}
+        )
+        return {"status": "failed", "message": error_msg}
 
 
 @register_handler(TaskStage.LISTEN, TaskStatus.WAITING)

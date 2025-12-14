@@ -46,6 +46,7 @@ class DynamicScheduler:
             'profit_email': self._execute_profit_email,
             'periodic_health_check': self._execute_periodic_health_check,
             'event_sniffing': self._execute_event_sniffing,
+            'position_monitor': self._execute_position_monitor,
         }
         
         logger.info(
@@ -257,9 +258,9 @@ class DynamicScheduler:
                 created_count = 0
                 for event in filtered_events:
                     try:
-                        # 创建MARK阶段的WAITING状态任务
+                        # 创建ANALYSIS阶段的WAITING状态任务
                         async_task = AsyncTask(
-                            stage=TaskStage.MARK,
+                            stage=TaskStage.ANALYSIS,
                             status=TaskStatus.WAITING,
                             metadata={
                                 "event_id": event.id,
@@ -311,6 +312,42 @@ class DynamicScheduler:
                     "DYNAMIC_SCHEDULER.EVENT_SNIFFING.ERROR",
                     msg="事件嗅探任务执行失败",
                     error_code="E-DYNAMIC-SCHEDULER-012",
+                    extra={"error": str(e)},
+                    trace_id=trace_id
+                )
+
+    def _execute_position_monitor(self, task: ScheduledTask):
+        """
+        执行仓位监听任务
+
+        每5分钟更新所有活跃仓位的价格和状态
+        """
+        from ..vlogger import TraceContext
+        from ..position_listener import monitor_all_positions
+
+        with TraceContext() as trace_id:
+            logger.info(
+                "DYNAMIC_SCHEDULER.POSITION_MONITOR.START",
+                msg="开始执行仓位监听任务",
+                trace_id=trace_id
+            )
+
+            try:
+                # 执行仓位监听
+                result = monitor_all_positions()
+
+                logger.info(
+                    "DYNAMIC_SCHEDULER.POSITION_MONITOR.SUCCESS",
+                    msg="仓位监听任务执行成功",
+                    extra=result,
+                    trace_id=trace_id
+                )
+
+            except Exception as e:
+                logger.error(
+                    "DYNAMIC_SCHEDULER.POSITION_MONITOR.ERROR",
+                    msg="仓位监听任务执行失败",
+                    error_code="E-DYNAMIC-SCHEDULER-013",
                     extra={"error": str(e)},
                     trace_id=trace_id
                 )
