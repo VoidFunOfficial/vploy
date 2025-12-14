@@ -12,7 +12,7 @@ from datetime import datetime
 from ..vlogger import get_logger, TraceContext
 from .database import get_db
 from ..polymarket_api import GammaMarketsAPI
-from ..polymarket_api.gamma_markets import Market
+from ..types import Market
 
 
 # 初始化日志记录器

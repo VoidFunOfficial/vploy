@@ -121,7 +121,7 @@
             </span>
             <span class="log-time">{{ formatTime(log.ts) }}</span>
             <span class="log-event">{{ truncateText(log.event, 30) }}</span>
-            <span class="log-event-code">{{ log.event_code }}</span>
+           
             <span class="log-message-preview">{{ truncateText(log.msg, 50) }}</span>
             <button
               class="btn-expand"

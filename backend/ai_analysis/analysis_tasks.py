@@ -19,7 +19,7 @@ from ..task_manager.models import TaskDatabase, AsyncTask, TaskStage, TaskStatus
 from ..vlogger import get_logger, TraceContext
 from .gpt_api import send_request, get_result, process_result, parse_cookie_string
 from ..sys_configs.token_refresher import get_token_refresher, TokenType
-from ..polymarket_api.gamma_markets import GammaMarketsAPI
+from ..polymarket_api import GammaMarketsAPI
 from ..core.utils.helpers import market_to_dict
 
 

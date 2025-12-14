@@ -73,6 +73,7 @@ export default {
       { id: 'analysis', name: '分析', icon: '📈' },
       { id: 'decision', name: '决策', icon: '🎯' },
       { id: 'trade', name: '交易', icon: '💱' },
+      { id: 'positions', name: '仓位监听', icon: '📍' },
       { id: 'monitor', name: '监控', icon: '👁️' },
       { id: 'logs', name: '日志管理', icon: '📝' },
       { id: 'api', name: 'API 刷新', icon: '🔄' },

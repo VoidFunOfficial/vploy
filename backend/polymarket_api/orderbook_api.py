@@ -91,6 +91,7 @@ class PolymarketOrderbookClient:
         register_event("EVT-OB-005", "ORDERBOOK.MARKET.QUERY", "查询市场数据", overwrite=True)
         register_event("EVT-OB-006", "ORDERBOOK.REQUEST.START", "API 请求开始", overwrite=True)
         register_event("EVT-OB-007", "ORDERBOOK.REQUEST.SUCCESS", "API 请求成功", overwrite=True)
+        register_event("EVT-OB-008", "ORDERBOOK.TIMESERIES.QUERY", "查询历史时间序列数据", overwrite=True)
 
         # 注册错误码
         register_error("E-OB-001", "HTTP_ERROR", "HTTP 请求错误", "error", overwrite=True)
@@ -334,6 +335,82 @@ class PolymarketOrderbookClient:
         })
 
         return self._make_request("GET", "/spread", params=params)
+
+    # ==================== 历史时间序列数据 ====================
+
+    def get_prices_history(
+        self,
+        market: str,
+        start_ts: Optional[int] = None,
+        end_ts: Optional[int] = None,
+        interval: Optional[str] = None,
+        fidelity: Optional[int] = None
+    ) -> Dict[str, Any]:
+        """
+        获取指定市场代币的历史价格数据
+
+        参数:
+            market (str): CLOB 代币 ID
+            start_ts (int): 开始时间，Unix 时间戳（UTC），可选
+            end_ts (int): 结束时间，Unix 时间戳（UTC），可选
+            interval (str): 时间间隔字符串，表示从当前时间往前的持续时间。
+                           与 start_ts 和 end_ts 互斥。可选值：
+                           - '1m': 1 个月
+                           - '1w': 1 周
+                           - '1d': 1 天
+                           - '6h': 6 小时
+                           - '1h': 1 小时
+                           - 'max': 最大范围
+            fidelity (int): 数据分辨率，单位为分钟，可选
+
+        返回:
+            dict: 历史价格数据，包含以下字段：
+                - history (list): 时间戳/价格对列表，每个元素包含：
+                    - t (int): UTC 时间戳
+                    - p (float): 价格
+
+        示例:
+            >>> client = PolymarketOrderbookClient()
+            >>> # 使用时间戳范围查询
+            >>> history = client.get_prices_history(
+            ...     market="21742633143463906290569050155826241533067272736897614950488156847949938836455",
+            ...     start_ts=1697875200,
+            ...     end_ts=1697961600,
+            ...     fidelity=60
+            ... )
+            >>> # 使用时间间隔查询
+            >>> history = client.get_prices_history(
+            ...     market="21742633143463906290569050155826241533067272736897614950488156847949938836455",
+            ...     interval="1d",
+            ...     fidelity=60
+            ... )
+            >>> for point in history['history']:
+            ...     print(f"时间: {point['t']}, 价格: {point['p']}")
+
+        注意:
+            - interval 参数与 start_ts/end_ts 参数互斥，不能同时使用
+            - 如果同时提供了 interval 和 start_ts/end_ts，API 可能返回错误
+        """
+        params = {"market": market}
+
+        if start_ts is not None:
+            params["startTs"] = start_ts
+        if end_ts is not None:
+            params["endTs"] = end_ts
+        if interval is not None:
+            params["interval"] = interval
+        if fidelity is not None:
+            params["fidelity"] = fidelity
+
+        vlogger.info("ORDERBOOK.TIMESERIES.QUERY", msg="查询历史价格数据", extra={
+            "market": market,
+            "start_ts": start_ts,
+            "end_ts": end_ts,
+            "interval": interval,
+            "fidelity": fidelity
+        })
+
+        return self._make_request("GET", "/prices-history", params=params)
 
 
 # ==================== 模块导出 ====================

@@ -10,13 +10,14 @@
 
 from .position_manager import (
     allocate,
-    Market,
-    convert_gamma_market_to_market
+    convert_gamma_market_to_simple_market
 )
+from ..types import SimpleMarket, TradeAllocation
 
 __all__ = [
     "allocate",
-    "Market",
-    "convert_gamma_market_to_market"
+    "SimpleMarket",
+    "TradeAllocation",
+    "convert_gamma_market_to_simple_market"
 ]
 

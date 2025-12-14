@@ -1,6 +1,6 @@
 from .coze_api import chat_with_coze
 from ..sys_configs.global_event_reg import vlogger
-from ..polymarket_api.gamma_markets import Event
+from ..types import Event
 
 
 def mark_event(event: Event) -> str:

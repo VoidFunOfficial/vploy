@@ -24,7 +24,7 @@ from ..purse import get_purse
 
 # 导入 Polymarket API 数据结构
 try:
-    from ..polymarket_api.gamma_markets import Market as GammaMarket
+    from ..types import Market as GammaMarket
     GAMMA_MARKET_AVAILABLE = True
 except ImportError:
     GAMMA_MARKET_AVAILABLE = False
@@ -33,24 +33,15 @@ except ImportError:
         msg="GammaMarket导入失败，部分功能可能不可用"
     )
 
-
-# ========== 数据结构 ==========
-
-@dataclass
-class Market:
-    """市场数据结构（用于仓位分配算法）"""
-    id: Any                      # 市场ID（字符串或整数）
-    m: float                     # YES价格（市场报价）
-    p_yes: float                 # 主观YES概率（AI预测）
-    d: int                       # 结算日期（天数索引，相对于now_day）
-    p_no: Optional[float] = None # 主观NO概率（可选，默认为1-p_yes）
+# 导入仓位管理相关数据结构
+from ..types import SimpleMarket, TradeAllocation
 
 
 # ========== 工具函数 ==========
 
-def clip01(x: float, eps: float = 1e-9) -> float:
+def clip01(x: float, eps: float = 1e-1) -> float:
     """将数值裁剪到(eps, 1-eps)区间，避免数值问题"""
-    return float(min(1 - eps, max(eps, x)))
+    return round(float(min(1 - eps, max(eps, x))), 3)
 
 
 def choose_side(m: float, p_yes: float, p_no: Optional[float], weight: float) -> Optional[Dict]:
@@ -94,10 +85,10 @@ def choose_side(m: float, p_yes: float, p_no: Optional[float], weight: float) ->
 
     return {
         "side": side,
-        "price": price,
-        "p": p,
-        "b": b,
-        "deriv0": max(deriv_yes, deriv_no)
+        "price": round(price, 3),
+        "p": round(p, 3),
+        "b": round(b, 3),
+        "deriv0": round(max(deriv_yes, deriv_no), 3)
     }
 
 
@@ -141,24 +132,24 @@ def f_from_mu(p: float, b: float, w: float, mu: float, f_cap: float = 0.95, iter
             lo = mid  # 需要更大f来降低边际
         else:
             hi = mid
-    return hi
+    return round(hi, 3)
 
 
 # ========== 核心分配函数 ==========
 
 def allocate(
-    markets_today: List[Market],
+    markets_today: List[SimpleMarket],
     wealth: Optional[float] = None,
     locked_value_now: Optional[float] = None,
     now_day: int = 0,
     k: float = 0.6,
     theta: Optional[Dict] = None
-) -> List[Dict]:
+) -> List[TradeAllocation]:
     """
     基于凯利 + 水位法 + 时间贴现的多市场自动仓位分配
 
     参数:
-        markets_today: 今天新到的若干Market
+        markets_today: 今天新到的若干SimpleMarket
         wealth: 当前总权益（现金 + 未结算仓位成本），None则从purse获取
         locked_value_now: 目前已锁仓成本金额，None则从purse获取
         now_day: 当前天索引（整数）
@@ -169,8 +160,8 @@ def allocate(
             * 'f_cap': 单市场上限（默认0.95）
 
     返回:
-        allocations: 列表，每个元素包含:
-            {'id', 'side', 'price', 'p', 'b', 'f', 'invest', 'shares', 'settle_day'}
+        allocations: TradeAllocation对象列表，每个对象包含:
+            id, side, price, p, b, f, invest, shares, settle_day
 
     备注:
         - 只在"今天"上新市场中做选择，不动已有仓位（持有到期）
@@ -206,25 +197,25 @@ def allocate(
         msg="开始仓位分配",
         extra={
             "markets_count": len(markets_today),
-            "wealth": wealth,
-            "locked_value_now": locked_value_now,
+            "wealth": round(wealth, 3),
+            "locked_value_now": round(locked_value_now, 3),
             "now_day": now_day,
-            "k": k,
-            "lambda_time": lam,
-            "c_fraction": c_frac,
-            "f_cap": f_cap
+            "k": round(k, 3),
+            "lambda_time": round(lam, 3),
+            "c_fraction": round(c_frac, 3),
+            "f_cap": round(f_cap, 3)
         }
     )
 
     wealth = max(1e-9, wealth)
-    locked_frac = locked_value_now / wealth
-    k_rem = max(0.0, k - locked_frac)
+    locked_frac = round(locked_value_now / wealth, 3)
+    k_rem = round(max(0.0, k - locked_frac), 3)
 
     if k_rem <= 1e-12:
         vlogger.warn(
             "POSITION.ALLOCATE.NO_BUDGET",
             msg="剩余锁仓预算不足",
-            extra={"k_rem": k_rem, "locked_frac": locked_frac}
+            extra={"k_rem": round(k_rem, 3), "locked_frac": round(locked_frac, 3)}
         )
         return []
 
@@ -232,16 +223,16 @@ def allocate(
     candidates = []
     for mk in markets_today:
         T = max(1, mk.d - now_day)  # 至少1天
-        w = math.exp(-lam * T)      # 时间贴现权重
+        w = round(math.exp(-lam * T), 3)      # 时间贴现权重
         sd = choose_side(mk.m, mk.p_yes, mk.p_no, w)
         if sd is None:
             continue
         candidates.append({
             "id": mk.id,
-            "w": w,
+            "w": round(w, 3),
             "p": clip01(sd["p"]),
-            "b": max(1e-9, sd["b"]),
-            "price": sd["price"],
+            "b": round(max(1e-9, sd["b"]), 3),
+            "price": round(sd["price"], 3),
             "side": sd["side"],
             "settle_day": mk.d
         })
@@ -265,7 +256,7 @@ def allocate(
         vlogger.info(
             "POSITION.ALLOCATE.KELLY_DIRECT",
             msg="预算充足，直接使用Kelly分配",
-            extra={"sum_kelly": sum_kelly, "k_rem": k_rem}
+            extra={"sum_kelly": round(sum_kelly, 3), "k_rem": round(k_rem, 3)}
         )
     else:
         # 水位二分：找到μ使得sum f(μ) = k_rem
@@ -295,7 +286,7 @@ def allocate(
         vlogger.info(
             "POSITION.ALLOCATE.WATER_FILLING",
             msg="使用水位法分配",
-            extra={"mu_star": mu_star, "sum_kelly": sum_kelly, "k_rem": k_rem}
+            extra={"mu_star": round(mu_star, 3), "sum_kelly": round(sum_kelly, 3), "k_rem": round(k_rem, 3)}
         )
 
     # 生成最终下单
@@ -303,26 +294,26 @@ def allocate(
     for c, f in zip(candidates, f_use):
         if f <= 1e-9:
             continue
-        invest = f * wealth
-        shares = invest / c["price"]
-        allocations.append({
-            "id": c["id"],
-            "side": c["side"],
-            "price": c["price"],
-            "p": c["p"],
-            "b": c["b"],
-            "f": float(f),
-            "invest": float(invest),
-            "shares": float(shares),
-            "settle_day": c["settle_day"],
-        })
+        invest = round(f * wealth, 3)
+        shares = round(invest / c["price"], 3)
+        allocations.append(TradeAllocation(
+            id=c["id"],
+            side=c["side"],
+            price=round(c["price"], 3),
+            p=round(c["p"], 3),
+            b=round(c["b"], 3),
+            f=round(float(f), 3),
+            invest=round(float(invest), 3),
+            shares=round(float(shares), 3),
+            settle_day=c["settle_day"]
+        ))
 
     vlogger.info(
         "POSITION.ALLOCATE.SUCCESS",
         msg="仓位分配完成",
         extra={
             "allocations_count": len(allocations),
-            "total_invest": sum(a["invest"] for a in allocations)
+            "total_invest": round(sum(a.invest for a in allocations), 3)
         }
     )
 
@@ -331,14 +322,14 @@ def allocate(
 
 # ========== 辅助转换函数 ==========
 
-def convert_gamma_market_to_market(
+def convert_gamma_market_to_simple_market(
     gamma_market: 'GammaMarket',
     p_yes: float,
     now_day: int = 0,
     p_no: Optional[float] = None
-) -> Market:
+) -> SimpleMarket:
     """
-    将GammaMarket对象转换为Market对象
+    将GammaMarket对象转换为SimpleMarket对象
 
     参数:
         gamma_market: GammaMarket对象
@@ -347,7 +338,7 @@ def convert_gamma_market_to_market(
         p_no: AI预测的NO概率（可选）
 
     返回:
-        Market对象
+        SimpleMarket对象
     """
     # 计算结算日期（天数索引）
     # 假设gamma_market有end_date_iso字段
@@ -369,13 +360,13 @@ def convert_gamma_market_to_market(
         d = now_day + 30
 
     # 获取YES价格
-    m = gamma_market.outcome_prices[0] if gamma_market.outcome_prices else 0.5
+    m = round(gamma_market.outcome_prices[0] if gamma_market.outcome_prices else 0.5, 3)
 
-    return Market(
+    return SimpleMarket(
         id=gamma_market.id,
-        m=m,
-        p_yes=p_yes,
+        m=round(m, 3),
+        p_yes=round(p_yes, 3),
         d=d,
-        p_no=p_no
+        p_no=round(p_no, 3) if p_no is not None else None
     )
 

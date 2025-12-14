@@ -24,6 +24,9 @@
     <!-- 交易界面 -->
     <Trade v-else-if="activeMenu === 'trade'" />
 
+    <!-- 仓位监听 -->
+    <PositionManagement v-else-if="activeMenu === 'positions'" />
+
     <!-- Token 管理 -->
     <TokenManagement v-else-if="activeMenu === 'api'" />
 
@@ -61,6 +64,7 @@ import TokenManagement from '@/components/TokenManagement.vue'
 import FilterManagement from '@/components/FilterManagement.vue'
 import ProfitChart from '@/components/ProfitChart.vue'
 import SystemSettings from '@/components/SystemSettings.vue'
+import PositionManagement from '@/components/PositionManagement.vue'
 
 export default {
   name: 'Dashboard',
@@ -74,6 +78,7 @@ export default {
     Analysis,
     Decision,
     Trade,
+    PositionManagement,
     TokenManagement,
     FilterManagement,
     ProfitChart,
@@ -92,6 +97,7 @@ export default {
       analysis: '分析',
       decision: '决策',
       trade: '交易',
+      positions: '仓位监听',
       monitor: '监控',
       logs: '日志管理',
       api: 'API 刷新',

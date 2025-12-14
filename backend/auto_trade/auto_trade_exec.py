@@ -291,6 +291,91 @@ def scan_orderbook(
             orderbook_client.session.close()
 
 
+def get_aggressive_price(
+    token_id: str,
+    side: str,
+    orderbook_client: Optional[PolymarketOrderbookClient] = None
+) -> Optional[float]:
+    """
+    获取贪婪压价策略的挂单价格
+
+    策略：采用bid的最低价格 - 一个spread，贪婪地压低价格，不激进追求成交
+
+    参数:
+        token_id (str): 代币 ID
+        side (str): 交易方向，BUY 或 SELL
+        orderbook_client (PolymarketOrderbookClient): 订单簿客户端，可选
+
+    返回:
+        float: 贪婪压价后的挂单价格，如果订单簿深度不足则返回None
+    """
+    should_close = False
+    if orderbook_client is None:
+        orderbook_client = PolymarketOrderbookClient()
+        should_close = True
+
+    try:
+        orderbook = orderbook_client.get_orderbook(token_id)
+
+        # 获取spread信息
+        spread_info = orderbook_client.get_spread(token_id)
+        spread = float(spread_info.get('spread', 0))
+
+        # BUY: 我们要买入，看bids（买单），取最低价格（最后一层）- spread
+        # SELL: 我们要卖出，看asks（卖单），取最高价格（最后一层）+ spread
+        if side == BUY:
+            bids = orderbook.get('bids', [])
+            if not bids:
+                vlogger.warn("TRADE.AGGRESSIVE_PRICE.NO_BIDS", msg="订单簿bids为空", extra={
+                    "token_id": token_id,
+                    "side": side
+                })
+                return None
+
+            # 取bids的最低价格（最后一层）
+            lowest_bid = float(bids[-1]['price'])
+            # 贪婪压价：最低bid - spread
+            aggressive_price = max(0.01, lowest_bid - spread)  # 确保价格不低于0.01
+
+            vlogger.info("TRADE.AGGRESSIVE_PRICE.SUCCESS", msg="计算贪婪压价（BUY）", extra={
+                "token_id": token_id,
+                "side": side,
+                "lowest_bid": lowest_bid,
+                "spread": spread,
+                "aggressive_price": aggressive_price,
+                "bids_depth": len(bids)
+            })
+
+        else:  # SELL
+            asks = orderbook.get('asks', [])
+            if not asks:
+                vlogger.warn("TRADE.AGGRESSIVE_PRICE.NO_ASKS", msg="订单簿asks为空", extra={
+                    "token_id": token_id,
+                    "side": side
+                })
+                return None
+
+            # 取asks的最高价格（最后一层）
+            highest_ask = float(asks[-1]['price'])
+            # 贪婪压价：最高ask + spread
+            aggressive_price = min(0.99, highest_ask + spread)  # 确保价格不超过0.99
+
+            vlogger.info("TRADE.AGGRESSIVE_PRICE.SUCCESS", msg="计算贪婪压价（SELL）", extra={
+                "token_id": token_id,
+                "side": side,
+                "highest_ask": highest_ask,
+                "spread": spread,
+                "aggressive_price": aggressive_price,
+                "asks_depth": len(asks)
+            })
+
+        return aggressive_price
+
+    finally:
+        if should_close:
+            orderbook_client.session.close()
+
+
 def trade(
     side: str,
     target_shares: float,
@@ -301,7 +386,150 @@ def trade(
     clob_client: Optional[Any] = None
 ) -> Dict[str, Any]:
     """
-    执行交易：扫描订单簿并下限价单
+    执行交易：采用贪婪压价策略挂限价单
+
+    新逻辑（贪婪压价）：
+    1. 获取bid最低价格 - spread（BUY）或 ask最高价格 + spread（SELL）
+    2. 按贪婪价格挂限价单，不激进追求成交
+    3. 返回order_id供监听模块追踪
+    4. 如果10分钟后仍未成交，监听模块会调用sweep_order进行扫单
+
+    参数:
+        side (str): 交易方向，BUY 或 SELL
+        target_shares (float): 目标购买数量（shares）
+        max_cost (float): 最大允许成本（美元）
+        clobtoken (str): 代币 ID (token_id)
+        neg_risk (bool): 是否为负风险市场，如果为 None 则自动检测
+        orderbook_client (PolymarketOrderbookClient): 订单簿客户端，可选
+        clob_client: CLOB 客户端，可选
+
+    返回:
+        dict: 交易结果，包含以下字段：
+            - success (bool): 是否成功
+            - order_id (str): 订单ID
+            - order_response (dict): 订单提交响应
+            - price (float): 挂单价格
+            - size (float): 挂单数量
+            - message (str): 结果说明
+
+    异常:
+        ValueError: 如果参数无效
+        Exception: 如果交易失败
+    """
+    vlogger.info("TRADE.EXECUTE.START", msg="开始执行交易（贪婪压价策略）", extra={
+        "side": side,
+        "target_shares": target_shares,
+        "max_cost": max_cost,
+        "clobtoken": clobtoken,
+        "neg_risk": neg_risk
+    })
+
+    try:
+        # 步骤1: 获取贪婪压价价格
+        aggressive_price = get_aggressive_price(
+            token_id=clobtoken,
+            side=side,
+            orderbook_client=orderbook_client
+        )
+        
+        if aggressive_price is None:
+            raise ValueError("无法获取贪婪压价价格，订单簿深度不足")
+
+        # 步骤2: 计算挂单数量（根据max_cost和aggressive_price）
+        # size = max_cost / price
+        order_size = max_cost / aggressive_price if aggressive_price > 0 else 0
+
+        # 确保不超过target_shares
+        if order_size > target_shares:
+            order_size = target_shares
+
+        vlogger.info("TRADE.ORDER.CALCULATE", msg="计算挂单参数", extra={
+            "aggressive_price": aggressive_price,
+            "max_cost": max_cost,
+            "target_shares": target_shares,
+            "calculated_size": order_size
+        })
+
+        # 步骤3: 创建限价单
+        vlogger.info("TRADE.ORDER.CREATE_LIMIT", msg="创建贪婪压价限价单", extra={
+            "token_id": clobtoken,
+            "side": side,
+            "price": aggressive_price,
+            "size": order_size,
+            "neg_risk": neg_risk
+        })
+
+        signed_order = create_limit_order(
+            token_id=clobtoken,
+            price=aggressive_price,
+            size=order_size,
+            side=side,
+            neg_risk=neg_risk,
+            client=clob_client
+        )
+
+        order_response = post_order(
+            signed_order=signed_order,
+            order_type=OrderType.GTC,  # Good Till Cancelled
+            client=clob_client
+        )
+
+        # 从响应中提取order_id
+        order_id = order_response.get('orderID') or order_response.get('order_id')
+
+        if not order_id:
+            vlogger.warn("TRADE.ORDER.NO_ORDER_ID", msg="订单响应中未找到order_id", extra={
+                "order_response": order_response
+            })
+
+        result = {
+            'success': True,
+            'order_id': order_id,
+            'order_response': order_response,
+            'price': aggressive_price,
+            'size': order_size,
+            'order_type': 'LIMIT_AGGRESSIVE',
+            'message': f"交易执行成功，已挂贪婪压价限价单（价格: {aggressive_price}, 数量: {order_size}）"
+        }
+
+        vlogger.info("TRADE.EXECUTE.SUCCESS", msg="交易执行成功", extra={
+            "side": side,
+            "target_shares": target_shares,
+            "order_size": order_size,
+            "max_cost": max_cost,
+            "clobtoken": clobtoken,
+            "price": aggressive_price,
+            "order_id": order_id,
+            "order_response": order_response
+        })
+
+        return result
+
+    except Exception as e:
+        error_msg = f"交易执行失败: {str(e)}"
+        vlogger.error("TRADE.EXECUTE.ERROR", msg=error_msg, error_code="E-TRADE-002", extra={
+            "side": side,
+            "target_shares": target_shares,
+            "max_cost": max_cost,
+            "clobtoken": clobtoken,
+            "error": str(e)
+        })
+        raise
+
+
+def sweep_order(
+    side: str,
+    target_shares: float,
+    max_cost: float,
+    clobtoken: str,
+    neg_risk: Optional[bool] = None,
+    orderbook_client: Optional[PolymarketOrderbookClient] = None,
+    clob_client: Optional[Any] = None
+) -> Dict[str, Any]:
+    """
+    扫单交易：逐层扫描订单簿并下单
+
+    当限价单10分钟后仍未成交时，监听模块会调用此函数进行扫单
 
     参数:
         side (str): 交易方向，BUY 或 SELL
@@ -323,7 +551,7 @@ def trade(
         ValueError: 如果参数无效
         Exception: 如果交易失败
     """
-    vlogger.info("TRADE.EXECUTE.START", msg="开始执行交易", extra={
+    vlogger.info("TRADE.SWEEP.START", msg="开始扫单交易", extra={
         "side": side,
         "target_shares": target_shares,
         "max_cost": max_cost,
@@ -346,7 +574,7 @@ def trade(
 
         # 检查是否达到目标shares
         if not scan_result.get('target_met', False):
-            vlogger.warn("TRADE.EXECUTE.TARGET_NOT_MET", msg="无法完全满足目标shares", extra={
+            vlogger.warn("TRADE.SWEEP.TARGET_NOT_MET", msg="无法完全满足目标shares", extra={
                 "target_shares": target_shares,
                 "actual_shares": scan_result['total_size'],
                 "max_cost": max_cost,
@@ -363,7 +591,7 @@ def trade(
 
         if total_cost <= MARKET_ORDER_THRESHOLD:
             # 使用市价单
-            vlogger.info("TRADE.ORDER.CREATE_MARKET", msg="成本≤2美元，使用市价单", extra={
+            vlogger.info("TRADE.SWEEP.CREATE_MARKET", msg="成本≤2美元，使用市价单", extra={
                 "token_id": clobtoken,
                 "side": side,
                 "amount": total_cost,
@@ -389,7 +617,7 @@ def trade(
             order_type_used = "MARKET"
         else:
             # 使用限价单
-            vlogger.info("TRADE.ORDER.CREATE_LIMIT", msg="成本>2美元，使用限价单", extra={
+            vlogger.info("TRADE.SWEEP.CREATE_LIMIT", msg="成本>2美元，使用限价单", extra={
                 "token_id": clobtoken,
                 "side": side,
                 "price": limit_price,
@@ -420,10 +648,10 @@ def trade(
             'scan_result': scan_result,
             'order_response': order_response,
             'order_type': order_type_used,
-            'message': f"交易执行成功，订单已提交（{order_type_used}）"
+            'message': f"扫单交易执行成功，订单已提交（{order_type_used}）"
         }
 
-        vlogger.info("TRADE.EXECUTE.SUCCESS", msg="交易执行成功", extra={
+        vlogger.info("TRADE.SWEEP.SUCCESS", msg="扫单交易执行成功", extra={
             "side": side,
             "target_shares": target_shares,
             "actual_shares": total_size,
@@ -438,8 +666,8 @@ def trade(
         return result
 
     except Exception as e:
-        error_msg = f"交易执行失败: {str(e)}"
-        vlogger.error("TRADE.EXECUTE.ERROR", msg=error_msg, error_code="E-TRADE-002", extra={
+        error_msg = f"扫单交易执行失败: {str(e)}"
+        vlogger.error("TRADE.SWEEP.ERROR", msg=error_msg, error_code="E-TRADE-004", extra={
             "side": side,
             "target_shares": target_shares,
             "max_cost": max_cost,
@@ -453,5 +681,7 @@ def trade(
 
 __all__ = [
     "scan_orderbook",
+    "get_aggressive_price",
     "trade",
+    "sweep_order",
 ]

@@ -312,8 +312,11 @@ def run_scheduled_task_now(task_id):
     立即执行定时任务一次
 
     不影响任务的正常调度，只是手动触发一次执行
+    提交到Huey队列异步执行，避免阻塞前端
     """
     try:
+        from ...task_manager import execute_scheduled_task
+
         # 获取任务信息
         task = db.get_scheduled_task(task_id)
         if not task:
@@ -324,13 +327,12 @@ def run_scheduled_task_now(task_id):
 
         logger.info(
             "SCHEDULER.API.RUN_NOW.START",
-            msg=f"手动触发任务执行: {task.name}",
+            msg=f"提交定时任务到Huey队列: {task.name}",
             extra={"task_id": task_id, "task_name": task.name}
         )
 
-        # 获取调度器实例并执行任务
-        scheduler = get_scheduler()
-        scheduler._execute_task(task)
+        # 提交到Huey队列异步执行
+        execute_scheduled_task(task_id)
 
         # 更新最后运行时间（但不更新下次运行时间，保持原有调度）
         from datetime import datetime
@@ -338,25 +340,25 @@ def run_scheduled_task_now(task_id):
         db.update_scheduled_task(task)
 
         logger.info(
-            "SCHEDULER.API.RUN_NOW.SUCCESS",
-            msg=f"手动执行任务成功: {task.name}",
+            "SCHEDULER.API.RUN_NOW.SUBMITTED",
+            msg=f"定时任务已提交到Huey队列: {task.name}",
             extra={"task_id": task_id, "task_name": task.name}
         )
 
         return jsonify({
             'success': True,
-            'message': f'任务 {task.name} 已立即执行'
-        }), 200
+            'message': f'任务 {task.name} 已提交到队列，将在后台异步执行'
+        }), 202
 
     except Exception as e:
         logger.error(
             "SCHEDULER.API.RUN_NOW.ERROR",
-            msg=f"手动执行任务失败: {task_id}",
+            msg=f"提交定时任务失败: {task_id}",
             error_code="E-SCHEDULER-API-006",
             extra={"task_id": task_id, "error": str(e)}
         )
         return jsonify({
             'success': False,
-            'message': f'执行任务失败: {str(e)}'
+            'message': f'提交任务失败: {str(e)}'
         }), 500
 

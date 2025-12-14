@@ -43,7 +43,10 @@ from .tasks import (
     submit_task,
     process_async_task,
     register_handler,
-    get_handler
+    get_handler,
+    execute_split_analysis_task,
+    execute_scheduled_task,
+    execute_poll_analysis_once
 )
 from .scheduler import (
     add_scheduled_task,
@@ -81,6 +84,9 @@ __all__ = [
     "process_async_task",
     "register_handler",
     "get_handler",
+    "execute_split_analysis_task",
+    "execute_scheduled_task",
+    "execute_poll_analysis_once",
 
     # 定时任务
     "add_scheduled_task",

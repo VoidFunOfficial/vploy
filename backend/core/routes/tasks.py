@@ -626,16 +626,12 @@ def poll_analysis_once(task_id):
     返回:
         {
             "success": true,
-            "data": {
-                "analysis_status": "success",  # 或 "polling" (仍在思考)
-                "has_result": true,
-                "analysis_result": {...},  # 如果成功
-                "market_ids": [...],
-                "error": "..."  # 如果失败
-            }
+            "message": "轮询任务已提交到队列"
         }
     """
     try:
+        from ...task_manager import execute_poll_analysis_once
+
         # 获取任务
         task = db.get_async_task(task_id)
 
@@ -667,157 +663,36 @@ def poll_analysis_once(task_id):
                 'message': '缺少conversation_id，无法轮询结果'
             }), 400
 
-        # 获取Cookie
-        from ...sys_configs.token_refresher import get_token_refresher, TokenType
-        token_refresher = get_token_refresher()
-        access_token_status = token_refresher.get_token_status(TokenType.ACCESS_TOKEN.value)
-        auth_token_status = token_refresher.get_token_status(TokenType.AUTH_TOKEN.value)
-
-        if not access_token_status or not auth_token_status:
-            return jsonify({
-                'success': False,
-                'message': '未配置access_token或auth_token'
-            }), 400
-
-        if access_token_status.get('is_expired') or auth_token_status.get('is_expired'):
-            return jsonify({
-                'success': False,
-                'message': 'access_token或auth_token已过期'
-            }), 400
-
-        # 构建cookie_string
-        access_token = access_token_status.get('token_value')
-        auth_token = auth_token_status.get('token_value')
-        cookie_string = f"__Secure-access_token={access_token};__Secure-auth_token={auth_token}"
-
-        from ...ai_analysis.gpt_api import parse_cookie_string, get_result
-        from ...ai_analysis.analysis_tasks import validate_analysis_result, AnalysisStatus
-
-        cookies_dict = parse_cookie_string(cookie_string)
-
-        # 执行一次轮询
         logger.info(
             "TASKS.API.POLL_ONCE.START",
-            msg=f"手动轮询分析结果: {task_id}",
+            msg=f"提交轮询任务到Huey队列: {task_id}",
             extra={"task_id": task_id, "conversation_id": conversation_id}
         )
 
-        poll_result = get_result(
-            conversation_id=conversation_id,
-            cookies=cookies_dict
+        # 提交到Huey队列异步执行
+        execute_poll_analysis_once(task_id)
+
+        logger.info(
+            "TASKS.API.POLL_ONCE.SUBMITTED",
+            msg=f"轮询任务已提交到Huey队列: {task_id}",
+            extra={"task_id": task_id}
         )
 
-        if poll_result.get("success"):
-            # 获取到结果，验证格式
-            ai_response = poll_result.get("ai_response", "")
-            task.result["analysis_status"] = AnalysisStatus.VALIDATING.value
-            task.result["raw_response"] = ai_response
-            db.update_async_task(task)
-
-            is_valid, parsed_json = validate_analysis_result(ai_response)
-
-            if is_valid:
-                # 验证成功
-                task.result["analysis_status"] = AnalysisStatus.SUCCESS.value
-                task.result["analysis_result"] = parsed_json
-                task.result["market_ids"] = list(parsed_json.keys())
-                task.metadata["analysis_result"] = parsed_json
-                task.metadata["market_ids"] = list(parsed_json.keys())
-                task.status = TaskStatus.FINISHED
-                db.update_async_task(task)
-
-                logger.info(
-                    "TASKS.API.POLL_ONCE.SUCCESS",
-                    msg=f"手动轮询成功，分析完成: {task_id}",
-                    extra={
-                        "task_id": task_id,
-                        "market_count": len(parsed_json),
-                        "market_ids": list(parsed_json.keys())
-                    }
-                )
-
-                return jsonify({
-                    'success': True,
-                    'data': {
-                        'analysis_status': AnalysisStatus.SUCCESS.value,
-                        'has_result': True,
-                        'analysis_result': parsed_json,
-                        'market_ids': list(parsed_json.keys()),
-                        'market_count': len(parsed_json)
-                    }
-                }), 200
-            else:
-                # 验证失败
-                error_msg = "结果验证失败: 返回的结果不符合预期的JSON结构"
-                task.error_msg = error_msg
-                task.result["analysis_status"] = AnalysisStatus.FAILED.value
-                task.result["error"] = error_msg
-                task.status = TaskStatus.FAILED
-                db.update_async_task(task)
-
-                logger.error(
-                    "TASKS.API.POLL_ONCE.VALIDATION_FAILED",
-                    msg=error_msg,
-                    error_code="E-TASKS-API-011",
-                    extra={
-                        "task_id": task_id,
-                        "response_preview": ai_response[:200]
-                    }
-                )
-
-                return jsonify({
-                    'success': False,
-                    'message': error_msg,
-                    'data': {
-                        'analysis_status': AnalysisStatus.FAILED.value,
-                        'has_result': False,
-                        'error': error_msg,
-                        'raw_response_preview': ai_response[:200]
-                    }
-                }), 200
-
-        elif poll_result.get("error") == "AI is thinking":
-            # AI仍在思考
-            logger.info(
-                "TASKS.API.POLL_ONCE.THINKING",
-                msg=f"AI仍在思考: {task_id}",
-                extra={"task_id": task_id}
-            )
-
-            return jsonify({
-                'success': True,
-                'data': {
-                    'analysis_status': AnalysisStatus.POLLING.value,
-                    'has_result': False,
-                    'message': 'AI仍在思考中，请稍后再试'
-                }
-            }), 200
-
-        else:
-            # 查询失败
-            error_msg = f"查询失败: {poll_result.get('error', '未知错误')}"
-            logger.error(
-                "TASKS.API.POLL_ONCE.QUERY_FAILED",
-                msg=error_msg,
-                error_code="E-TASKS-API-012",
-                extra={"task_id": task_id, "poll_result": poll_result}
-            )
-
-            return jsonify({
-                'success': False,
-                'message': error_msg
-            }), 500
+        return jsonify({
+            'success': True,
+            'message': '轮询任务已提交到队列，将在后台异步执行'
+        }), 202
 
     except Exception as e:
         logger.error(
             "TASKS.API.POLL_ONCE.ERROR",
-            msg=f"手动轮询失败: {task_id}",
+            msg=f"提交轮询任务失败: {task_id}",
             error_code="E-TASKS-API-013",
             extra={"task_id": task_id, "error": str(e)}
         )
         return jsonify({
             'success': False,
-            'message': f'手动轮询失败: {str(e)}'
+            'message': f'提交轮询任务失败: {str(e)}'
         }), 500
 
 
@@ -831,80 +706,37 @@ def split_analysis_task_route(task_id):
 
     处理流程:
     1. 验证任务状态（必须是analysis阶段且成功）
-    2. 遍历analysis_result中的每个市场
-    3. 获取市场详细信息
-    4. 合并mark信息
-    5. 创建decision任务
-    6. 删除原始analysis任务
+    2. 提交到Huey队列异步执行拆分操作
+    3. 返回提交成功消息
 
     返回:
         {
-            "success": true/false,
-            "message": "消息",
-            "data": {
-                "created_tasks": [1, 2, 3],  # 创建的decision任务ID列表
-                "failed_markets": ["market_id"],  # 失败的市场ID列表
-                "total_markets": 5,
-                "success_count": 4,
-                "failed_count": 1
-            }
+            "success": true,
+            "message": "拆分任务已提交到队列"
         }
     """
     try:
-        from ...ai_analysis.analysis_tasks import split_analysis_task
+        from ...task_manager import execute_split_analysis_task
 
         logger.info(
             "TASKS.API.SPLIT.START",
-            msg=f"开始拆分分析任务: {task_id}",
+            msg=f"提交拆分任务到Huey队列: {task_id}",
             extra={"task_id": task_id}
         )
 
-        # 调用拆分函数
-        result = split_analysis_task(task_id)
+        # 提交到Huey队列异步执行
+        execute_split_analysis_task(task_id)
 
-        if result["success"]:
-            logger.info(
-                "TASKS.API.SPLIT.SUCCESS",
-                msg=f"拆分任务成功: {task_id}",
-                extra={
-                    "task_id": task_id,
-                    "created_count": result["success_count"],
-                    "failed_count": result["failed_count"]
-                }
-            )
+        logger.info(
+            "TASKS.API.SPLIT.SUBMITTED",
+            msg=f"拆分任务已提交到Huey队列: {task_id}",
+            extra={"task_id": task_id}
+        )
 
-            return jsonify({
-                'success': True,
-                'message': result["message"],
-                'data': {
-                    'created_tasks': result["created_tasks"],
-                    'failed_markets': result["failed_markets"],
-                    'total_markets': result["total_markets"],
-                    'success_count': result["success_count"],
-                    'failed_count': result["failed_count"]
-                }
-            }), 200
-        else:
-            logger.warn(
-                "TASKS.API.SPLIT.FAILED",
-                msg=f"拆分任务失败: {task_id}",
-                extra={
-                    "task_id": task_id,
-                    "error": result["message"]
-                }
-            )
-
-            return jsonify({
-                'success': False,
-                'message': result["message"],
-                'data': {
-                    'created_tasks': result["created_tasks"],
-                    'failed_markets': result["failed_markets"],
-                    'total_markets': result["total_markets"],
-                    'success_count': result["success_count"],
-                    'failed_count': result["failed_count"]
-                }
-            }), 400
+        return jsonify({
+            'success': True,
+            'message': '拆分任务已提交到队列，将在后台异步执行'
+        }), 202
 
     except Exception as e:
         logger.error(
@@ -1047,7 +879,7 @@ def execute_decision():
         }
     """
     try:
-        from ...auto_decision import allocate, Market
+        from ...auto_decision import allocate, SimpleMarket
         from ...purse import get_purse
         import json
 
@@ -1214,8 +1046,8 @@ def execute_decision():
                 }
             )
 
-            # 创建Market对象
-            market = Market(
+            # 创建SimpleMarket对象
+            market = SimpleMarket(
                 id=market_id,
                 m=yes_price,
                 p_yes=p_yes,
@@ -1266,7 +1098,7 @@ def execute_decision():
         )
 
         # 4. 将分配结果写回任务（过滤投入金额少于5*side_price的decision）
-        allocation_map = {alloc['id']: alloc for alloc in allocations}
+        allocation_map = {alloc.id: alloc for alloc in allocations}
 
         processed_count = 0
         filtered_count = 0  # 被过滤掉的任务数
@@ -1276,21 +1108,21 @@ def execute_decision():
 
             if alloc:
                 # 有分配结果，检查投入金额是否满足最小阈值
-                side_price = alloc['price']  # 交易方向的价格
+                side_price = alloc.price  # 交易方向的价格
                 min_invest = 5.0 * side_price  # 最小投入金额阈值
 
-                if alloc['invest'] < min_invest:
+                if alloc.invest < min_invest:
                     # 投入金额不足，过滤掉
                     task.result = {
                         'decision': 'skip',
-                        'reason': f'投入金额${alloc["invest"]:.2f}低于最小阈值${min_invest:.2f} (5*{side_price:.2f})',
+                        'reason': f'投入金额${alloc.invest:.2f}低于最小阈值${min_invest:.2f} (5*{side_price:.2f})',
                         'wealth': wealth,
                         'filtered': True,
                         'original_allocation': {
-                            'side': alloc['side'],
-                            'dollars': alloc['invest'],
-                            'shares': alloc['shares'],
-                            'cost': alloc['price']
+                            'side': alloc.side,
+                            'dollars': alloc.invest,
+                            'shares': alloc.shares,
+                            'cost': alloc.price
                         }
                     }
                     filtered_count += 1
@@ -1301,7 +1133,7 @@ def execute_decision():
                         extra={
                             "task_id": task.id,
                             "market_id": market_id,
-                            "invest": alloc['invest'],
+                            "invest": alloc.invest,
                             "min_invest": min_invest,
                             "side_price": side_price
                         }
@@ -1309,17 +1141,17 @@ def execute_decision():
                 else:
                     # 投入金额满足要求
                     # 计算评分（基于投资金额占总资金的比例）
-                    score = alloc['invest'] / wealth if wealth > 0 else 0.0
+                    score = alloc.invest / wealth if wealth > 0 else 0.0
 
                     task.result = {
                         'decision': 'trade',
                         'allocation': {
-                            'side': alloc['side'],
+                            'side': alloc.side,
                             'score': score,
-                            'fraction_of_gross': alloc['f'],
-                            'dollars': alloc['invest'],
-                            'shares': alloc['shares'],
-                            'cost': alloc['price']
+                            'fraction_of_gross': alloc.f,
+                            'dollars': alloc.invest,
+                            'shares': alloc.shares,
+                            'cost': alloc.price
                         },
                         'wealth': wealth,
                         'locked_value': locked_value
@@ -1353,13 +1185,13 @@ def execute_decision():
             'data': {
                 'processed_count': processed_count,
                 'filtered_count': filtered_count,
-                'allocations': allocations,
+                'allocations': [a.to_dict() for a in allocations],
                 'summary': {
                     'total_tasks': len(pending_tasks),
                     'valid_markets': len(markets),
                     'tradable_markets': len(allocations),
                     'filtered_markets': filtered_count,
-                    'actual_trade_markets': len([a for a in allocations if a['invest'] >= 5.0 * a['price']]),
+                    'actual_trade_markets': len([a for a in allocations if a.invest >= 5.0 * a.price]),
                     'wealth': wealth,
                     'locked_value': locked_value
                 }

@@ -105,9 +105,6 @@ from backend.sys_configs.global_event_reg import vlogger
 # Gamma Markets API
 from .gamma_markets import (
     GammaMarketsAPI,
-    Market,
-    Event,
-    Tag,
     get_active_markets,
     get_new_events,
     search,
@@ -115,6 +112,9 @@ from .gamma_markets import (
     event_summary_readable,
     event_summary_readableforai,
 )
+
+# 数据类型从 backend.types 导入
+from ..types import Market, Event, Tag
 
 # Orderbook API
 from .orderbook_api import (

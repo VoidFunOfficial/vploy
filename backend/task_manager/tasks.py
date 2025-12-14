@@ -437,7 +437,7 @@ def handle_mark_processing(task: AsyncTask) -> Dict[str, Any]:
     返回:
         Dict[str, Any]: 处理结果
     """
-    from ..polymarket_api.gamma_markets import GammaMarketsAPI
+    from ..polymarket_api import GammaMarketsAPI
     from ..mark.auto_mark import mark
 
     logger.info(
@@ -590,7 +590,7 @@ def handle_analysis_processing(task: AsyncTask) -> Dict[str, Any]:
     返回:
         Dict[str, Any]: 处理结果
     """
-    from ..polymarket_api.gamma_markets import GammaMarketsAPI, event_summary_readableforai
+    from ..polymarket_api import GammaMarketsAPI, event_summary_readableforai
     from ..ai_analysis.analysis_tasks import submit_analysis_task, AnalysisStatus
 
     logger.info(
@@ -783,7 +783,7 @@ def handle_trade_waiting(task: AsyncTask) -> Dict[str, Any]:
         extra={"task_id": task.id}
     )
     # TODO: 实现交易等待逻辑
-    return {"status": "ready", "message": "准备开始交易"}
+    return {"status": "waiting", "message": task.result}
 
 
 @register_handler(TaskStage.TRADE, TaskStatus.PROCESSING)
@@ -925,7 +925,7 @@ def handle_trade_processing(task: AsyncTask) -> Dict[str, Any]:
             }
         )
 
-        # 调用auto_trade_exec.trade()进行自动挂单
+        # 调用auto_trade_exec.trade()进行自动挂单（挂best-bid-2限价单）
         # 目标: 达到预期shares且花费不超过dollars
         trade_result = trade(
             side="BUY",  # 我们总是买入(BUY)，买入YES或NO token
@@ -937,7 +937,7 @@ def handle_trade_processing(task: AsyncTask) -> Dict[str, Any]:
 
         logger.info(
             "TASK.TRADE.SUCCESS",
-            msg="交易执行成功",
+            msg="交易执行成功（已挂best-bid-2限价单）",
             extra={
                 "task_id": task.id,
                 "market_id": market.get("id"),
@@ -945,7 +945,7 @@ def handle_trade_processing(task: AsyncTask) -> Dict[str, Any]:
             }
         )
 
-        # 添加到仓位监听
+        # 添加到仓位监听（带订单追踪）
         try:
             db = get_db()
 
@@ -953,41 +953,67 @@ def handle_trade_processing(task: AsyncTask) -> Dict[str, Any]:
             marks = task.metadata.get("marks", [])
             marks_str = json.dumps(marks) if marks else None
 
-            # 添加仓位监听记录
+            # 提取订单信息
+            order_id = trade_result.get("order_id") or trade_result.get("orderID")
+            order_salt = str(trade_result.get("order_salt", ""))
+
+            # 提取交易哈希
+            transaction_hashes = trade_result.get("transactionsHashes") or trade_result.get("transaction_hashes")
+            if transaction_hashes and isinstance(transaction_hashes, list):
+                transaction_hashes = json.dumps(transaction_hashes)
+
+            # 提取订单状态
+            order_status = trade_result.get("status", "pending")
+
+            # 添加仓位监听记录（包含订单信息）
             position_id = db.add_position(
                 market_id=market.get("id"),
                 buy_price=cost,  # 买入价格
                 buy_side=side,  # 买入方向 (YES/NO)
                 marks=marks_str,  # 标记信息
                 shares=shares,  # 持仓份额
-                threshold_config=None  # 暂不设置阈值配置
+                threshold_config=None,  # 暂不设置阈值配置
+                order_id=order_id,  # 订单ID
+                order_salt=order_salt,  # 订单salt
+                transaction_hashes=transaction_hashes,  # 交易哈希
+                order_status=order_status,  # 订单状态
+                order_created_at=datetime.now().isoformat()  # 订单创建时间
             )
 
             logger.info(
                 "TASK.TRADE.POSITION_ADDED",
-                msg="已添加到仓位监听",
+                msg="已添加到仓位监听（含订单追踪）",
                 extra={
                     "task_id": task.id,
                     "position_id": position_id,
                     "market_id": market.get("id"),
                     "buy_price": cost,
                     "buy_side": side,
-                    "shares": shares
+                    "shares": shares,
+                    "order_id": order_id,
+                    "order_status": order_status
                 }
             )
 
-            # 返回成功结果
+            # 返回成功结果，包含order_id和订单创建时间
+            import time
             return {
                 "status": "traded",
-                "message": "交易完成并已添加到仓位监听",
+                "message": "交易完成并已添加到仓位监听（挂best-bid-2限价单）",
                 "trade_result": trade_result,
+                "order_id": trade_result.get("order_id"),  # 保存order_id供LISTEN阶段使用
+                "order_created_at": time.time(),  # 记录订单创建时间
                 "position_id": position_id,
                 "market_id": market.get("id"),
                 "market_question": market.get("question"),
                 "side": side,
                 "dollars": dollars,
                 "cost": cost,
-                "shares": shares
+                "shares": shares,
+                "clobtoken": clobtoken,
+                "neg_risk": neg_risk,
+                "next_stage": TaskStage.LISTEN.value,
+                "next_status": TaskStatus.WAITING.value
             }
 
         except Exception as e:
@@ -1033,8 +1059,7 @@ def handle_listen_waiting(task: AsyncTask) -> Dict[str, Any]:
         msg="LISTEN阶段任务等待处理",
         extra={"task_id": task.id}
     )
-    # TODO: 实现监听等待逻辑
-    return {"status": "ready", "message": "准备开始监听"}
+    return {"status": "ready", "message": "准备开始监听订单状态"}
 
 
 @register_handler(TaskStage.LISTEN, TaskStatus.PROCESSING)
@@ -1042,17 +1067,484 @@ def handle_listen_processing(task: AsyncTask) -> Dict[str, Any]:
     """
     处理LISTEN阶段的PROCESSING状态任务
 
+    监听订单状态，如果10分钟后仍未成交，则调用sweep_order进行扫单
+
     参数:
         task: 任务实例
 
     返回:
         Dict[str, Any]: 处理结果
     """
+    from ..auto_trade.auto_trade_exec import sweep_order
+    from ..polymarket_api.clob_api import get_order, cancel_order
+    import time
+
     logger.info(
         "TASK.LISTEN.PROCESSING",
         msg="处理LISTEN阶段任务",
         extra={"task_id": task.id}
     )
-    # TODO: 实现监听处理逻辑
-    return {"status": "listening", "message": "监听中"}
+
+    try:
+        # 从result中获取订单信息
+        order_id = task.result.get("order_id")
+        order_created_at = task.result.get("order_created_at")
+
+        if not order_id:
+            error_msg = "result中缺少order_id信息"
+            logger.error(
+                "TASK.LISTEN.ERROR",
+                msg=error_msg,
+                error_code="E-LISTEN-001",
+                extra={"task_id": task.id}
+            )
+            return {"status": "failed", "message": error_msg}
+
+        if not order_created_at:
+            error_msg = "result中缺少order_created_at信息"
+            logger.error(
+                "TASK.LISTEN.ERROR",
+                msg=error_msg,
+                error_code="E-LISTEN-002",
+                extra={"task_id": task.id}
+            )
+            return {"status": "failed", "message": error_msg}
+
+        # 检查订单状态
+        try:
+            order_info = get_order(order_id)
+            order_status = order_info.get("status", "").upper()
+
+            logger.info(
+                "TASK.LISTEN.ORDER_STATUS",
+                msg=f"订单状态: {order_status}",
+                extra={
+                    "task_id": task.id,
+                    "order_id": order_id,
+                    "order_status": order_status,
+                    "order_info": order_info
+                }
+            )
+
+            # 如果订单已完全成交，任务完成
+            if order_status in ["FILLED", "MATCHED"]:
+                logger.info(
+                    "TASK.LISTEN.ORDER_FILLED",
+                    msg="订单已完全成交",
+                    extra={
+                        "task_id": task.id,
+                        "order_id": order_id,
+                        "order_info": order_info
+                    }
+                )
+                return {
+                    "status": "completed",
+                    "message": "订单已完全成交",
+                    "order_id": order_id,
+                    "order_info": order_info,
+                    "next_stage": TaskStage.LISTEN.value,
+                    "next_status": TaskStatus.FINISHED.value
+                }
+
+            # 如果订单已取消或失败
+            if order_status in ["CANCELLED", "CANCELED", "FAILED", "EXPIRED"]:
+                logger.warn(
+                    "TASK.LISTEN.ORDER_CANCELLED",
+                    msg=f"订单已取消或失败: {order_status}",
+                    extra={
+                        "task_id": task.id,
+                        "order_id": order_id,
+                        "order_status": order_status
+                    }
+                )
+                # 需要扫单
+                return _execute_sweep_order(task)
+
+            # 检查是否超过10分钟
+            current_time = time.time()
+            elapsed_time = current_time - order_created_at
+            WAIT_TIMEOUT = 600  # 10分钟 = 600秒
+
+            if elapsed_time >= WAIT_TIMEOUT:
+                logger.info(
+                    "TASK.LISTEN.TIMEOUT",
+                    msg="订单10分钟未成交，准备取消并扫单",
+                    extra={
+                        "task_id": task.id,
+                        "order_id": order_id,
+                        "elapsed_time": elapsed_time,
+                        "timeout": WAIT_TIMEOUT
+                    }
+                )
+
+                # 取消原订单
+                try:
+                    cancel_result = cancel_order(order_id)
+                    logger.info(
+                        "TASK.LISTEN.ORDER_CANCELLED",
+                        msg="已取消原订单",
+                        extra={
+                            "task_id": task.id,
+                            "order_id": order_id,
+                            "cancel_result": cancel_result
+                        }
+                    )
+                except Exception as e:
+                    logger.warn(
+                        "TASK.LISTEN.CANCEL_ERROR",
+                        msg=f"取消订单失败（可能已成交或已取消）: {str(e)}",
+                        extra={
+                            "task_id": task.id,
+                            "order_id": order_id,
+                            "error": str(e)
+                        }
+                    )
+
+                # 执行扫单
+                return _execute_sweep_order(task)
+
+            else:
+                # 继续等待
+                remaining_time = WAIT_TIMEOUT - elapsed_time
+                logger.info(
+                    "TASK.LISTEN.WAITING",
+                    msg=f"订单尚未成交，继续等待（剩余{remaining_time:.0f}秒）",
+                    extra={
+                        "task_id": task.id,
+                        "order_id": order_id,
+                        "elapsed_time": elapsed_time,
+                        "remaining_time": remaining_time
+                    }
+                )
+                return {
+                    "status": "listening",
+                    "message": f"订单尚未成交，继续等待（剩余{remaining_time:.0f}秒）",
+                    "order_id": order_id,
+                    "elapsed_time": elapsed_time,
+                    "remaining_time": remaining_time
+                }
+
+        except Exception as e:
+            error_msg = f"查询订单状态失败: {str(e)}"
+            logger.error(
+                "TASK.LISTEN.QUERY_ERROR",
+                msg=error_msg,
+                error_code="E-LISTEN-003",
+                extra={"task_id": task.id, "order_id": order_id, "error": str(e)}
+            )
+            return {"status": "failed", "message": error_msg}
+
+    except Exception as e:
+        error_msg = f"监听处理异常: {str(e)}"
+        logger.error(
+            "TASK.LISTEN.EXCEPTION",
+            msg=error_msg,
+            error_code="E-LISTEN-004",
+            extra={"task_id": task.id, "exception": str(e)}
+        )
+        return {"status": "failed", "message": error_msg}
+
+
+def _execute_sweep_order(task: AsyncTask) -> Dict[str, Any]:
+    """
+    执行扫单操作（内部辅助函数）
+
+    参数:
+        task: 任务实例
+
+    返回:
+        Dict[str, Any]: 处理结果
+    """
+    from ..auto_trade.auto_trade_exec import sweep_order
+
+    logger.info(
+        "TASK.LISTEN.SWEEP_START",
+        msg="开始执行扫单",
+        extra={"task_id": task.id}
+    )
+
+    try:
+        # 从result中获取交易参数
+        side = task.result.get("side")
+        dollars = task.result.get("dollars")
+        shares = task.result.get("shares")
+        clobtoken = task.result.get("clobtoken")
+        neg_risk = task.result.get("neg_risk")
+
+        if not all([side, dollars, shares, clobtoken]):
+            error_msg = "result中缺少必要的交易参数"
+            logger.error(
+                "TASK.LISTEN.SWEEP_ERROR",
+                msg=error_msg,
+                error_code="E-LISTEN-005",
+                extra={"task_id": task.id}
+            )
+            return {"status": "failed", "message": error_msg}
+
+        # 执行扫单
+        sweep_result = sweep_order(
+            side="BUY",  # 我们总是买入(BUY)
+            target_shares=shares,
+            max_cost=dollars,
+            clobtoken=clobtoken,
+            neg_risk=neg_risk
+        )
+
+        logger.info(
+            "TASK.LISTEN.SWEEP_SUCCESS",
+            msg="扫单执行成功",
+            extra={
+                "task_id": task.id,
+                "sweep_result": sweep_result
+            }
+        )
+
+        return {
+            "status": "completed",
+            "message": "扫单执行成功，订单已成交",
+            "sweep_result": sweep_result,
+            "next_stage": TaskStage.LISTEN.value,
+            "next_status": TaskStatus.FINISHED.value
+        }
+
+    except Exception as e:
+        error_msg = f"扫单执行失败: {str(e)}"
+        logger.error(
+            "TASK.LISTEN.SWEEP_EXCEPTION",
+            msg=error_msg,
+            error_code="E-LISTEN-006",
+            extra={"task_id": task.id, "exception": str(e)}
+        )
+        return {"status": "failed", "message": error_msg}
+
+
+# ==================== 前端触发任务的Huey包装器 ====================
+
+@huey.task()
+def execute_split_analysis_task(async_task_id: int):
+    """
+    Huey任务: 拆分analysis任务为多个decision任务
+
+    参数:
+        async_task_id: 分析任务ID
+    """
+    from ..ai_analysis.analysis_tasks import split_analysis_task
+
+    with TraceContext() as trace_id:
+        logger.info(
+            "HUEY.SPLIT_ANALYSIS.START",
+            msg=f"开始执行拆分任务: {async_task_id}",
+            extra={"async_task_id": async_task_id},
+            trace_id=trace_id
+        )
+
+        try:
+            result = split_analysis_task(async_task_id)
+
+            logger.info(
+                "HUEY.SPLIT_ANALYSIS.SUCCESS",
+                msg=f"拆分任务完成: {async_task_id}",
+                extra={
+                    "async_task_id": async_task_id,
+                    "success": result.get("success"),
+                    "created_tasks": result.get("created_tasks", []),
+                    "success_count": result.get("success_count", 0)
+                },
+                trace_id=trace_id
+            )
+
+            return result
+
+        except Exception as e:
+            logger.error(
+                "HUEY.SPLIT_ANALYSIS.ERROR",
+                msg=f"拆分任务失败: {async_task_id}",
+                error_code="E-HUEY-SPLIT-001",
+                extra={"async_task_id": async_task_id, "error": str(e)},
+                trace_id=trace_id
+            )
+            raise
+
+
+@huey.task()
+def execute_scheduled_task(task_id: int):
+    """
+    Huey任务: 执行定时任务
+
+    参数:
+        task_id: 定时任务ID
+    """
+    from .dynamic_scheduler import get_scheduler
+
+    with TraceContext() as trace_id:
+        logger.info(
+            "HUEY.SCHEDULED_TASK.START",
+            msg=f"开始执行定时任务: {task_id}",
+            extra={"task_id": task_id},
+            trace_id=trace_id
+        )
+
+        try:
+            # 获取任务信息
+            task = db.get_scheduled_task(task_id)
+            if not task:
+                logger.error(
+                    "HUEY.SCHEDULED_TASK.NOT_FOUND",
+                    msg=f"定时任务不存在: {task_id}",
+                    error_code="E-HUEY-SCHEDULED-001",
+                    extra={"task_id": task_id},
+                    trace_id=trace_id
+                )
+                return {"success": False, "message": f"任务不存在: {task_id}"}
+
+            # 获取调度器并执行任务
+            scheduler = get_scheduler()
+            scheduler._execute_task(task)
+
+            logger.info(
+                "HUEY.SCHEDULED_TASK.SUCCESS",
+                msg=f"定时任务执行完成: {task.name}",
+                extra={"task_id": task_id, "task_name": task.name},
+                trace_id=trace_id
+            )
+
+            return {"success": True, "message": f"任务 {task.name} 执行成功"}
+
+        except Exception as e:
+            logger.error(
+                "HUEY.SCHEDULED_TASK.ERROR",
+                msg=f"定时任务执行失败: {task_id}",
+                error_code="E-HUEY-SCHEDULED-002",
+                extra={"task_id": task_id, "error": str(e)},
+                trace_id=trace_id
+            )
+            raise
+
+
+@huey.task()
+def execute_poll_analysis_once(async_task_id: int):
+    """
+    Huey任务: 手动轮询一次分析任务结果
+
+    参数:
+        async_task_id: 分析任务ID
+    """
+    from ..ai_analysis.gpt_api import parse_cookie_string, get_result
+    from ..ai_analysis.analysis_tasks import validate_analysis_result, AnalysisStatus
+    from ..sys_configs.token_refresher import get_token_refresher, TokenType
+
+    with TraceContext() as trace_id:
+        logger.info(
+            "HUEY.POLL_ONCE.START",
+            msg=f"开始手动轮询分析结果: {async_task_id}",
+            extra={"async_task_id": async_task_id},
+            trace_id=trace_id
+        )
+
+        try:
+            # 获取任务
+            task = db.get_async_task(async_task_id)
+            if not task:
+                logger.error(
+                    "HUEY.POLL_ONCE.NOT_FOUND",
+                    msg=f"任务不存在: {async_task_id}",
+                    error_code="E-HUEY-POLL-001",
+                    extra={"async_task_id": async_task_id},
+                    trace_id=trace_id
+                )
+                return {"success": False, "message": f"任务不存在: {async_task_id}"}
+
+            # 检查conversation_id
+            conversation_id = task.result.get("conversation_id")
+            if not conversation_id:
+                return {"success": False, "message": "缺少conversation_id"}
+
+            # 获取Cookie
+            token_refresher = get_token_refresher()
+            access_token_status = token_refresher.get_token_status(TokenType.ACCESS_TOKEN.value)
+            auth_token_status = token_refresher.get_token_status(TokenType.AUTH_TOKEN.value)
+
+            if not access_token_status or not auth_token_status:
+                return {"success": False, "message": "未配置token"}
+
+            if access_token_status.get('is_expired') or auth_token_status.get('is_expired'):
+                return {"success": False, "message": "token已过期"}
+
+            # 构建cookie_string
+            access_token = access_token_status.get('token_value')
+            auth_token = auth_token_status.get('token_value')
+            cookie_string = f"__Secure-access_token={access_token};__Secure-auth_token={auth_token}"
+            cookies_dict = parse_cookie_string(cookie_string)
+
+            # 执行轮询
+            poll_result = get_result(
+                conversation_id=conversation_id,
+                cookies=cookies_dict
+            )
+
+            if poll_result.get("success"):
+                # 获取到结果，验证格式
+                ai_response = poll_result.get("ai_response", "")
+                task.result["analysis_status"] = AnalysisStatus.VALIDATING.value
+                task.result["raw_response"] = ai_response
+                db.update_async_task(task)
+
+                is_valid, parsed_json = validate_analysis_result(ai_response)
+
+                if is_valid:
+                    # 验证成功
+                    task.result["analysis_status"] = AnalysisStatus.SUCCESS.value
+                    task.result["analysis_result"] = parsed_json
+                    task.result["market_ids"] = list(parsed_json.keys())
+                    task.metadata["analysis_result"] = parsed_json
+                    task.metadata["market_ids"] = list(parsed_json.keys())
+                    task.status = TaskStatus.FINISHED
+                    db.update_async_task(task)
+
+                    logger.info(
+                        "HUEY.POLL_ONCE.SUCCESS",
+                        msg=f"轮询成功，分析完成: {async_task_id}",
+                        extra={
+                            "async_task_id": async_task_id,
+                            "market_count": len(parsed_json)
+                        },
+                        trace_id=trace_id
+                    )
+
+                    return {
+                        "success": True,
+                        "analysis_status": AnalysisStatus.SUCCESS.value,
+                        "has_result": True,
+                        "analysis_result": parsed_json,
+                        "market_ids": list(parsed_json.keys())
+                    }
+                else:
+                    # 验证失败
+                    task.result["analysis_status"] = AnalysisStatus.FAILED.value
+                    task.result["error"] = "AI返回格式验证失败"
+                    task.status = TaskStatus.FAILED
+                    db.update_async_task(task)
+
+                    return {
+                        "success": False,
+                        "analysis_status": AnalysisStatus.FAILED.value,
+                        "error": "AI返回格式验证失败"
+                    }
+            else:
+                # 仍在思考中
+                return {
+                    "success": True,
+                    "analysis_status": AnalysisStatus.POLLING.value,
+                    "has_result": False
+                }
+
+        except Exception as e:
+            logger.error(
+                "HUEY.POLL_ONCE.ERROR",
+                msg=f"轮询失败: {async_task_id}",
+                error_code="E-HUEY-POLL-002",
+                extra={"async_task_id": async_task_id, "error": str(e)},
+                trace_id=trace_id
+            )
+            raise
 

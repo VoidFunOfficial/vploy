@@ -1,9 +1,27 @@
-from ..polymarket_api.gamma_markets import Event
+from ..types import Event, Market, Tag
 from ..sys_configs.global_event_reg import vlogger
 from ..ai_analysis.ai_mark import mark_event
-
-
-def mark(event: Event) -> str:
+from ..auto_decision import convert_gamma_market_to_simple_market
+def featureMark(event: Event) -> str:
+    tags=[]
+    if Event.volume < 100:
+        tags.append("low_volume")
+    if Event.liquidity < 100:
+        tags.append("low_liquidity")
+    if Event.tau < 7:
+        tags.append("short_tau")
+    if Event.tau > 30:
+        tags.append("long_tau")
+    if Event.tau > 60:
+        tags.append("very_long_tau")
+    if Event.negRisk == True:
+        tags.append("negRisk")
+    if "trump" in str(Event.tags):
+        tags.append("trump")
+    
+    
+    return tags
+def mark(event: Event,allocate) -> str:
     """
     对事件进行标记
 
