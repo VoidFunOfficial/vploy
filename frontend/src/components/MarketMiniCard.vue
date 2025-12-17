@@ -1,22 +1,23 @@
 <template>
-  <div class="market-mini-card">
+  <el-card class="market-mini-card" shadow="hover" :body-style="{ padding: '15px' }">
     <!-- 市场问题 -->
-    <div class="market-header">
+    <div class="market-header mb-3">
       <h4 class="market-question">{{ market.question }}</h4>
-      <div class="market-badges">
-        <span v-if="market.active" class="badge badge-success">活跃</span>
-        <span v-else class="badge badge-gray">已关闭</span>
+      <div class="market-badges ml-2">
+        <el-tag :type="market.active ? 'success' : 'info'" size="small" effect="dark">
+          {{ market.active ? '活跃' : '已关闭' }}
+        </el-tag>
       </div>
     </div>
 
     <!-- 选项和价格 -->
-    <div v-if="parsedOutcomes && parsedOutcomes.length > 0" class="outcomes-section">
+    <div v-if="parsedOutcomes && parsedOutcomes.length > 0" class="outcomes-section mb-3">
       <div
         v-for="(outcome, index) in parsedOutcomes"
         :key="index"
         class="outcome-row"
       >
-        <span class="outcome-name">{{ outcome }}</span>
+        <span class="outcome-name text-truncate">{{ outcome }}</span>
         <span class="outcome-price">
           {{ parsedPrices && parsedPrices[index] ? '$' + parsedPrices[index] : '-' }}
         </span>
@@ -24,30 +25,44 @@
     </div>
 
     <!-- 市场统计 -->
-    <div class="market-stats">
-      <div v-if="market.volume" class="stat-item">
-        <span class="stat-icon">💰</span>
-        <span class="stat-label">交易量:</span>
-        <span class="stat-value">${{ formatNumber(market.volume) }}</span>
-      </div>
-      <div v-if="market.liquidity" class="stat-item">
-        <span class="stat-icon">💧</span>
-        <span class="stat-label">流动性:</span>
-        <span class="stat-value">${{ formatNumber(market.liquidity) }}</span>
-      </div>
+    <div class="market-stats mb-2">
+      <el-space spacer="|" class="w-100">
+        <div v-if="market.volume" class="stat-item">
+          <el-icon><Money /></el-icon>
+          <span class="stat-label ml-1">交易量:</span>
+          <span class="stat-value ml-1">${{ formatNumber(market.volume) }}</span>
+        </div>
+        <div v-if="market.liquidity" class="stat-item">
+          <el-icon><WaterRate /></el-icon>
+          <span class="stat-label ml-1">流动性:</span>
+          <span class="stat-value ml-1">${{ formatNumber(market.liquidity) }}</span>
+        </div>
+      </el-space>
     </div>
 
     <!-- 市场ID -->
-    <div class="market-id">
+    <div class="market-id text-secondary">
       <span class="id-label">ID:</span>
-      <span class="id-value">{{ market.id }}</span>
+      <el-tooltip :content="market.id" placement="top">
+        <span class="id-value ml-1 text-truncate" style="max-width: 150px; display: inline-block; vertical-align: bottom;">{{ market.id }}</span>
+      </el-tooltip>
     </div>
-  </div>
+  </el-card>
 </template>
 
 <script>
+import { Money, Coin as WaterRate } from '@element-plus/icons-vue' // Using Coin as placeholder for liquidity/water if WaterRate doesn't exist, but let's check. Actually 'Money' is good. For Liquidity maybe 'SoldOut' or just 'Coin'. Let's use 'Coin' for Volume and 'Money' for Liquidity or similar.
+// Wait, Element Plus icons: Money, Coin, Wallet, etc.
+// Let's use Money for Volume, and maybe DataLine or TrendCharts for Liquidity?
+// Or just reuse Money and something else.
+// I will use `Money` for Volume and `Coin` for Liquidity.
+
 export default {
   name: 'MarketMiniCard',
+  components: {
+    Money,
+    WaterRate: Money // Alias Money to WaterRate for now or just use Money directly
+  },
   props: {
     market: {
       type: Object,
@@ -100,67 +115,22 @@ export default {
 
 <style scoped>
 .market-mini-card {
-  background-color: #fff;
-  border: 1px solid #e9ecef;
-  border-radius: 6px;
-  padding: 16px;
-  transition: all 0.2s ease;
+  height: 100%;
 }
 
-.market-mini-card:hover {
-  border-color: #dee2e6;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-}
-
-/* 市场头部 */
 .market-header {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  margin-bottom: 12px;
-  padding-bottom: 12px;
-  border-bottom: 1px solid #f5f5f5;
 }
 
 .market-question {
   font-size: 15px;
   font-weight: 600;
-  color: #212529;
+  color: var(--text-color);
   margin: 0;
   flex: 1;
-  margin-right: 12px;
   line-height: 1.4;
-}
-
-.market-badges {
-  display: flex;
-  gap: 6px;
-  flex-shrink: 0;
-}
-
-.badge {
-  padding: 3px 8px;
-  border-radius: 3px;
-  font-size: 11px;
-  font-weight: 600;
-  white-space: nowrap;
-}
-
-.badge-success {
-  background-color: #e8f5e9;
-  color: #2e7d32;
-  border: 1px solid #c8e6c9;
-}
-
-.badge-gray {
-  background-color: #f5f5f5;
-  color: #757575;
-  border: 1px solid #e0e0e0;
-}
-
-/* 选项和价格 */
-.outcomes-section {
-  margin-bottom: 12px;
 }
 
 .outcome-row {
@@ -169,7 +139,7 @@ export default {
   align-items: center;
   padding: 8px 12px;
   margin-bottom: 6px;
-  background-color: #f8f9fa;
+  background-color: var(--el-fill-color-light);
   border-radius: 4px;
   transition: background-color 0.2s ease;
 }
@@ -179,99 +149,62 @@ export default {
 }
 
 .outcome-row:hover {
-  background-color: #e9ecef;
+  background-color: var(--el-fill-color);
 }
 
 .outcome-name {
   flex: 1;
   font-size: 13px;
-  color: #495057;
+  color: var(--el-text-color-regular);
   font-weight: 500;
+  margin-right: 10px;
 }
 
 .outcome-price {
   font-size: 14px;
   font-weight: 600;
-  color: #20a53a;
+  color: var(--el-color-success);
 }
 
-/* 市场统计 */
 .market-stats {
-  display: flex;
-  gap: 16px;
-  margin-bottom: 10px;
-  padding: 10px 12px;
-  background-color: #fafafa;
+  padding: 8px 12px;
+  background-color: var(--el-fill-color-lighter);
   border-radius: 4px;
 }
 
 .stat-item {
   display: flex;
   align-items: center;
-  gap: 4px;
   font-size: 12px;
-}
-
-.stat-icon {
-  font-size: 14px;
-}
-
-.stat-label {
-  color: #6c757d;
+  color: var(--el-text-color-secondary);
 }
 
 .stat-value {
-  color: #212529;
+  color: var(--el-text-color-primary);
   font-weight: 600;
 }
 
-/* 市场ID */
 .market-id {
-  display: flex;
-  align-items: center;
-  gap: 6px;
   font-size: 11px;
-  color: #6c757d;
   padding-top: 8px;
-  border-top: 1px solid #f5f5f5;
-}
-
-.id-label {
-  font-weight: 500;
+  border-top: 1px solid var(--el-border-color-lighter);
 }
 
 .id-value {
   font-family: monospace;
-  color: #495057;
-  word-break: break-all;
 }
 
-/* 移动端适配 */
-@media (max-width: 768px) {
-  .market-mini-card {
-    padding: 14px;
-  }
-
-  .market-question {
-    font-size: 14px;
-  }
-
-  .market-stats {
-    flex-direction: column;
-    gap: 8px;
-  }
-
-  .outcome-row {
-    padding: 6px 10px;
-  }
-
-  .outcome-name {
-    font-size: 12px;
-  }
-
-  .outcome-price {
-    font-size: 13px;
-  }
+/* Utility classes */
+.mb-2 { margin-bottom: 8px; }
+.mb-3 { margin-bottom: 12px; }
+.ml-1 { margin-left: 4px; }
+.ml-2 { margin-left: 8px; }
+.w-100 { width: 100%; }
+.text-secondary { color: var(--el-text-color-secondary); }
+.text-truncate {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 </style>
 

@@ -1,340 +1,328 @@
 <template>
   <div class="task-management">
-    <!-- 标题栏 -->
-    <div class="header">
-      <div class="header-left">
-        <h2>任务管理</h2>
-        <span class="task-count">共 {{ tasks.length }} 条任务</span>
-      </div>
-      <div class="header-actions">
-        <button
-          v-if="selectedTasks.length > 0"
-          class="btn btn-danger"
-          @click="batchDelete"
-        >
-          批量删除 ({{ selectedTasks.length }})
-        </button>
-        <button class="btn btn-primary" @click="showCreateDialog">
-          新建任务
-        </button>
-      </div>
-    </div>
-
-    <!-- 过滤器 -->
-    <div class="filter-section">
-      <div class="filter-row">
-        <div class="filter-item">
-          <label>阶段</label>
-          <select v-model="filters.stage" @change="refreshTasks">
-            <option value="">全部阶段</option>
-            <option value="mark">标记</option>
-            <option value="analysis">分析</option>
-            <option value="decision">决策</option>
-            <option value="trade">交易</option>
-            <option value="listen">监听</option>
-          </select>
+    <el-card shadow="never">
+      <template #header>
+        <div class="header-actions">
+          <div class="header-left">
+            <h2>任务管理</h2>
+            <el-tag type="info" effect="plain" round>共 {{ tasks.length }} 条任务</el-tag>
+          </div>
+          <div class="header-right">
+            <el-button
+              v-if="selectedTasks.length > 0"
+              type="danger"
+              :icon="Delete"
+              @click="batchDelete"
+            >
+              批量删除 ({{ selectedTasks.length }})
+            </el-button>
+            <el-button type="primary" :icon="Plus" @click="showCreateDialog">
+              新建任务
+            </el-button>
+          </div>
         </div>
-        <div class="filter-item">
-          <label>状态</label>
-          <select v-model="filters.status" @change="refreshTasks">
-            <option value="">全部状态</option>
-            <option value="waiting">等待中</option>
-            <option value="processing">处理中</option>
-            <option value="finished">已完成</option>
-            <option value="failed">失败</option>
-          </select>
-        </div>
-        <div class="filter-item">
-          <label>显示数量</label>
-          <select v-model="filters.limit" @change="refreshTasks">
-            <option :value="50">50 条</option>
-            <option :value="100">100 条</option>
-            <option :value="200">200 条</option>
-            <option :value="500">500 条</option>
-          </select>
-        </div>
-      </div>
-    </div>
+      </template>
 
-    <!-- 任务列表 -->
-    <div class="tasks-section">
-      <div v-if="loading" class="loading">
-        <div class="loading-spinner"></div>
-        <p>加载中...</p>
-      </div>
+      <!-- 过滤器 -->
+      <el-form :inline="true" :model="filters" class="filter-form">
+        <el-form-item label="阶段">
+          <el-select v-model="filters.stage" placeholder="全部阶段" clearable @change="refreshTasks" style="width: 120px">
+            <el-option label="标记" value="mark" />
+            <el-option label="分析" value="analysis" />
+            <el-option label="决策" value="decision" />
+            <el-option label="交易" value="trade" />
+            <el-option label="监听" value="listen" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="状态">
+          <el-select v-model="filters.status" placeholder="全部状态" clearable @change="refreshTasks" style="width: 120px">
+            <el-option label="等待中" value="waiting" />
+            <el-option label="处理中" value="processing" />
+            <el-option label="已完成" value="finished" />
+            <el-option label="失败" value="failed" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="显示数量">
+          <el-select v-model="filters.limit" placeholder="50 条" @change="refreshTasks" style="width: 100px">
+            <el-option label="50 条" :value="50" />
+            <el-option label="100 条" :value="100" />
+            <el-option label="200 条" :value="200" />
+            <el-option label="500 条" :value="500" />
+          </el-select>
+        </el-form-item>
+      </el-form>
 
-      <div v-else-if="tasks.length === 0" class="empty-state">
-        <p>暂无任务数据</p>
-        <button class="btn btn-primary" @click="showCreateDialog">创建第一个任务</button>
-      </div>
-
-      <div v-else class="tasks-table-wrapper">
-        <table class="tasks-table">
-          <thead>
-            <tr>
-              <th class="th-checkbox">
-                <input
-                  type="checkbox"
-                  @change="toggleSelectAll"
-                  :checked="isAllSelected"
-                />
-              </th>
-              <th class="th-id">ID</th>
-              <th class="th-stage">阶段</th>
-              <th class="th-status">状态</th>
-              <th class="th-extended">详细状态</th>
-              <th class="th-data">元数据</th>
-              <th class="th-data">结果</th>
-              <th class="th-error">错误信息</th>
-              <th class="th-time">创建时间</th>
-              <th class="th-time">更新时间</th>
-              <th class="th-actions">操作</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="task in tasks" :key="task.id" class="task-row">
-              <td class="td-checkbox">
-                <input
-                  type="checkbox"
-                  :value="task.id"
-                  v-model="selectedTasks"
-                />
-              </td>
-              <td class="td-id">
-                <span class="task-id">#{{ task.id }}</span>
-              </td>
-              <td class="td-stage">
-                <span class="badge badge-stage" :class="'badge-stage-' + task.stage">
-                  {{ getStageLabel(task.stage) }}
-                </span>
-              </td>
-              <td class="td-status">
-                <span class="badge" :class="getStatusClass(task.status)">
-                  {{ getStatusLabel(task.status) }}
-                </span>
-              </td>
-              <td class="td-extended">
-                <div v-if="task.extended_info" class="extended-info">
-                  <span
-                    v-if="task.extended_info.type === 'analysis'"
-                    class="badge badge-sm"
-                    :class="getAnalysisStatusClass(task.extended_info.analysis_status)"
-                  >
-                    {{ getAnalysisStatusLabel(task.extended_info.analysis_status) }}
-                  </span>
-                  <div v-if="task.extended_info.conversation_id" class="info-detail">
-                    <small>会话: {{ task.extended_info.conversation_id.substring(0, 8) }}...</small>
-                  </div>
-                  <div v-if="task.extended_info.market_count > 0" class="info-detail">
-                    <small>市场: {{ task.extended_info.market_count }}</small>
-                  </div>
-                </div>
-                <span v-else class="text-muted">-</span>
-              </td>
-              <td class="td-data">
-                <div class="btn-group">
-                  <button class="btn-sm btn-view" @click="showMetadata(task.metadata)" title="查看元数据">
-                    查看
-                  </button>
-                  <button class="btn-sm btn-edit" @click="editMetadata(task)" title="编辑元数据">
-                    编辑
-                  </button>
-                </div>
-              </td>
-              <td class="td-data">
-                <div class="btn-group">
-                  <button
-                    v-if="task.result && Object.keys(task.result).length > 0"
-                    class="btn-sm btn-view"
-                    @click="showResult(task.result)"
-                    title="查看结果"
-                  >
-                    查看
-                  </button>
-                  <span v-else class="text-muted">-</span>
-                  <button class="btn-sm btn-edit" @click="editResult(task)" title="编辑结果">
-                    编辑
-                  </button>
-                </div>
-              </td>
-              <td class="td-error">
-                <span v-if="task.error_msg" class="error-text" :title="task.error_msg">
-                  {{ task.error_msg.length > 30 ? task.error_msg.substring(0, 30) + '...' : task.error_msg }}
-                </span>
-                <span v-else class="text-muted">-</span>
-              </td>
-              <td class="td-time">
-                <span class="time-text">{{ formatTime(task.create_time) }}</span>
-              </td>
-              <td class="td-time">
-                <span class="time-text">{{ formatTime(task.update_time) }}</span>
-              </td>
-              <td class="td-actions">
-                <div class="action-buttons">
-                  <button
-                    v-if="task.status === 'waiting'"
-                    class="btn-sm btn-success"
-                    @click="approveTask(task)"
-                    title="同意并开始处理"
-                  >
-                    同意
-                  </button>
-                  <button
-                    v-if="task.stage === 'analysis' && task.extended_info && (task.extended_info.analysis_status === 'polling' || task.extended_info.analysis_status === 'requesting')"
-                    class="btn-sm btn-poll"
-                    @click="pollAnalysisOnceHandler(task)"
-                    title="手动轮询一次"
-                  >
-                    轮询
-                  </button>
-                  <button
-                    v-if="task.stage === 'analysis' && task.extended_info && task.extended_info.analysis_status === 'success' && task.extended_info.market_count > 0"
-                    class="btn-sm btn-split"
-                    @click="splitAnalysisTaskHandler(task)"
-                    title="拆分为decision任务"
-                  >
-                    拆分
-                  </button>
-                  <button
-                    v-if="task.status === 'waiting' || task.status === 'processing'"
-                    class="btn-sm btn-cancel"
-                    @click="cancelTask(task)"
-                    title="取消任务"
-                  >
-                    取消
-                  </button>
-                  <button
-                    v-if="task.status === 'failed' || task.status === 'finished'"
-                    class="btn-sm btn-retry"
-                    @click="retryTaskHandler(task)"
-                    title="重新打回重试"
-                  >
-                    重试
-                  </button>
-                  <button class="btn-sm btn-delete" @click="confirmDelete(task)" title="删除任务">
-                    删除
-                  </button>
-                </div>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
+      <!-- 任务列表 -->
+      <el-table
+        v-loading="loading"
+        :data="tasks"
+        style="width: 100%"
+        @selection-change="handleSelectionChange"
+        border
+        stripe
+      >
+        <el-table-column type="selection" width="55" />
+        <el-table-column label="ID" width="80" prop="id">
+          <template #default="{ row }">
+            <span class="task-id">#{{ row.id }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="阶段" width="100">
+          <template #default="{ row }">
+            <el-tag :type="getStageType(row.stage)">
+              {{ getStageLabel(row.stage) }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="状态" width="100">
+          <template #default="{ row }">
+            <el-tag :type="getStatusType(row.status)">
+              {{ getStatusLabel(row.status) }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="详细状态" min-width="150">
+          <template #default="{ row }">
+            <div v-if="row.extended_info" class="extended-info">
+              <el-tag
+                v-if="row.extended_info.type === 'analysis'"
+                size="small"
+                :type="getAnalysisStatusType(row.extended_info.analysis_status)"
+              >
+                {{ getAnalysisStatusLabel(row.extended_info.analysis_status) }}
+              </el-tag>
+              <div v-if="row.extended_info.conversation_id" class="info-detail">
+                <small>会话: {{ row.extended_info.conversation_id.substring(0, 8) }}...</small>
+              </div>
+              <div v-if="row.extended_info.market_count > 0" class="info-detail">
+                <small>市场: {{ row.extended_info.market_count }}</small>
+              </div>
+            </div>
+            <span v-else class="text-muted">-</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="元数据" width="140">
+          <template #default="{ row }">
+            <el-button-group>
+              <el-button size="small" :icon="View" @click="showMetadata(row.metadata)" title="查看" />
+              <el-button size="small" :icon="Edit" @click="editMetadata(row)" title="编辑" />
+            </el-button-group>
+          </template>
+        </el-table-column>
+        <el-table-column label="结果" width="140">
+          <template #default="{ row }">
+            <el-button-group>
+              <el-button
+                size="small"
+                :icon="View"
+                :disabled="!row.result || Object.keys(row.result).length === 0"
+                @click="showResult(row.result)"
+                title="查看"
+              />
+              <el-button size="small" :icon="Edit" @click="editResult(row)" title="编辑" />
+            </el-button-group>
+          </template>
+        </el-table-column>
+        <el-table-column label="错误信息" min-width="150" show-overflow-tooltip>
+          <template #default="{ row }">
+            <span v-if="row.error_msg" class="error-text">{{ row.error_msg }}</span>
+            <span v-else class="text-muted">-</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="创建时间" width="160">
+          <template #default="{ row }">
+            {{ formatTime(row.create_time) }}
+          </template>
+        </el-table-column>
+        <el-table-column label="更新时间" width="160">
+          <template #default="{ row }">
+            {{ formatTime(row.update_time) }}
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="220" fixed="right">
+          <template #default="{ row }">
+            <div class="action-buttons">
+              <el-button
+                v-if="row.status === 'waiting'"
+                type="success"
+                size="small"
+                :icon="Check"
+                circle
+                @click="approveTask(row)"
+                title="同意并开始处理"
+              />
+              <el-button
+                v-if="row.stage === 'analysis' && row.extended_info && (row.extended_info.analysis_status === 'polling' || row.extended_info.analysis_status === 'requesting')"
+                type="warning"
+                size="small"
+                :icon="Refresh"
+                circle
+                @click="pollAnalysisOnceHandler(row)"
+                title="手动轮询一次"
+              />
+              <el-button
+                v-if="row.stage === 'analysis' && row.extended_info && row.extended_info.analysis_status === 'success' && row.extended_info.market_count > 0"
+                type="primary"
+                size="small"
+                :icon="Share"
+                circle
+                @click="splitAnalysisTaskHandler(row)"
+                title="拆分为decision任务"
+              />
+              <el-button
+                v-if="row.status === 'waiting' || row.status === 'processing'"
+                type="warning"
+                size="small"
+                :icon="Close"
+                circle
+                @click="cancelTask(row)"
+                title="取消任务"
+              />
+              <el-button
+                v-if="row.status === 'failed' || row.status === 'finished'"
+                type="info"
+                size="small"
+                :icon="RefreshLeft"
+                circle
+                @click="retryTaskHandler(row)"
+                title="重新打回重试"
+              />
+              <el-button
+                type="danger"
+                size="small"
+                :icon="Delete"
+                circle
+                @click="confirmDelete(row)"
+                title="删除任务"
+              />
+            </div>
+          </template>
+        </el-table-column>
+      </el-table>
 
       <!-- 分页 -->
-      <div v-if="tasks.length > 0" class="pagination">
-        <button 
-          class="btn-secondary" 
-          :disabled="filters.offset === 0"
-          @click="prevPage"
-        >
-          上一页
-        </button>
-        <span class="page-info">
-          显示 {{ filters.offset + 1 }} - {{ filters.offset + tasks.length }} 条
-        </span>
-        <button 
-          class="btn-secondary" 
-          :disabled="tasks.length < filters.limit"
-          @click="nextPage"
-        >
-          下一页
-        </button>
+      <div class="pagination-container">
+        <el-pagination
+          v-model:current-page="currentPage"
+          v-model:page-size="filters.limit"
+          :total="totalTasks" 
+          layout="total, prev, pager, next, jumper"
+          @current-change="handlePageChange"
+          @size-change="handleSizeChange"
+        />
       </div>
-    </div>
+    </el-card>
 
     <!-- 创建任务对话框 -->
-    <Modal
-      v-model:visible="createDialogVisible"
+    <el-dialog
+      v-model="createDialogVisible"
       title="新建任务"
-      confirm-text="创建"
-      @confirm="submitCreate"
+      width="500px"
+      :close-on-click-modal="false"
     >
-      <div class="form-group">
-        <label>任务阶段 *</label>
-        <select v-model="formData.stage">
-          <option value="mark">标记</option>
-          <option value="analysis">分析</option>
-          <option value="decision">决策</option>
-          <option value="trade">交易</option>
-          <option value="listen">监听</option>
-        </select>
-      </div>
-      <div class="form-group">
-        <label>任务状态 *</label>
-        <select v-model="formData.status">
-          <option value="waiting">等待中</option>
-          <option value="processing">处理中</option>
-        </select>
-      </div>
-      <div class="form-group">
-        <label>元数据 (JSON格式)</label>
-        <textarea
-          v-model="formData.metadata"
-          rows="5"
-          placeholder='{"key": "value"}'
-        ></textarea>
-      </div>
-    </Modal>
+      <el-form :model="formData" label-width="100px">
+        <el-form-item label="任务阶段" required>
+          <el-select v-model="formData.stage" style="width: 100%">
+            <el-option label="标记" value="mark" />
+            <el-option label="分析" value="analysis" />
+            <el-option label="决策" value="decision" />
+            <el-option label="交易" value="trade" />
+            <el-option label="监听" value="listen" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="任务状态" required>
+          <el-select v-model="formData.status" style="width: 100%">
+            <el-option label="等待中" value="waiting" />
+            <el-option label="处理中" value="processing" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="元数据">
+          <el-input
+            v-model="formData.metadata"
+            type="textarea"
+            :rows="5"
+            placeholder='{"key": "value"}'
+          />
+          <div class="form-tip">请输入有效的 JSON 格式</div>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <span class="dialog-footer">
+          <el-button @click="createDialogVisible = false">取消</el-button>
+          <el-button type="primary" @click="submitCreate">创建</el-button>
+        </span>
+      </template>
+    </el-dialog>
 
     <!-- 查看详情对话框 -->
-    <Modal
-      v-model:visible="detailDialogVisible"
+    <el-dialog
+      v-model="detailDialogVisible"
       :title="detailTitle"
-      :show-footer="false"
-      size="large"
+      width="600px"
     >
       <pre class="json-view">{{ detailContent }}</pre>
-    </Modal>
+    </el-dialog>
 
     <!-- 编辑元数据对话框 -->
-    <Modal
-      v-model:visible="editMetadataDialogVisible"
+    <el-dialog
+      v-model="editMetadataDialogVisible"
       title="编辑元数据"
-      confirm-text="保存"
-      @confirm="submitMetadataEdit"
+      width="600px"
+      :close-on-click-modal="false"
     >
-      <div class="form-group">
-        <label>元数据 (JSON格式) *</label>
-        <textarea
-          v-model="editFormData.metadata"
-          rows="15"
-          placeholder='{"key": "value"}'
-          class="json-editor"
-        ></textarea>
-      </div>
-    </Modal>
+      <el-form :model="editFormData" label-width="80px">
+        <el-form-item label="元数据" required>
+          <el-input
+            v-model="editFormData.metadata"
+            type="textarea"
+            :rows="15"
+            placeholder='{"key": "value"}'
+          />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <span class="dialog-footer">
+          <el-button @click="editMetadataDialogVisible = false">取消</el-button>
+          <el-button type="primary" @click="submitMetadataEdit">保存</el-button>
+        </span>
+      </template>
+    </el-dialog>
 
     <!-- 编辑结果对话框 -->
-    <Modal
-      v-model:visible="editResultDialogVisible"
+    <el-dialog
+      v-model="editResultDialogVisible"
       title="编辑任务结果"
-      confirm-text="保存"
-      @confirm="submitResultEdit"
+      width="600px"
+      :close-on-click-modal="false"
     >
-      <div class="form-group">
-        <label>任务结果 (JSON格式) *</label>
-        <textarea
-          v-model="editFormData.result"
-          rows="15"
-          placeholder='{"key": "value"}'
-          class="json-editor"
-        ></textarea>
-      </div>
-    </Modal>
+      <el-form :model="editFormData" label-width="80px">
+        <el-form-item label="任务结果" required>
+          <el-input
+            v-model="editFormData.result"
+            type="textarea"
+            :rows="15"
+            placeholder='{"key": "value"}'
+          />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <span class="dialog-footer">
+          <el-button @click="editResultDialogVisible = false">取消</el-button>
+          <el-button type="primary" @click="submitResultEdit">保存</el-button>
+        </span>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script>
-import { ref, reactive, onMounted, onBeforeUnmount, computed } from 'vue'
+import { ref, reactive, onMounted, computed, watch } from 'vue'
 import { getTasks, createTask, updateTask, deleteTask, batchDeleteTasks, retryTask, pollAnalysisOnce, splitAnalysisTask } from '@/api/tasks'
-import { toast, confirm, Modal } from '@/components/Notification'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { Delete, Plus, Check, Refresh, Share, Close, RefreshLeft, View, Edit } from '@element-plus/icons-vue'
 
 export default {
   name: 'TaskManagement',
-  components: {
-    Modal
-  },
   setup() {
     const loading = ref(false)
     const tasks = ref([])
@@ -345,6 +333,22 @@ export default {
     const detailContent = ref('')
     const editMetadataDialogVisible = ref(false)
     const editResultDialogVisible = ref(false)
+    
+    // Pagination state
+    const currentPage = ref(1)
+    // Note: Since API uses offset/limit, we need to manage total count if possible, 
+    // but the current API might not return total count in a standard way or the previous code didn't use it.
+    // Looking at previous code, it used offset/limit manual pagination.
+    // If API doesn't return total, we might need to adjust or simulate.
+    // Assuming API returns tasks list, let's look at previous code: 
+    // response.data.tasks is the array.
+    // We will assume for now we can fetch more. But el-pagination works best with total.
+    // Let's use a large number for total if unknown, or just simple pagination.
+    // Actually previous code: "显示 X - Y 条", and "下一页" disabled if tasks.length < limit.
+    // So we don't know total. We can simulate "infinite" pages or just keep simple pagination logic.
+    // However, el-pagination requires 'total' to show numbers properly.
+    // Let's try to adapt to el-pagination by tracking current offset.
+    const totalTasks = ref(1000) // Placeholder since we don't know total
 
     const filters = reactive({
       stage: '',
@@ -365,12 +369,76 @@ export default {
       result: '{}'
     })
 
-    // 是否全选
-    const isAllSelected = computed(() => {
-      return tasks.value.length > 0 && selectedTasks.value.length === tasks.value.length
-    })
+    // Helper functions for labels and types
+    const getStageLabel = (stage) => {
+      const map = {
+        mark: '标记',
+        analysis: '分析',
+        decision: '决策',
+        trade: '交易',
+        listen: '监听'
+      }
+      return map[stage] || stage
+    }
 
-    // 加载任务列表
+    const getStageType = (stage) => {
+      const map = {
+        mark: 'info',
+        analysis: 'primary',
+        decision: 'warning',
+        trade: 'success',
+        listen: 'info'
+      }
+      return map[stage] || ''
+    }
+
+    const getStatusLabel = (status) => {
+      const map = {
+        waiting: '等待中',
+        processing: '处理中',
+        finished: '已完成',
+        failed: '失败'
+      }
+      return map[status] || status
+    }
+
+    const getStatusType = (status) => {
+      const map = {
+        waiting: 'info',
+        processing: 'primary',
+        finished: 'success',
+        failed: 'danger'
+      }
+      return map[status] || ''
+    }
+
+    const getAnalysisStatusLabel = (status) => {
+      const map = {
+        requesting: '请求中',
+        polling: '轮询中',
+        success: '成功',
+        failed: '失败'
+      }
+      return map[status] || status
+    }
+
+    const getAnalysisStatusType = (status) => {
+      const map = {
+        requesting: 'warning',
+        polling: 'info',
+        success: 'success',
+        failed: 'danger'
+      }
+      return map[status] || ''
+    }
+
+    // Format time
+    const formatTime = (timeStr) => {
+      if (!timeStr) return '-'
+      return new Date(timeStr).toLocaleString('zh-CN')
+    }
+
+    // Load tasks
     const loadTasks = async () => {
       loading.value = true
       try {
@@ -382,104 +450,164 @@ export default {
         if (filters.status) params.status = filters.status
 
         const response = await getTasks(params)
-        console.log('任务列表响应:', response)
         if (response.success) {
           tasks.value = response.data.tasks || []
-          console.log('加载的任务列表:', tasks.value)
+          // If we got fewer tasks than limit, we reached the end (roughly)
+          if (tasks.value.length < filters.limit) {
+            totalTasks.value = filters.offset + tasks.value.length
+          } else {
+            // Assume there are more
+            totalTasks.value = filters.offset + tasks.value.length + 100 // Approximation
+          }
         }
       } catch (error) {
         console.error('加载任务列表失败:', error)
-        toast.error('加载任务列表失败: ' + (error.response?.data?.message || error.message))
+        ElMessage.error('加载任务列表失败: ' + (error.response?.data?.message || error.message))
       } finally {
         loading.value = false
       }
     }
 
-    // 刷新任务列表
+    // Refresh
     const refreshTasks = () => {
       filters.offset = 0
+      currentPage.value = 1
       selectedTasks.value = []
       loadTasks()
     }
 
-    // 上一页
-    const prevPage = () => {
-      if (filters.offset >= filters.limit) {
-        filters.offset -= filters.limit
-        selectedTasks.value = []
-        loadTasks()
-      }
-    }
-
-    // 下一页
-    const nextPage = () => {
-      filters.offset += filters.limit
-      selectedTasks.value = []
+    // Pagination handlers
+    const handlePageChange = (page) => {
+      filters.offset = (page - 1) * filters.limit
       loadTasks()
     }
 
-    // 全选/取消全选
-    const toggleSelectAll = (event) => {
-      if (event.target.checked) {
-        selectedTasks.value = tasks.value.map(task => task.id)
-      } else {
-        selectedTasks.value = []
-      }
+    const handleSizeChange = (size) => {
+      filters.limit = size
+      filters.offset = 0
+      currentPage.value = 1
+      loadTasks()
     }
 
-    // 批量删除
+    // Selection handler
+    const handleSelectionChange = (selection) => {
+      selectedTasks.value = selection.map(item => item.id)
+    }
+
+    // Batch delete
     const batchDelete = async () => {
       if (selectedTasks.value.length === 0) {
-        toast.warning('请先选择要删除的任务')
-        return
-      }
-
-      const result = await confirm({
-        message: `确定要删除选中的 ${selectedTasks.value.length} 个任务吗？`,
-        type: 'danger'
-      })
-      if (!result) {
+        ElMessage.warning('请先选择要删除的任务')
         return
       }
 
       try {
+        await ElMessageBox.confirm(
+          `确定要删除选中的 ${selectedTasks.value.length} 个任务吗？`,
+          '警告',
+          {
+            confirmButtonText: '确定',
+            cancelButtonText: '取消',
+            type: 'warning'
+          }
+        )
+
         const response = await batchDeleteTasks(selectedTasks.value)
         if (response.success) {
           const { deleted_count, failed_count } = response.data
           if (failed_count > 0) {
-            toast.warning(`批量删除完成: 成功${deleted_count}个, 失败${failed_count}个`)
+            ElMessage.warning(`批量删除完成: 成功${deleted_count}个, 失败${failed_count}个`)
           } else {
-            toast.success(`批量删除成功: 已删除${deleted_count}个任务`)
+            ElMessage.success(`批量删除成功: 已删除${deleted_count}个任务`)
           }
           selectedTasks.value = []
           refreshTasks()
         }
       } catch (error) {
-        console.error('批量删除任务失败:', error)
-        toast.error('批量删除任务失败: ' + (error.response?.data?.message || error.message))
+        if (error !== 'cancel') {
+          console.error('批量删除任务失败:', error)
+          ElMessage.error('批量删除任务失败: ' + (error.response?.data?.message || error.message))
+        }
       }
     }
 
-    // 同意任务(将waiting状态变为processing)
+    // Approve task
     const approveTask = async (task) => {
-      const result = await confirm(`确定要同意并开始处理任务 #${task.id} 吗？`)
-      if (!result) {
-        return
-      }
-
       try {
+        await ElMessageBox.confirm(
+          `确定要同意并开始处理任务 #${task.id} 吗？`,
+          '提示',
+          { type: 'info' }
+        )
+
         const response = await updateTask(task.id, { status: 'processing' })
         if (response.success) {
-          toast.success('任务已开始处理')
+          ElMessage.success('任务已开始处理')
           refreshTasks()
         }
       } catch (error) {
-        console.error('更新任务状态失败:', error)
-        toast.error('更新任务状态失败: ' + (error.response?.data?.message || error.message))
+        if (error !== 'cancel') {
+          console.error('更新任务状态失败:', error)
+          ElMessage.error('更新任务状态失败')
+        }
       }
     }
 
-    // 显示创建对话框
+    // Poll Analysis Once
+    const pollAnalysisOnceHandler = async (task) => {
+      try {
+         const response = await pollAnalysisOnce(task.id)
+         if (response.success) {
+            ElMessage.success('已触发轮询')
+            refreshTasks()
+         }
+      } catch (error) {
+         ElMessage.error('轮询失败: ' + (error.response?.data?.message || error.message))
+      }
+    }
+
+    // Split Analysis Task
+    const splitAnalysisTaskHandler = async (task) => {
+       try {
+          await ElMessageBox.confirm(
+             `确定要将任务 #${task.id} 拆分为决策任务吗？`,
+             '提示',
+             { type: 'info' }
+          )
+          const response = await splitAnalysisTask(task.id)
+          if (response.success) {
+             ElMessage.success(`拆分成功，创建了 ${response.data.created_count} 个新任务`)
+             refreshTasks()
+          }
+       } catch (error) {
+          if (error !== 'cancel') {
+             ElMessage.error('拆分任务失败: ' + (error.response?.data?.message || error.message))
+          }
+       }
+    }
+
+    // Retry Task
+    const retryTaskHandler = async (task) => {
+       try {
+          await ElMessageBox.confirm(
+             `确定要重试任务 #${task.id} 吗？`,
+             '提示',
+             { type: 'warning' }
+          )
+          const response = await retryTask(task.id)
+          if (response.success) {
+             ElMessage.success('任务已重置为等待状态')
+             refreshTasks()
+          }
+       } catch (error) {
+          if (error !== 'cancel') {
+             ElMessage.error('重试任务失败')
+          }
+       }
+    }
+
+
+    // Show create dialog
     const showCreateDialog = () => {
       formData.stage = 'mark'
       formData.status = 'waiting'
@@ -487,15 +615,9 @@ export default {
       createDialogVisible.value = true
     }
 
-    // 关闭创建对话框
-    const closeCreateDialog = () => {
-      createDialogVisible.value = false
-    }
-
-    // 提交创建
+    // Submit create
     const submitCreate = async () => {
       try {
-        // 解析metadata
         let metadata = {}
         if (formData.metadata.trim()) {
           metadata = JSON.parse(formData.metadata)
@@ -509,360 +631,260 @@ export default {
 
         const response = await createTask(data)
         if (response.success) {
-          toast.success('创建任务成功')
-          closeCreateDialog()
+          ElMessage.success('创建任务成功')
+          createDialogVisible.value = false
           refreshTasks()
         }
       } catch (error) {
-        console.error('创建任务失败:', error)
-        toast.error('创建任务失败: ' + (error.response?.data?.message || error.message))
+        if (error instanceof SyntaxError) {
+          ElMessage.error('JSON格式错误: ' + error.message)
+        } else {
+          console.error('创建任务失败:', error)
+          ElMessage.error('创建任务失败: ' + (error.response?.data?.message || error.message))
+        }
       }
     }
 
-    // 显示元数据
+    // Show metadata
     const showMetadata = (metadata) => {
       detailTitle.value = '元数据'
       detailContent.value = JSON.stringify(metadata, null, 2)
       detailDialogVisible.value = true
     }
 
-    // 显示结果
+    // Show result
     const showResult = (result) => {
       detailTitle.value = '任务结果'
       detailContent.value = JSON.stringify(result, null, 2)
       detailDialogVisible.value = true
     }
 
-    // 关闭详情对话框
-    const closeDetailDialog = () => {
-      detailDialogVisible.value = false
-    }
-
-    // 编辑元数据
+    // Edit metadata
     const editMetadata = (task) => {
       editFormData.taskId = task.id
       editFormData.metadata = JSON.stringify(task.metadata || {}, null, 2)
       editMetadataDialogVisible.value = true
     }
 
-    // 提交元数据编辑
+    // Submit metadata edit
     const submitMetadataEdit = async () => {
       try {
-        // 解析JSON
         const metadata = JSON.parse(editFormData.metadata)
-
         const response = await updateTask(editFormData.taskId, { metadata })
         if (response.success) {
-          toast.success('更新元数据成功')
+          ElMessage.success('更新元数据成功')
           editMetadataDialogVisible.value = false
           refreshTasks()
         }
       } catch (error) {
         if (error instanceof SyntaxError) {
-          toast.error('JSON格式错误: ' + error.message)
+          ElMessage.error('JSON格式错误: ' + error.message)
         } else {
-          console.error('更新元数据失败:', error)
-          toast.error('更新元数据失败: ' + (error.response?.data?.message || error.message))
+          ElMessage.error('更新元数据失败')
         }
       }
     }
 
-    // 编辑结果
+    // Edit result
     const editResult = (task) => {
       editFormData.taskId = task.id
       editFormData.result = JSON.stringify(task.result || {}, null, 2)
       editResultDialogVisible.value = true
     }
 
-    // 提交结果编辑
+    // Submit result edit
     const submitResultEdit = async () => {
       try {
-        // 解析JSON
         const result = JSON.parse(editFormData.result)
-
         const response = await updateTask(editFormData.taskId, { result })
         if (response.success) {
-          toast.success('更新任务结果成功')
+          ElMessage.success('更新任务结果成功')
           editResultDialogVisible.value = false
           refreshTasks()
         }
       } catch (error) {
         if (error instanceof SyntaxError) {
-          toast.error('JSON格式错误: ' + error.message)
+          ElMessage.error('JSON格式错误: ' + error.message)
         } else {
-          console.error('更新任务结果失败:', error)
-          toast.error('更新任务结果失败: ' + (error.response?.data?.message || error.message))
+          ElMessage.error('更新任务结果失败')
         }
       }
     }
 
-    // 取消任务
+    // Cancel task
     const cancelTask = async (task) => {
-      const result = await confirm(`确定要取消任务 #${task.id} 吗？`)
-      if (!result) {
-        return
-      }
-
       try {
+        await ElMessageBox.confirm(
+          `确定要取消任务 #${task.id} 吗？`,
+          '警告',
+          { type: 'warning' }
+        )
+
         const response = await updateTask(task.id, {
           status: 'failed',
           error_msg: '用户手动取消'
         })
         if (response.success) {
-          toast.success('取消任务成功')
+          ElMessage.success('取消任务成功')
           refreshTasks()
         }
       } catch (error) {
-        console.error('取消任务失败:', error)
-        toast.error('取消任务失败: ' + (error.response?.data?.message || error.message))
+        if (error !== 'cancel') {
+          console.error('取消任务失败:', error)
+          ElMessage.error('取消任务失败')
+        }
       }
     }
 
-    // 确认删除
+    // Confirm delete
     const confirmDelete = async (task) => {
-      const result = await confirm({
-        message: `确定要删除任务 #${task.id} 吗？`,
-        type: 'danger'
-      })
-      if (!result) {
-        return
-      }
-
       try {
+        await ElMessageBox.confirm(
+          `确定要删除任务 #${task.id} 吗？`,
+          '警告',
+          { type: 'error' }
+        )
         const response = await deleteTask(task.id)
         if (response.success) {
-          toast.success('删除任务成功')
+          ElMessage.success('删除成功')
           refreshTasks()
         }
       } catch (error) {
-        console.error('删除任务失败:', error)
-        toast.error('删除任务失败: ' + (error.response?.data?.message || error.message))
-      }
-    }
-
-    // 重试任务
-    const retryTaskHandler = async (task) => {
-      const result = await confirm({
-        message: `确定要重试任务 #${task.id} 吗？\n任务将被重新打回到等待状态并重新执行。`
-      })
-      if (!result) {
-        return
-      }
-
-      try {
-        const response = await retryTask(task.id)
-        if (response.success) {
-          toast.success('任务已重新提交')
-          refreshTasks()
+        if (error !== 'cancel') {
+          ElMessage.error('删除失败')
         }
-      } catch (error) {
-        console.error('重试任务失败:', error)
-        toast.error('重试任务失败: ' + (error.response?.data?.message || error.message))
       }
-    }
-
-    // 手动轮询一次分析任务
-    const pollAnalysisOnceHandler = async (task) => {
-      try {
-        const response = await pollAnalysisOnce(task.id)
-        if (response.success) {
-          const data = response.data
-
-          if (data.analysis_status === 'success') {
-            // 分析成功
-            toast.success(`分析完成！成功解析 ${data.market_count} 个市场`)
-            refreshTasks()
-          } else if (data.analysis_status === 'polling') {
-            // 仍在思考
-            toast.info('AI仍在思考中，请稍后再试')
-          } else if (data.analysis_status === 'failed') {
-            // 分析失败
-            toast.error(`分析失败: ${data.error || '未知错误'}`)
-            refreshTasks()
-          }
-        } else {
-          toast.error(`轮询失败: ${response.message}`)
-        }
-      } catch (error) {
-        console.error('手动轮询失败:', error)
-        toast.error('手动轮询失败: ' + (error.response?.data?.message || error.message))
-      }
-    }
-
-    // 拆分分析任务为多个decision任务
-    const splitAnalysisTaskHandler = async (task) => {
-      const marketCount = task.extended_info?.market_count || 0
-
-      const result = await confirm({
-        message: `确定要拆分任务 #${task.id} 吗？\n将创建 ${marketCount} 个decision任务，并删除原始analysis任务。`,
-        type: 'warning'
-      })
-      if (!result) {
-        return
-      }
-
-      try {
-        const response = await splitAnalysisTask(task.id)
-
-        if (response.success) {
-          const data = response.data
-          let message = `拆分成功！总市场数: ${data.total_markets}, 成功创建: ${data.success_count} 个decision任务`
-
-          if (data.failed_count > 0) {
-            message += `, 失败: ${data.failed_count} 个市场`
-          }
-
-          toast.success(message)
-          refreshTasks()
-        } else {
-          toast.error(`拆分失败: ${response.message}`)
-        }
-      } catch (error) {
-        console.error('拆分任务失败:', error)
-        toast.error('拆分任务失败: ' + (error.response?.data?.message || error.message))
-      }
-    }
-
-    // 获取阶段标签
-    const getStageLabel = (stage) => {
-      const labels = {
-        mark: '标记',
-        analysis: '分析',
-        decision: '决策',
-        trade: '交易',
-        listen: '监听'
-      }
-      return labels[stage] || stage
-    }
-
-    // 获取状态标签
-    const getStatusLabel = (status) => {
-      const labels = {
-        waiting: '等待中',
-        processing: '处理中',
-        finished: '已完成',
-        failed: '失败'
-      }
-      return labels[status] || status
-    }
-
-    // 获取状态样式类
-    const getStatusClass = (status) => {
-      const classes = {
-        waiting: 'badge-warning',
-        processing: 'badge-info',
-        finished: 'badge-success',
-        failed: 'badge-danger'
-      }
-      return classes[status] || 'badge-gray'
-    }
-
-    // 获取分析状态标签
-    const getAnalysisStatusLabel = (analysisStatus) => {
-      const labels = {
-        pending: '待处理',
-        requesting: '请求中',
-        polling: '轮询中',
-        validating: '验证中',
-        success: '成功',
-        failed: '失败'
-      }
-      return labels[analysisStatus] || analysisStatus || '-'
-    }
-
-    // 获取分析状态样式类
-    const getAnalysisStatusClass = (analysisStatus) => {
-      const classes = {
-        pending: 'badge-gray',
-        requesting: 'badge-info',
-        polling: 'badge-warning',
-        validating: 'badge-info',
-        success: 'badge-success',
-        failed: 'badge-danger'
-      }
-      return classes[analysisStatus] || 'badge-gray'
-    }
-
-    // 格式化时间
-    const formatTime = (timeStr) => {
-      if (!timeStr) return '-'
-      const date = new Date(timeStr)
-      return date.toLocaleString('zh-CN')
-    }
-
-    // 自动刷新定时器
-    let autoRefreshTimer = null
-
-    // 全局刷新事件处理
-    const handleGlobalRefresh = () => {
-      loadTasks()
     }
 
     onMounted(() => {
       loadTasks()
-      // 每30秒自动刷新一次
-      autoRefreshTimer = setInterval(() => {
-        loadTasks()
-      }, 30000)
-      // 监听全局刷新事件
-      window.addEventListener('global-refresh', handleGlobalRefresh)
-    })
-
-    onBeforeUnmount(() => {
-      if (autoRefreshTimer) {
-        clearInterval(autoRefreshTimer)
-      }
-      // 移除全局刷新事件监听
-      window.removeEventListener('global-refresh', handleGlobalRefresh)
     })
 
     return {
       loading,
       tasks,
       selectedTasks,
-      isAllSelected,
-      filters,
       createDialogVisible,
       detailDialogVisible,
       detailTitle,
       detailContent,
       editMetadataDialogVisible,
       editResultDialogVisible,
+      currentPage,
+      totalTasks,
+      filters,
       formData,
       editFormData,
+      getStageLabel,
+      getStageType,
+      getStatusLabel,
+      getStatusType,
+      getAnalysisStatusLabel,
+      getAnalysisStatusType,
+      formatTime,
+      loadTasks,
       refreshTasks,
-      prevPage,
-      nextPage,
-      toggleSelectAll,
+      handlePageChange,
+      handleSizeChange,
+      handleSelectionChange,
       batchDelete,
       approveTask,
+      pollAnalysisOnceHandler,
+      splitAnalysisTaskHandler,
+      retryTaskHandler,
       showCreateDialog,
-      closeCreateDialog,
       submitCreate,
       showMetadata,
       showResult,
-      closeDetailDialog,
       editMetadata,
       submitMetadataEdit,
       editResult,
       submitResultEdit,
       cancelTask,
       confirmDelete,
-      retryTaskHandler,
-      pollAnalysisOnceHandler,
-      splitAnalysisTaskHandler,
-      getStageLabel,
-      getStatusLabel,
-      getStatusClass,
-      getAnalysisStatusLabel,
-      getAnalysisStatusClass,
-      formatTime
+      Delete, Plus, Check, Refresh, Share, Close, RefreshLeft, View, Edit
     }
   }
 }
 </script>
 
 <style scoped>
+.task-management {
+  padding: 20px;
+  max-width: 1600px;
+  margin: 0 auto;
+}
+
+.header-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.header-left h2 {
+  margin: 0;
+  font-size: 18px;
+  color: #303133;
+}
+
+.filter-form {
+  margin-bottom: 20px;
+}
+
+.extended-info {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.info-detail {
+  font-size: 12px;
+  color: #606266;
+}
+
+.error-text {
+  color: #F56C6C;
+  font-size: 12px;
+}
+
+.action-buttons {
+  display: flex;
+  gap: 5px;
+  justify-content: flex-start;
+  flex-wrap: wrap;
+}
+
+.pagination-container {
+  margin-top: 20px;
+  display: flex;
+  justify-content: center;
+}
+
+.json-view {
+  background-color: #f5f7fa;
+  padding: 10px;
+  border-radius: 4px;
+  overflow: auto;
+  max-height: 400px;
+  font-family: monospace;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.form-tip {
+  font-size: 12px;
+  color: #909399;
+  margin-top: 5px;
+}
+
+
+
 /* 容器 */
 .task-management {
   padding: 20px;

@@ -1,217 +1,216 @@
 <template>
   <div class="trade-container">
-    <div class="trade-header">
-      <h2>交易管理</h2>
-    </div>
-
-    <!-- 操作面板 -->
-    <div class="action-panel">
-      <button class="btn btn-primary" @click="loadPendingTasks" :disabled="loading">
-        {{ loading ? '加载中...' : '刷新列表' }}
-      </button>
+    <div class="header-actions mb-4">
+      <div class="left">
+        <h2>交易管理</h2>
+      </div>
+      <div class="right">
+        <el-button type="primary" :loading="loading" :icon="Refresh" @click="loadPendingTasks">
+          刷新列表
+        </el-button>
+      </div>
     </div>
 
     <!-- 错误提示 -->
-    <div v-if="error" class="error-message">{{ error }}</div>
+    <el-alert
+      v-if="error"
+      title="错误"
+      type="error"
+      :description="error"
+      show-icon
+      class="mb-4"
+    />
 
     <!-- 待交易任务列表 -->
     <div class="tasks-section">
-      <div class="section-header">
+      <div class="section-header mb-3">
         <h3>待交易任务</h3>
-        <span class="count-badge">{{ pendingTasks.length }}</span>
+        <el-tag type="success" effect="dark" round class="ml-2">{{ pendingTasks.length }}</el-tag>
       </div>
 
-      <div v-if="pendingTasks.length === 0 && !loading" class="empty-state">
-        <p>暂无待交易任务</p>
-      </div>
+      <el-empty v-if="pendingTasks.length === 0 && !loading" description="暂无待交易任务" />
 
       <div v-else class="tasks-list">
-        <div v-for="task in pendingTasks" :key="task.id" class="task-card">
-          <!-- 任务头部 -->
-          <div class="task-header">
-            <div class="task-header-left">
-              <span class="task-id">任务 #{{ task.id }}</span>
-              <span v-if="task.metadata?.marks?.length" class="marks-inline">
-                <span v-for="mark in task.metadata.marks" :key="mark" class="mark-tag">{{ mark }}</span>
-              </span>
+        <el-card v-for="task in pendingTasks" :key="task.id" class="task-card mb-4" shadow="hover">
+          <template #header>
+            <div class="task-header">
+              <div class="task-header-left">
+                <span class="task-id">任务 #{{ task.id }}</span>
+                <div v-if="task.metadata?.marks?.length" class="marks-inline ml-2">
+                  <el-tag 
+                    v-for="mark in task.metadata.marks" 
+                    :key="mark" 
+                    size="small" 
+                    effect="plain"
+                    class="mr-1"
+                  >
+                    {{ mark }}
+                  </el-tag>
+                </div>
+              </div>
+              <span class="task-time text-secondary">{{ formatTime(task.create_time) }}</span>
             </div>
-            <span class="task-time">{{ formatTime(task.create_time) }}</span>
-          </div>
+          </template>
 
           <!-- 市场问题 -->
-          <div class="market-question" v-if="task.metadata?.market">
-            {{ task.metadata.market.question }}
+          <div class="market-question mb-4" v-if="task.metadata?.market">
+            <h3>{{ task.metadata.market.question }}</h3>
           </div>
 
           <!-- 核心信息卡片 -->
-          <div class="core-info-grid">
+          <el-row :gutter="20" class="mb-4">
             <!-- 市场概率 vs AI预测 -->
-            <div class="info-card probability-card">
-              <div class="card-title">概率对比</div>
-              <div class="probability-comparison">
-                <div class="prob-column">
-                  <div class="prob-header">YES</div>
-                  <div class="prob-row">
-                    <span class="prob-label">市场</span>
-                    <span class="prob-value market">{{ formatPricePercent(task.metadata?.market?.outcome_prices, 0) }}</span>
-                  </div>
-                  <div class="prob-row">
-                    <span class="prob-label">预测</span>
-                    <span class="prob-value predict">{{ formatPercent(task.metadata?.analysis?.p) }}</span>
-                  </div>
-                  <div class="prob-row diff">
-                    <span class="prob-label">差值</span>
-                    <span :class="['prob-value', getDiffClass(calculateDiff(task.metadata?.analysis?.p, task.metadata?.market?.outcome_prices, 0))]">
-                      {{ formatDiff(calculateDiff(task.metadata?.analysis?.p, task.metadata?.market?.outcome_prices, 0)) }}
-                    </span>
-                  </div>
-                  <!-- 交易操作 -->
-                  <div v-if="task.result?.decision === 'trade' && task.result?.allocation?.side === 'YES'" class="trade-action">
-                    <div class="action-badge buy">买入 YES</div>
-                    <div class="action-amount">${{ task.result.allocation.dollars?.toFixed(2) }}</div>
-                  </div>
-                  <div v-else-if="task.result?.decision === 'skip'" class="trade-action">
-                    <div class="action-badge skip">不交易</div>
-                  </div>
-                </div>
+            <el-col :xs="24" :lg="12" class="mb-3">
+              <el-card shadow="never" class="h-100">
+                <template #header><div class="card-title">概率对比</div></template>
+                <div class="probability-comparison">
+                  <el-row :gutter="20">
+                    <el-col :span="12" class="prob-column">
+                      <div class="prob-header">YES</div>
+                      <div class="prob-row">
+                        <span class="prob-label">市场</span>
+                        <span class="prob-value market">{{ formatPricePercent(task.metadata?.market?.outcome_prices, 0) }}</span>
+                      </div>
+                      <div class="prob-row">
+                        <span class="prob-label">预测</span>
+                        <span class="prob-value predict">{{ formatPercent(task.metadata?.analysis?.p) }}</span>
+                      </div>
+                      <div class="prob-row diff">
+                        <span class="prob-label">差值</span>
+                        <span :class="['prob-value', getDiffClass(calculateDiff(task.metadata?.analysis?.p, task.metadata?.market?.outcome_prices, 0))]">
+                          {{ formatDiff(calculateDiff(task.metadata?.analysis?.p, task.metadata?.market?.outcome_prices, 0)) }}
+                        </span>
+                      </div>
+                      <!-- 交易操作 -->
+                      <div v-if="task.result?.decision === 'trade' && task.result?.allocation?.side === 'YES'" class="trade-action mt-3">
+                        <el-tag type="success" effect="dark" class="mb-1">买入 YES</el-tag>
+                        <div class="action-amount">${{ task.result.allocation.dollars?.toFixed(2) }}</div>
+                      </div>
+                      <div v-else-if="task.result?.decision === 'skip'" class="trade-action mt-3">
+                        <el-tag type="info" effect="dark">不交易</el-tag>
+                      </div>
+                    </el-col>
 
-                <div class="prob-column">
-                  <div class="prob-header">NO</div>
-                  <div class="prob-row">
-                    <span class="prob-label">市场</span>
-                    <span class="prob-value market">{{ formatPricePercent(task.metadata?.market?.outcome_prices, 1) }}</span>
-                  </div>
-                  <div class="prob-row">
-                    <span class="prob-label">预测</span>
-                    <span class="prob-value predict">{{ formatPercent(task.metadata?.analysis?.n) }}</span>
-                  </div>
-                  <div class="prob-row diff">
-                    <span class="prob-label">差值</span>
-                    <span :class="['prob-value', getDiffClass(calculateDiff(task.metadata?.analysis?.n, task.metadata?.market?.outcome_prices, 1))]">
-                      {{ formatDiff(calculateDiff(task.metadata?.analysis?.n, task.metadata?.market?.outcome_prices, 1)) }}
-                    </span>
-                  </div>
-                  <!-- 交易操作 -->
-                  <div v-if="task.result?.decision === 'trade' && task.result?.allocation?.side === 'NO'" class="trade-action">
-                    <div class="action-badge buy">买入 NO</div>
-                    <div class="action-amount">${{ task.result.allocation.dollars?.toFixed(2) }}</div>
-                  </div>
-                  <div v-else-if="task.result?.decision === 'skip'" class="trade-action">
-                    <div class="action-badge skip">不交易</div>
-                  </div>
+                    <el-col :span="12" class="prob-column">
+                      <div class="prob-header">NO</div>
+                      <div class="prob-row">
+                        <span class="prob-label">市场</span>
+                        <span class="prob-value market">{{ formatPricePercent(task.metadata?.market?.outcome_prices, 1) }}</span>
+                      </div>
+                      <div class="prob-row">
+                        <span class="prob-label">预测</span>
+                        <span class="prob-value predict">{{ formatPercent(task.metadata?.analysis?.n) }}</span>
+                      </div>
+                      <div class="prob-row diff">
+                        <span class="prob-label">差值</span>
+                        <span :class="['prob-value', getDiffClass(calculateDiff(task.metadata?.analysis?.n, task.metadata?.market?.outcome_prices, 1))]">
+                          {{ formatDiff(calculateDiff(task.metadata?.analysis?.n, task.metadata?.market?.outcome_prices, 1)) }}
+                        </span>
+                      </div>
+                      <!-- 交易操作 -->
+                      <div v-if="task.result?.decision === 'trade' && task.result?.allocation?.side === 'NO'" class="trade-action mt-3">
+                        <el-tag type="danger" effect="dark" class="mb-1">买入 NO</el-tag>
+                        <div class="action-amount">${{ task.result.allocation.dollars?.toFixed(2) }}</div>
+                      </div>
+                      <div v-else-if="task.result?.decision === 'skip'" class="trade-action mt-3">
+                        <el-tag type="info" effect="dark">不交易</el-tag>
+                      </div>
+                    </el-col>
+                  </el-row>
                 </div>
-              </div>
-            </div>
+              </el-card>
+            </el-col>
 
             <!-- 交易详情 -->
-            <div class="info-card trade-details-card" v-if="task.result?.decision === 'trade'">
-              <div class="card-title">交易详情</div>
-              <div class="trade-details">
-                <div class="detail-row">
-                  <span class="detail-label">方向</span>
-                  <span :class="['detail-value', 'side-' + task.result.allocation.side.toLowerCase()]">
-                    {{ task.result.allocation.side }}
-                  </span>
-                </div>
-                <div class="detail-row">
-                  <span class="detail-label">投入</span>
-                  <span class="detail-value">${{ task.result.allocation.dollars?.toFixed(2) }}</span>
-                </div>
-                <div class="detail-row">
-                  <span class="detail-label">份额</span>
-                  <span class="detail-value">{{ task.result.allocation.shares?.toFixed(2) }}</span>
-                </div>
-                <div class="detail-row">
-                  <span class="detail-label">成本</span>
-                  <span class="detail-value">{{ (task.result.allocation.cost * 100)?.toFixed(1) }}%</span>
-                </div>
-                <div class="detail-row">
-                  <span class="detail-label">仓位占比</span>
-                  <span class="detail-value">{{ (task.result.allocation.fraction_of_gross * 100)?.toFixed(2) }}%</span>
-                </div>
-                <div class="detail-row">
-                  <span class="detail-label">评分</span>
-                  <span class="detail-value">{{ task.result.allocation.score?.toFixed(4) }}</span>
-                </div>
-              </div>
-            </div>
+            <el-col :xs="24" :sm="12" :lg="6" class="mb-3" v-if="task.result?.decision === 'trade'">
+              <el-card shadow="never" class="h-100">
+                <template #header><div class="card-title">交易详情</div></template>
+                <el-descriptions :column="1" border size="small">
+                  <el-descriptions-item label="方向">
+                    <el-tag :type="task.result.allocation.side === 'YES' ? 'success' : 'danger'" size="small">
+                      {{ task.result.allocation.side }}
+                    </el-tag>
+                  </el-descriptions-item>
+                  <el-descriptions-item label="投入">${{ task.result.allocation.dollars?.toFixed(2) }}</el-descriptions-item>
+                  <el-descriptions-item label="份额">{{ task.result.allocation.shares?.toFixed(2) }}</el-descriptions-item>
+                  <el-descriptions-item label="成本">{{ (task.result.allocation.cost * 100)?.toFixed(1) }}%</el-descriptions-item>
+                  <el-descriptions-item label="仓位">{{ (task.result.allocation.fraction_of_gross * 100)?.toFixed(2) }}%</el-descriptions-item>
+                  <el-descriptions-item label="评分">{{ task.result.allocation.score?.toFixed(4) }}</el-descriptions-item>
+                </el-descriptions>
+              </el-card>
+            </el-col>
 
             <!-- 市场信息 -->
-            <div class="info-card market-info-card">
-              <div class="card-title">市场信息</div>
-              <div class="market-details">
-                <div class="detail-row">
-                  <span class="detail-label">市场ID</span>
-                  <span class="detail-value small">{{ task.metadata?.market?.id }}</span>
-                </div>
-                <div class="detail-row">
-                  <span class="detail-label">流动性</span>
-                  <span class="detail-value">${{ formatNumber(task.metadata?.market?.liquidity) }}</span>
-                </div>
-                <div class="detail-row">
-                  <span class="detail-label">交易量</span>
-                  <span class="detail-value">${{ formatNumber(task.metadata?.market?.volume) }}</span>
-                </div>
-                <div class="detail-row">
-                  <span class="detail-label">风险因子</span>
-                  <span class="detail-value">{{ formatPercent(task.metadata?.analysis?.a) }}</span>
-                </div>
-              </div>
-            </div>
-          </div>
+            <el-col :xs="24" :sm="12" :lg="6" class="mb-3">
+              <el-card shadow="never" class="h-100">
+                <template #header><div class="card-title">市场信息</div></template>
+                <el-descriptions :column="1" border size="small">
+                  <el-descriptions-item label="ID">
+                    <el-tooltip :content="task.metadata?.market?.id" placement="top">
+                      <span class="text-truncate d-block" style="max-width: 100px;">{{ task.metadata?.market?.id }}</span>
+                    </el-tooltip>
+                  </el-descriptions-item>
+                  <el-descriptions-item label="流动性">${{ formatNumber(task.metadata?.market?.liquidity) }}</el-descriptions-item>
+                  <el-descriptions-item label="交易量">${{ formatNumber(task.metadata?.market?.volume) }}</el-descriptions-item>
+                  <el-descriptions-item label="风险因子">{{ formatPercent(task.metadata?.analysis?.a) }}</el-descriptions-item>
+                </el-descriptions>
+              </el-card>
+            </el-col>
+          </el-row>
 
           <!-- AI分析理由 -->
           <div class="analysis-reasons" v-if="task.metadata?.analysis">
-            <div class="reasons-section" v-if="task.metadata.analysis.reasons_y?.length">
-              <div class="reasons-header">
-                <span class="reasons-icon">✓</span>
-                <span class="reasons-title">支持理由</span>
-              </div>
-              <ul class="reasons-list">
-                <li v-for="(reason, idx) in task.metadata.analysis.reasons_y" :key="idx">{{ reason }}</li>
-              </ul>
-            </div>
-            <div class="reasons-section" v-if="task.metadata.analysis.reasons_n?.length">
-              <div class="reasons-header">
-                <span class="reasons-icon">✗</span>
-                <span class="reasons-title">反对理由</span>
-              </div>
-              <ul class="reasons-list">
-                <li v-for="(reason, idx) in task.metadata.analysis.reasons_n" :key="idx">{{ reason }}</li>
-              </ul>
-            </div>
+            <el-row :gutter="20">
+              <el-col :span="12" v-if="task.metadata.analysis.reasons_y?.length">
+                <el-alert title="支持理由" type="success" :closable="false" show-icon>
+                  <ul class="reasons-list">
+                    <li v-for="(reason, idx) in task.metadata.analysis.reasons_y" :key="idx">{{ reason }}</li>
+                  </ul>
+                </el-alert>
+              </el-col>
+              <el-col :span="12" v-if="task.metadata.analysis.reasons_n?.length">
+                <el-alert title="反对理由" type="error" :closable="false" show-icon>
+                  <ul class="reasons-list">
+                    <li v-for="(reason, idx) in task.metadata.analysis.reasons_n" :key="idx">{{ reason }}</li>
+                  </ul>
+                </el-alert>
+              </el-col>
+            </el-row>
           </div>
-        </div>
+        </el-card>
       </div>
     </div>
 
     <!-- 已完成交易列表 -->
     <div class="tasks-section">
-      <div class="section-header">
+      <div class="section-header mb-3">
         <h3>已完成交易</h3>
-        <span class="count-badge finished">{{ finishedTasks.length }}</span>
+        <el-tag type="primary" effect="dark" round class="ml-2">{{ finishedTasks.length }}</el-tag>
       </div>
 
-      <div v-if="finishedTasks.length === 0 && !loading" class="empty-state">
-        <div class="empty-icon">✅</div>
-        <p>暂无已完成的交易</p>
-      </div>
+      <el-empty v-if="finishedTasks.length === 0 && !loading" description="暂无已完成的交易" />
 
-      <div v-else class="tasks-list compact">
-        <div v-for="task in finishedTasks" :key="task.id" class="task-card finished-card">
-          <div class="finished-header">
-            <div class="finished-left">
-              <span class="task-id">任务 #{{ task.id }}</span>
-              <span :class="['side-badge', task.result?.allocation?.side?.toLowerCase()]">
-                {{ task.result?.allocation?.side }}
-              </span>
-              <span class="finished-amount">${{ task.result?.allocation?.dollars?.toFixed(2) }}</span>
+      <el-row v-else :gutter="20">
+        <el-col :xs="24" :sm="12" :lg="8" v-for="task in finishedTasks" :key="task.id" class="mb-3">
+          <el-card class="finished-card" shadow="hover" :body-style="{ padding: '15px' }">
+            <div class="finished-header">
+              <div class="finished-left">
+                <span class="task-id">#{{ task.id }}</span>
+                <el-tag 
+                  :type="task.result?.allocation?.side === 'YES' ? 'success' : 'danger'" 
+                  size="small" 
+                  effect="dark"
+                >
+                  {{ task.result?.allocation?.side }}
+                </el-tag>
+                <span class="finished-amount">${{ task.result?.allocation?.dollars?.toFixed(2) }}</span>
+              </div>
+              <span class="task-time text-secondary" style="font-size: 12px;">{{ formatTime(task.update_time) }}</span>
             </div>
-            <span class="task-time">{{ formatTime(task.update_time) }}</span>
-          </div>
-          <div class="finished-question">{{ task.metadata?.market?.question }}</div>
-        </div>
-      </div>
+            <div class="finished-question mt-2">{{ task.metadata?.market?.question }}</div>
+          </el-card>
+        </el-col>
+      </el-row>
     </div>
   </div>
 </template>
@@ -219,6 +218,7 @@
 <script>
 import { ref, onMounted, onBeforeUnmount } from 'vue'
 import { getPendingTradeTasks, getTasks } from '@/api/tasks'
+import { Refresh } from '@element-plus/icons-vue'
 
 export default {
   name: 'Trade',
@@ -374,121 +374,182 @@ export default {
       formatPercent,
       calculateDiff,
       formatDiff,
-      getDiffClass
+      getDiffClass,
+      Refresh
     }
   }
 }
 </script>
 
 <style scoped>
-.trade-container { padding: 20px; max-width: 1400px; margin: 0 auto; }
-.trade-header { margin-bottom: 12px; }
-.trade-header h2 { font-size: 18px; color: #333; margin: 0; }
+.trade-container { 
+  padding: 20px; 
+  max-width: 1400px; 
+  margin: 0 auto; 
+}
 
-.action-panel { display: flex; gap: 10px; margin-bottom: 20px; }
-.btn { height: 40px; padding: 0 20px; border: none; border-radius: 6px; font-size: 14px; cursor: pointer; transition: background 0.2s; }
-.btn-primary { background: #20a53a; color: #fff; }
-.btn-primary:hover:not(:disabled) { background: #1a8c31; }
-.btn:disabled { background: #ccc; cursor: not-allowed; }
+.header-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
 
-.error-message { padding: 12px 15px; background: #ffebee; border: 1px solid #ef5350; border-radius: 6px; color: #c62828; margin-bottom: 20px; }
+.header-actions h2 {
+  font-size: 20px;
+  color: var(--text-color);
+  margin: 0;
+}
 
-.section-header { display: flex; align-items: center; gap: 10px; margin-bottom: 15px; }
-.section-header h3 { font-size: 16px; color: #333; margin: 0; }
-.count-badge { padding: 3px 10px; background: #20a53a; color: #fff; border-radius: 12px; font-size: 12px; font-weight: 600; }
-.count-badge.finished { background: #2196f3; }
+.section-header {
+  display: flex;
+  align-items: center;
+}
 
-.empty-state { text-align: center; padding: 60px 20px; background: #fff; border: 1px solid #ddd; border-radius: 8px; }
-.empty-icon { font-size: 48px; margin-bottom: 15px; }
-.empty-state p { color: #666; margin: 0; }
-
-.tasks-list { display: flex; flex-direction: column; gap: 20px; }
-.task-card { background: #fff; border: 1px solid #e0e0e0; border-radius: 8px; padding: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+.section-header h3 {
+  font-size: 18px;
+  color: var(--text-color);
+  margin: 0;
+}
 
 /* 任务头部 */
-.task-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; padding-bottom: 12px; border-bottom: 1px solid #f0f0f0; }
-.task-header-left { display: flex; align-items: center; gap: 10px; }
-.task-id { font-weight: 600; color: #333; font-size: 14px; }
-.task-time { font-size: 12px; color: #999; }
-.marks-inline { display: flex; gap: 6px; }
-.mark-tag { padding: 2px 8px; background: #e3f2fd; color: #1976d2; border-radius: 4px; font-size: 11px; }
-
-/* 市场问题 */
-.market-question { font-size: 16px; font-weight: 500; color: #222; margin-bottom: 20px; line-height: 1.5; }
-
-/* 核心信息网格 */
-.core-info-grid { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 15px; margin-bottom: 20px; }
-
-/* 信息卡片 */
-.info-card { background: #fafafa; border: 1px solid #e8e8e8; border-radius: 6px; padding: 15px; }
-.card-title { font-size: 13px; font-weight: 600; color: #666; margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
-
-/* 概率对比卡片 */
-.probability-card { grid-column: span 1; }
-.probability-comparison { display: flex; gap: 20px; }
-.prob-column { flex: 1; }
-.prob-header { font-size: 14px; font-weight: 600; color: #333; margin-bottom: 10px; text-align: center; padding-bottom: 8px; border-bottom: 2px solid #e0e0e0; }
-.prob-row { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; }
-.prob-row.diff { margin-top: 4px; padding-top: 10px; border-top: 1px dashed #ddd; }
-.prob-label { font-size: 11px; color: #888; text-transform: uppercase; }
-.prob-value { font-size: 15px; font-weight: 600; }
-.prob-value.market { color: #666; }
-.prob-value.predict { color: #2196f3; }
-.prob-value.positive { color: #4caf50; }
-.prob-value.positive-high { color: #2e7d32; font-weight: 700; }
-.prob-value.negative { color: #f44336; }
-.prob-value.negative-high { color: #c62828; font-weight: 700; }
-.prob-value.neutral { color: #999; }
-
-/* 交易操作 */
-.trade-action { margin-top: 12px; padding-top: 12px; border-top: 1px solid #e0e0e0; text-align: center; }
-.action-badge { display: inline-block; padding: 6px 12px; border-radius: 4px; font-size: 12px; font-weight: 600; margin-bottom: 6px; }
-.action-badge.buy { background: #4caf50; color: #fff; }
-.action-badge.skip { background: #999; color: #fff; }
-.action-amount { font-size: 16px; font-weight: 700; color: #333; }
-
-/* 交易详情卡片 */
-.trade-details-card { grid-column: span 1; }
-.trade-details { display: flex; flex-direction: column; gap: 8px; }
-.detail-row { display: flex; justify-content: space-between; align-items: center; padding: 4px 0; }
-.detail-label { font-size: 11px; color: #888; text-transform: uppercase; }
-.detail-value { font-size: 14px; font-weight: 600; color: #333; }
-.detail-value.small { font-size: 11px; font-weight: 400; color: #666; word-break: break-all; }
-.detail-value.side-yes { color: #4caf50; }
-.detail-value.side-no { color: #f44336; }
-
-/* 市场信息卡片 */
-.market-info-card { grid-column: span 1; }
-.market-details { display: flex; flex-direction: column; gap: 8px; }
-
-/* AI分析理由 */
-.analysis-reasons { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
-.reasons-section { background: #f9f9f9; border-left: 3px solid #ddd; border-radius: 4px; padding: 12px; }
-.reasons-section:first-child { border-left-color: #4caf50; }
-.reasons-section:last-child { border-left-color: #f44336; }
-.reasons-header { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
-.reasons-icon { font-size: 16px; font-weight: 700; }
-.reasons-title { font-size: 13px; font-weight: 600; color: #555; }
-.reasons-list { margin: 0; padding-left: 20px; }
-.reasons-list li { font-size: 12px; color: #666; line-height: 1.6; margin-bottom: 6px; }
-
-/* 已完成交易卡片 */
-.tasks-list.compact { gap: 10px; }
-.finished-card { padding: 12px 15px; border-left: 4px solid #2196f3; background: #fafafa; }
-.finished-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
-.finished-left { display: flex; align-items: center; gap: 10px; }
-.side-badge { padding: 3px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; }
-.side-badge.yes { background: #4caf50; color: #fff; }
-.side-badge.no { background: #f44336; color: #fff; }
-.finished-amount { font-size: 14px; font-weight: 700; color: #333; }
-.finished-question { font-size: 13px; color: #666; line-height: 1.4; }
-
-.tasks-section { margin-bottom: 40px; }
-
-/* 响应式 */
-@media (max-width: 1200px) {
-  .core-info-grid { grid-template-columns: 1fr; }
-  .analysis-reasons { grid-template-columns: 1fr; }
+.task-header { 
+  display: flex; 
+  justify-content: space-between; 
+  align-items: center; 
 }
+
+.task-header-left { 
+  display: flex; 
+  align-items: center; 
+}
+
+.task-id { 
+  font-weight: bold; 
+  font-size: 16px; 
+}
+
+.market-question h3 {
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--text-color);
+  margin: 0;
+  line-height: 1.5;
+}
+
+.card-title {
+  font-size: 14px;
+  font-weight: bold;
+  color: var(--el-text-color-secondary);
+}
+
+/* 概率对比 */
+.prob-column {
+  text-align: center;
+}
+
+.prob-header {
+  font-weight: bold;
+  margin-bottom: 10px;
+  border-bottom: 2px solid var(--el-border-color-lighter);
+  padding-bottom: 5px;
+}
+
+.prob-row {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 5px;
+  font-size: 14px;
+}
+
+.prob-row.diff {
+  border-top: 1px dashed var(--el-border-color-lighter);
+  padding-top: 5px;
+  margin-top: 5px;
+}
+
+.prob-label {
+  color: var(--el-text-color-secondary);
+}
+
+.prob-value {
+  font-weight: 500;
+}
+
+.prob-value.market { color: var(--el-text-color-regular); }
+.prob-value.predict { color: var(--el-color-primary); }
+.prob-value.positive { color: var(--el-color-success); }
+.prob-value.positive-high { color: var(--el-color-success); font-weight: bold; }
+.prob-value.negative { color: var(--el-color-danger); }
+.prob-value.negative-high { color: var(--el-color-danger); font-weight: bold; }
+.prob-value.neutral { color: var(--el-text-color-secondary); }
+
+.trade-action {
+  text-align: center;
+  padding-top: 10px;
+  border-top: 1px solid var(--el-border-color-lighter);
+}
+
+.action-amount {
+  font-weight: bold;
+  font-size: 16px;
+}
+
+.reasons-list {
+  margin: 0;
+  padding-left: 15px;
+}
+
+.reasons-list li {
+  font-size: 13px;
+  margin-bottom: 4px;
+}
+
+/* 已完成交易 */
+.finished-card {
+  border-left: 4px solid var(--el-color-primary);
+}
+
+.finished-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.finished-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.finished-amount {
+  font-weight: bold;
+}
+
+.finished-question {
+  font-size: 13px;
+  color: var(--el-text-color-regular);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Utility classes */
+.mb-1 { margin-bottom: 4px; }
+.mb-2 { margin-bottom: 8px; }
+.mb-3 { margin-bottom: 12px; }
+.mb-4 { margin-bottom: 16px; }
+.ml-2 { margin-left: 8px; }
+.mr-1 { margin-right: 4px; }
+.mt-2 { margin-top: 8px; }
+.mt-3 { margin-top: 12px; }
+.h-100 { height: 100%; }
+.text-secondary { color: var(--el-text-color-secondary); }
+.text-truncate {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.d-block { display: block; }
 </style>
 

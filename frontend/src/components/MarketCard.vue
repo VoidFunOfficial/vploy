@@ -1,132 +1,153 @@
 <template>
-  <div class="market-card">
+  <el-card class="market-card mb-4" shadow="hover">
     <!-- 卡片头部 -->
-    <div class="card-header">
-      <div class="header-left">
-        <h3 class="market-question">{{ market.question }}</h3>
-        <div class="market-meta">
-          <span v-if="market.category" class="meta-item">
-            <span class="meta-icon">📁</span>
-            {{ market.category }}
-          </span>
-          <span v-if="market.end_date" class="meta-item">
-            <span class="meta-icon">⏰</span>
-            {{ formatDate(market.end_date) }}
-          </span>
+    <template #header>
+      <div class="card-header-content">
+        <div class="header-left">
+          <h3 class="market-question">{{ market.question }}</h3>
+          <div class="market-meta mt-2">
+            <el-tag v-if="market.category" type="info" effect="plain" size="small" class="mr-2">
+              <el-icon class="mr-1"><Folder /></el-icon>
+              {{ market.category }}
+            </el-tag>
+            <el-tag v-if="market.end_date" type="info" effect="plain" size="small">
+              <el-icon class="mr-1"><Timer /></el-icon>
+              {{ formatDate(market.end_date) }}
+            </el-tag>
+          </div>
+        </div>
+        <div class="market-badges">
+          <el-tag :type="market.active ? 'success' : 'info'" effect="dark" class="mr-1">
+            {{ market.active ? '活跃' : '已关闭' }}
+          </el-tag>
+          <el-tag v-if="market.negRisk" type="warning" effect="dark">
+            负风险
+          </el-tag>
         </div>
       </div>
-      <div class="market-badges">
-        <span v-if="market.active" class="badge badge-success">活跃</span>
-        <span v-else class="badge badge-gray">已关闭</span>
-        <span v-if="market.negRisk" class="badge badge-warning">负风险</span>
-      </div>
-    </div>
+    </template>
 
     <!-- 选项和价格 -->
-    <div v-if="parsedOutcomes && parsedOutcomes.length > 0" class="market-outcomes">
-      <div class="section-title">
-        <span class="title-icon">📊</span>
+    <div v-if="parsedOutcomes && parsedOutcomes.length > 0" class="market-outcomes mb-4">
+      <div class="section-title mb-2">
+        <el-icon class="mr-1"><DataLine /></el-icon>
         <span>选项和价格</span>
       </div>
       <div class="outcomes-list">
-        <div
-          v-for="(outcome, index) in parsedOutcomes"
-          :key="index"
-          class="outcome-item"
-        >
-          <span class="outcome-name">{{ outcome }}</span>
-          <span class="outcome-price">
-            {{ parsedPrices && parsedPrices[index] ? '$' + parsedPrices[index] : '-' }}
-          </span>
-        </div>
+        <el-row :gutter="10">
+          <el-col :xs="24" :sm="12" :md="8" v-for="(outcome, index) in parsedOutcomes" :key="index" class="mb-2">
+            <div class="outcome-item">
+              <span class="outcome-name text-truncate">{{ outcome }}</span>
+              <span class="outcome-price">
+                {{ parsedPrices && parsedPrices[index] ? '$' + parsedPrices[index] : '-' }}
+              </span>
+            </div>
+          </el-col>
+        </el-row>
       </div>
     </div>
 
     <!-- 统计数据 -->
-    <div class="stats-grid">
-      <div v-if="market.volume" class="stat-card">
-        <div class="stat-icon">💰</div>
-        <div class="stat-content">
-          <div class="stat-label">交易量</div>
-          <div class="stat-value">${{ formatNumber(market.volume) }}</div>
-        </div>
-      </div>
-      <div v-if="market.liquidity" class="stat-card">
-        <div class="stat-icon">💧</div>
-        <div class="stat-content">
-          <div class="stat-label">流动性</div>
-          <div class="stat-value">${{ formatNumber(market.liquidity) }}</div>
-        </div>
-      </div>
-      <div v-if="market.events && market.events.length > 0" class="stat-card">
-        <div class="stat-icon">🎯</div>
-        <div class="stat-content">
-          <div class="stat-label">关联事件</div>
-          <div class="stat-value">{{ market.events.length }} 个</div>
-        </div>
-      </div>
-    </div>
+    <el-row :gutter="20" class="mb-4">
+      <el-col :xs="24" :sm="8" v-if="market.volume">
+        <el-card shadow="never" class="stat-card">
+          <div class="stat-content">
+            <div class="stat-icon-wrapper"><el-icon><Money /></el-icon></div>
+            <div>
+              <div class="stat-label">交易量</div>
+              <div class="stat-value">${{ formatNumber(market.volume) }}</div>
+            </div>
+          </div>
+        </el-card>
+      </el-col>
+      <el-col :xs="24" :sm="8" v-if="market.liquidity">
+        <el-card shadow="never" class="stat-card">
+          <div class="stat-content">
+            <div class="stat-icon-wrapper"><el-icon><Coin /></el-icon></div>
+            <div>
+              <div class="stat-label">流动性</div>
+              <div class="stat-value">${{ formatNumber(market.liquidity) }}</div>
+            </div>
+          </div>
+        </el-card>
+      </el-col>
+      <el-col :xs="24" :sm="8" v-if="market.events && market.events.length > 0">
+        <el-card shadow="never" class="stat-card">
+          <div class="stat-content">
+            <div class="stat-icon-wrapper"><el-icon><Aim /></el-icon></div>
+            <div>
+              <div class="stat-label">关联事件</div>
+              <div class="stat-value">{{ market.events.length }} 个</div>
+            </div>
+          </div>
+        </el-card>
+      </el-col>
+    </el-row>
 
     <!-- 市场详细信息 -->
-    <div class="market-details">
-      <div class="detail-item">
-        <span class="detail-label">市场ID</span>
-        <span class="detail-value">{{ market.id }}</span>
-      </div>
-      <div class="detail-item">
-        <span class="detail-label">Slug</span>
-        <span class="detail-value">{{ market.slug }}</span>
-      </div>
-      <div v-if="market.closedTime" class="detail-item">
-        <span class="detail-label">关闭时间</span>
-        <span class="detail-value">{{ formatDate(market.closedTime) }}</span>
-      </div>
-    </div>
+    <el-descriptions border :column="1" class="mb-4">
+      <el-descriptions-item label="市场ID">
+        <span class="font-monospace">{{ market.id }}</span>
+      </el-descriptions-item>
+      <el-descriptions-item label="Slug">
+        <span class="font-monospace">{{ market.slug }}</span>
+      </el-descriptions-item>
+      <el-descriptions-item v-if="market.closedTime" label="关闭时间">
+        {{ formatDate(market.closedTime) }}
+      </el-descriptions-item>
+    </el-descriptions>
 
     <!-- 标签 -->
-    <div v-if="market.tags && market.tags.length > 0" class="market-tags">
-      <div class="section-title">
-        <span class="title-icon">🏷️</span>
+    <div v-if="market.tags && market.tags.length > 0" class="mb-4">
+      <div class="section-title mb-2">
+        <el-icon class="mr-1"><PriceTag /></el-icon>
         <span>标签</span>
       </div>
       <div class="tags-list">
-        <span v-for="tag in market.tags" :key="tag.id" class="tag">
+        <el-tag v-for="tag in market.tags" :key="tag.id" size="small" class="mr-2 mb-2">
           {{ tag.label }}
-        </span>
+        </el-tag>
       </div>
     </div>
 
     <!-- 自定义标记 -->
-    <div v-if="market.marks && market.marks.length > 0" class="market-marks">
-      <div class="section-title">
-        <span class="title-icon">⭐</span>
+    <div v-if="market.marks && market.marks.length > 0" class="mb-4">
+      <div class="section-title mb-2">
+        <el-icon class="mr-1"><Star /></el-icon>
         <span>标记</span>
       </div>
       <div class="marks-list">
-        <span v-for="mark in market.marks" :key="mark" class="mark">
+        <el-tag v-for="mark in market.marks" :key="mark" type="warning" size="small" class="mr-2 mb-2">
           {{ mark }}
-        </span>
+        </el-tag>
       </div>
     </div>
 
     <!-- CLOB Token IDs -->
-    <div v-if="market.clobTokenIds && market.clobTokenIds.length > 0" class="market-tokens">
-      <div class="section-title">
-        <span class="title-icon">🔑</span>
+    <div v-if="market.clobTokenIds && market.clobTokenIds.length > 0">
+      <div class="section-title mb-2">
+        <el-icon class="mr-1"><Key /></el-icon>
         <span>CLOB Token IDs</span>
       </div>
       <div class="tokens-list">
-        <span v-for="tokenId in market.clobTokenIds" :key="tokenId" class="token-id">
+        <el-tag v-for="tokenId in market.clobTokenIds" :key="tokenId" type="info" size="small" class="mr-2 mb-2 font-monospace">
           {{ tokenId }}
-        </span>
+        </el-tag>
       </div>
     </div>
-  </div>
+  </el-card>
 </template>
 
 <script>
+import { 
+  Folder, Timer, DataLine, Money, Coin, Aim, PriceTag, Star, Key 
+} from '@element-plus/icons-vue'
+
 export default {
   name: 'MarketCard',
+  components: {
+    Folder, Timer, DataLine, Money, Coin, Aim, PriceTag, Star, Key
+  },
   props: {
     market: {
       type: Object,
@@ -194,27 +215,13 @@ export default {
 
 <style scoped>
 .market-card {
-  background-color: #fff;
-  border: 1px solid #e0e0e0;
   border-radius: 8px;
-  padding: 24px;
-  margin-bottom: 20px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-  transition: box-shadow 0.2s ease;
 }
 
-.market-card:hover {
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-}
-
-/* 卡片头部 */
-.card-header {
+.card-header-content {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  margin-bottom: 20px;
-  padding-bottom: 16px;
-  border-bottom: 2px solid #f5f5f5;
 }
 
 .header-left {
@@ -223,91 +230,25 @@ export default {
 }
 
 .market-question {
-  font-size: 20px;
+  font-size: 18px;
   font-weight: 600;
-  color: #1a1a1a;
-  margin: 0 0 8px 0;
+  color: var(--el-text-color-primary);
+  margin: 0;
   line-height: 1.4;
 }
 
 .market-meta {
   display: flex;
-  gap: 12px;
-  margin-top: 6px;
   flex-wrap: wrap;
-}
-
-.meta-item {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 13px;
-  color: #666;
-}
-
-.meta-icon {
-  font-size: 14px;
-}
-
-.market-badges {
-  display: flex;
   gap: 8px;
-  flex-shrink: 0;
 }
 
-.badge {
-  padding: 5px 12px;
-  border-radius: 4px;
-  font-size: 12px;
-  font-weight: 600;
-  white-space: nowrap;
-}
-
-.badge-success {
-  background-color: #e8f5e9;
-  color: #2e7d32;
-  border: 1px solid #c8e6c9;
-}
-
-.badge-gray {
-  background-color: #f5f5f5;
-  color: #757575;
-  border: 1px solid #e0e0e0;
-}
-
-.badge-warning {
-  background-color: #fff3e0;
-  color: #e65100;
-  border: 1px solid #ffe0b2;
-}
-
-/* 通用区块标题 */
 .section-title {
   display: flex;
   align-items: center;
-  gap: 6px;
   font-size: 14px;
   font-weight: 600;
-  color: #424242;
-  margin-bottom: 12px;
-}
-
-.title-icon {
-  font-size: 16px;
-}
-
-/* 选项和价格 */
-.market-outcomes {
-  margin-bottom: 20px;
-  padding: 16px;
-  background-color: #f8f9fa;
-  border-radius: 6px;
-}
-
-.outcomes-list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+  color: var(--el-text-color-regular);
 }
 
 .outcome-item {
@@ -315,260 +256,77 @@ export default {
   justify-content: space-between;
   align-items: center;
   padding: 10px 14px;
-  background-color: #fff;
-  border: 1px solid #e9ecef;
+  background-color: var(--el-fill-color-light);
+  border: 1px solid var(--el-border-color-lighter);
   border-radius: 4px;
   transition: all 0.2s ease;
 }
 
 .outcome-item:hover {
-  border-color: #dee2e6;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  border-color: var(--el-border-color);
+  background-color: var(--el-fill-color);
 }
 
 .outcome-name {
   flex: 1;
-  color: #495057;
+  color: var(--el-text-color-primary);
   font-size: 14px;
   font-weight: 500;
+  margin-right: 10px;
 }
 
 .outcome-price {
-  color: #20a53a;
+  color: var(--el-color-success);
   font-weight: 700;
   font-size: 16px;
 }
 
-/* 统计数据卡片 */
-.stats-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: 12px;
-  margin-bottom: 20px;
-}
-
 .stat-card {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 14px 16px;
-  background-color: #f8f9fa;
-  border: 1px solid #e9ecef;
-  border-radius: 6px;
-  transition: all 0.2s ease;
-}
-
-.stat-card:hover {
-  background-color: #e9ecef;
-  border-color: #dee2e6;
-}
-
-.stat-icon {
-  font-size: 24px;
-  flex-shrink: 0;
+  height: 100%;
 }
 
 .stat-content {
-  flex: 1;
-  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.stat-icon-wrapper {
+  font-size: 24px;
+  color: var(--el-color-primary);
+  background: var(--el-color-primary-light-9);
+  padding: 10px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .stat-label {
   font-size: 12px;
-  color: #6c757d;
+  color: var(--el-text-color-secondary);
   margin-bottom: 4px;
 }
 
 .stat-value {
-  font-size: 16px;
+  font-size: 18px;
   font-weight: 600;
-  color: #212529;
+  color: var(--el-text-color-primary);
+}
+
+/* Utility classes */
+.mb-2 { margin-bottom: 8px; }
+.mb-4 { margin-bottom: 16px; }
+.mt-2 { margin-top: 8px; }
+.mr-1 { margin-right: 4px; }
+.mr-2 { margin-right: 8px; }
+.text-truncate {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-
-/* 市场详细信息 */
-.market-details {
-  margin-bottom: 20px;
-  padding: 16px;
-  background-color: #fafafa;
-  border-radius: 6px;
-}
-
-.detail-item {
-  display: flex;
-  justify-content: space-between;
-  padding: 8px 0;
-  border-bottom: 1px solid #f0f0f0;
-}
-
-.detail-item:last-child {
-  border-bottom: none;
-}
-
-.detail-label {
-  font-size: 13px;
-  color: #757575;
-  font-weight: 500;
-}
-
-.detail-value {
-  font-size: 13px;
-  color: #424242;
-  text-align: right;
-  word-break: break-all;
-  max-width: 60%;
-}
-
-/* 标签、标记、Token IDs */
-.market-tags,
-.market-marks,
-.market-tokens {
-  margin-bottom: 20px;
-}
-
-.tags-list,
-.marks-list,
-.tokens-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.tag {
-  padding: 6px 12px;
-  background-color: #e3f2fd;
-  color: #1565c0;
-  border: 1px solid #bbdefb;
-  border-radius: 4px;
-  font-size: 12px;
-  font-weight: 500;
-  transition: all 0.2s ease;
-}
-
-.tag:hover {
-  background-color: #bbdefb;
-}
-
-.mark {
-  padding: 6px 12px;
-  background-color: #f3e5f5;
-  color: #6a1b9a;
-  border: 1px solid #e1bee7;
-  border-radius: 4px;
-  font-size: 12px;
-  font-weight: 500;
-  transition: all 0.2s ease;
-}
-
-.mark:hover {
-  background-color: #e1bee7;
-}
-
-.token-id {
-  padding: 6px 12px;
-  background-color: #fff3e0;
-  color: #e65100;
-  border: 1px solid #ffe0b2;
-  border-radius: 4px;
-  font-size: 11px;
-  font-weight: 500;
+.font-monospace {
   font-family: monospace;
-  transition: all 0.2s ease;
-}
-
-.token-id:hover {
-  background-color: #ffe0b2;
-}
-
-/* 移动端适配 */
-@media (max-width: 768px) {
-  .market-card {
-    padding: 16px;
-  }
-
-  .card-header {
-    flex-direction: column;
-    gap: 12px;
-  }
-
-  .header-left {
-    margin-right: 0;
-  }
-
-  .market-question {
-    font-size: 18px;
-  }
-
-  .market-badges {
-    align-self: flex-start;
-  }
-
-  .market-outcomes {
-    padding: 14px;
-  }
-
-  .outcome-item {
-    padding: 8px 12px;
-  }
-
-  .outcome-name {
-    font-size: 13px;
-  }
-
-  .outcome-price {
-    font-size: 15px;
-  }
-
-  .stats-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .stat-card {
-    padding: 12px 14px;
-  }
-
-  .stat-icon {
-    font-size: 20px;
-  }
-
-  .stat-value {
-    font-size: 15px;
-  }
-
-  .detail-value {
-    max-width: 50%;
-  }
-}
-
-@media (max-width: 480px) {
-  .market-card {
-    padding: 14px;
-  }
-
-  .market-question {
-    font-size: 16px;
-  }
-
-  .outcome-item {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 6px;
-  }
-
-  .stat-label {
-    font-size: 11px;
-  }
-
-  .stat-value {
-    font-size: 14px;
-  }
-
-  .detail-label,
-  .detail-value {
-    font-size: 12px;
-  }
 }
 </style>
 

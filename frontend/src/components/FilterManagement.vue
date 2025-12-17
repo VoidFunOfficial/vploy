@@ -1,182 +1,199 @@
 <template>
   <div class="filter-management">
-    <!-- 标题栏 -->
-    <div class="header">
-      <h2>过滤器管理</h2>
-    </div>
+    <el-card shadow="never" class="stats-container">
+      <template #header>
+        <div class="header">
+          <h2>过滤器管理</h2>
+        </div>
+      </template>
+      
+      <el-row :gutter="20">
+        <el-col :span="4" :xs="12">
+          <el-statistic title="总配置项" :value="summary.total" />
+        </el-col>
+        <el-col :span="4" :xs="12">
+          <el-statistic title="已激活" :value="summary.active" value-style="color: var(--el-color-success)" />
+        </el-col>
+        <el-col :span="4" :xs="12">
+          <el-statistic title="未激活" :value="summary.inactive" value-style="color: var(--el-color-info)" />
+        </el-col>
+        <el-col :span="4" :xs="12">
+          <el-statistic title="Tag 黑名单" :value="summary.by_type.tag || 0" />
+        </el-col>
+        <el-col :span="4" :xs="12">
+          <el-statistic title="标题关键词" :value="summary.by_type.title_keyword || 0" />
+        </el-col>
+        <el-col :span="4" :xs="12">
+          <el-statistic title="描述关键词" :value="summary.by_type.description_keyword || 0" />
+        </el-col>
+      </el-row>
+    </el-card>
 
-    <!-- 统计卡片 -->
-    <div class="stats-cards">
-      <div class="stat-card">
-        <div class="stat-label">总配置项</div>
-        <div class="stat-value">{{ summary.total }}</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-label">已激活</div>
-        <div class="stat-value active">{{ summary.active }}</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-label">未激活</div>
-        <div class="stat-value inactive">{{ summary.inactive }}</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-label">Tag 黑名单</div>
-        <div class="stat-value">{{ summary.by_type.tag || 0 }}</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-label">标题关键词</div>
-        <div class="stat-value">{{ summary.by_type.title_keyword || 0 }}</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-label">描述关键词</div>
-        <div class="stat-value">{{ summary.by_type.description_keyword || 0 }}</div>
-      </div>
-    </div>
-
-    <!-- 主体区域 -->
     <div class="main-content">
       <!-- 黑名单管理 -->
-      <div class="section">
-        <div class="section-header">
-          <h3>黑名单配置</h3>
-          <button class="btn-primary" @click="showAddDialog = true">➕ 添加黑名单</button>
-        </div>
+      <el-card shadow="never" class="section-card">
+        <template #header>
+          <div class="section-header">
+            <h3>黑名单配置</h3>
+            <el-button type="primary" :icon="Plus" @click="showAddDialog = true">添加黑名单</el-button>
+          </div>
+        </template>
 
         <!-- 过滤器 -->
-        <div class="filters">
-          <select v-model="filterType" class="filter-select">
-            <option value="">全部类型</option>
-            <option value="tag">Tag 黑名单</option>
-            <option value="title_keyword">标题关键词</option>
-            <option value="description_keyword">描述关键词</option>
-          </select>
-          <select v-model="filterStatus" class="filter-select">
-            <option value="">全部状态</option>
-            <option value="active">已激活</option>
-            <option value="inactive">未激活</option>
-          </select>
-        </div>
+        <el-form :inline="true" class="filter-form">
+          <el-form-item label="类型">
+            <el-select v-model="filterType" placeholder="全部类型" clearable style="width: 150px">
+              <el-option label="Tag 黑名单" value="tag" />
+              <el-option label="标题关键词" value="title_keyword" />
+              <el-option label="描述关键词" value="description_keyword" />
+            </el-select>
+          </el-form-item>
+          <el-form-item label="状态">
+            <el-select v-model="filterStatus" placeholder="全部状态" clearable style="width: 150px">
+              <el-option label="已激活" value="active" />
+              <el-option label="未激活" value="inactive" />
+            </el-select>
+          </el-form-item>
+        </el-form>
 
         <!-- 黑名单列表 -->
-        <div v-if="loading" class="loading">加载中...</div>
-        <div v-else-if="filteredBlacklist.length === 0" class="empty">暂无黑名单配置</div>
-        <div v-else class="blacklist-table">
-          <table>
-            <thead>
-              <tr>
-                <th>ID</th>
-                <th>类型</th>
-                <th>值</th>
-                <th>状态</th>
-                <th>创建时间</th>
-                <th>操作</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="item in filteredBlacklist" :key="item.id">
-                <td>{{ item.id }}</td>
-                <td>
-                  <span :class="['type-badge', item.blacklist_type]">
-                    {{ getTypeLabel(item.blacklist_type) }}
-                  </span>
-                </td>
-                <td class="value-cell">{{ item.value }}</td>
-                <td>
-                  <span :class="['status-badge', item.is_active ? 'active' : 'inactive']">
-                    {{ item.is_active ? '已激活' : '未激活' }}
-                  </span>
-                </td>
-                <td>{{ formatDate(item.created_at) }}</td>
-                <td class="actions-cell">
-                  <button 
-                    class="btn-toggle" 
-                    @click="toggleBlacklist(item)"
-                    :title="item.is_active ? '禁用' : '启用'"
-                  >
-                    {{ item.is_active ? '🔴' : '🟢' }}
-                  </button>
-                  <button class="btn-delete" @click="confirmDelete(item)" title="删除">🗑️</button>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
+        <el-table
+          v-loading="loading"
+          :data="filteredBlacklist"
+          style="width: 100%"
+          border
+          stripe
+        >
+          <el-table-column prop="id" label="ID" width="80" />
+          <el-table-column label="类型" width="150">
+            <template #default="{ row }">
+              <el-tag :type="getTypeTag(row.blacklist_type)">
+                {{ getTypeLabel(row.blacklist_type) }}
+              </el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column prop="value" label="值" min-width="200" show-overflow-tooltip />
+          <el-table-column label="状态" width="100">
+            <template #default="{ row }">
+              <el-tag :type="row.is_active ? 'success' : 'info'">
+                {{ row.is_active ? '已激活' : '未激活' }}
+              </el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column label="创建时间" width="180">
+            <template #default="{ row }">
+              {{ formatDate(row.created_at) }}
+            </template>
+          </el-table-column>
+          <el-table-column label="操作" width="150" fixed="right">
+            <template #default="{ row }">
+              <el-button
+                :type="row.is_active ? 'warning' : 'success'"
+                size="small"
+                circle
+                :icon="row.is_active ? VideoPause : VideoPlay"
+                @click="toggleBlacklist(row)"
+                :title="row.is_active ? '禁用' : '启用'"
+              />
+              <el-button
+                type="danger"
+                size="small"
+                circle
+                :icon="Delete"
+                @click="confirmDelete(row)"
+                title="删除"
+              />
+            </template>
+          </el-table-column>
+        </el-table>
+        <el-empty v-if="!loading && filteredBlacklist.length === 0" description="暂无黑名单配置" />
+      </el-card>
 
       <!-- 已处理事件管理 -->
-      <div class="section">
-        <div class="section-header">
-          <h3>已处理事件 ({{ processedTotal }})</h3>
-          <button class="btn-danger" @click="confirmClearProcessed">🗑️ 清空所有</button>
-        </div>
+      <el-card shadow="never" class="section-card">
+        <template #header>
+          <div class="section-header">
+            <h3>已处理事件 ({{ processedTotal }})</h3>
+            <el-button type="danger" :icon="Delete" @click="confirmClearProcessed">清空所有</el-button>
+          </div>
+        </template>
 
         <!-- 已处理事件列表 -->
-        <div v-if="loadingProcessed" class="loading">加载中...</div>
-        <div v-else-if="processedMarkets.length === 0" class="empty">暂无已处理事件</div>
-        <div v-else class="processed-table">
-          <table>
-            <thead>
-              <tr>
-                <th>ID</th>
-                <th>Market ID</th>
-                <th>处理时间</th>
-                <th>操作</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="item in processedMarkets" :key="item.id">
-                <td>{{ item.id }}</td>
-                <td class="market-id-cell">{{ item.market_id }}</td>
-                <td>{{ formatDate(item.processed_at) }}</td>
-                <td class="actions-cell">
-                  <button class="btn-delete" @click="deleteProcessedMarket(item.market_id)" title="删除">🗑️</button>
-                </td>
-              </tr>
-            </tbody>
-          </table>
+        <el-table
+          v-loading="loadingProcessed"
+          :data="processedMarkets"
+          style="width: 100%"
+          border
+          stripe
+        >
+          <el-table-column prop="id" label="ID" width="80" />
+          <el-table-column label="Market ID" min-width="300">
+             <template #default="{ row }">
+                <span class="monospace-font">{{ row.market_id }}</span>
+             </template>
+          </el-table-column>
+          <el-table-column label="处理时间" width="180">
+            <template #default="{ row }">
+              {{ formatDate(row.processed_at) }}
+            </template>
+          </el-table-column>
+          <el-table-column label="操作" width="100" fixed="right">
+            <template #default="{ row }">
+              <el-button
+                type="danger"
+                size="small"
+                circle
+                :icon="Delete"
+                @click="deleteProcessedMarket(row.market_id)"
+                title="删除"
+              />
+            </template>
+          </el-table-column>
+        </el-table>
 
-          <!-- 分页 -->
-          <div class="pagination">
-            <button :disabled="processedOffset === 0" @click="loadProcessedMarkets(processedOffset - processedLimit)">
-              上一页
-            </button>
-            <span class="page-info">
-              显示 {{ processedOffset + 1 }} - {{ Math.min(processedOffset + processedLimit, processedTotal) }} / {{ processedTotal }}
-            </span>
-            <button :disabled="processedOffset + processedLimit >= processedTotal" @click="loadProcessedMarkets(processedOffset + processedLimit)">
-              下一页
-            </button>
-          </div>
+        <!-- 分页 -->
+        <div class="pagination-container">
+          <el-pagination
+            v-model:current-page="currentPage"
+            v-model:page-size="processedLimit"
+            :total="processedTotal"
+            layout="total, prev, pager, next"
+            @current-change="handlePageChange"
+          />
         </div>
-      </div>
+      </el-card>
     </div>
 
     <!-- 添加黑名单对话框 -->
-    <Modal
-      v-model:visible="showAddDialog"
+    <el-dialog
+      v-model="showAddDialog"
       title="添加黑名单"
-      size="small"
-      @confirm="addBlacklist"
+      width="500px"
+      :close-on-click-modal="false"
     >
-      <div class="form-group">
-        <label>类型</label>
-        <select v-model="newBlacklist.type" class="form-control">
-          <option value="tag">Tag 黑名单</option>
-          <option value="title_keyword">标题关键词</option>
-          <option value="description_keyword">描述关键词</option>
-        </select>
-      </div>
-      <div class="form-group">
-        <label>值</label>
-        <input
-          v-model="newBlacklist.value"
-          type="text"
-          class="form-control"
-          placeholder="请输入黑名单值"
-          @keyup.enter="addBlacklist"
-        />
-      </div>
-    </Modal>
+      <el-form :model="newBlacklist" label-width="80px">
+        <el-form-item label="类型">
+          <el-select v-model="newBlacklist.type" style="width: 100%">
+            <el-option label="Tag 黑名单" value="tag" />
+            <el-option label="标题关键词" value="title_keyword" />
+            <el-option label="描述关键词" value="description_keyword" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="值">
+          <el-input
+            v-model="newBlacklist.value"
+            placeholder="请输入黑名单值"
+            @keyup.enter="addBlacklist"
+          />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <span class="dialog-footer">
+          <el-button @click="showAddDialog = false">取消</el-button>
+          <el-button type="primary" @click="addBlacklist">确定</el-button>
+        </span>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -191,13 +208,11 @@ import {
   deleteProcessedMarket as deleteProcessedMarketApi,
   clearProcessedMarkets as clearProcessedMarketsApi
 } from '@/api/filter'
-import { toast, confirm, Modal } from '@/components/Notification'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { Plus, Delete, VideoPlay, VideoPause } from '@element-plus/icons-vue'
 
 export default {
   name: 'FilterManagement',
-  components: {
-    Modal
-  },
   setup() {
     // 数据状态
     const loading = ref(false)
@@ -218,7 +233,7 @@ export default {
     const processedMarkets = ref([])
     const processedTotal = ref(0)
     const processedLimit = ref(50)
-    const processedOffset = ref(0)
+    const currentPage = ref(1)
     
     // 对话框
     const showAddDialog = ref(false)
@@ -255,16 +270,16 @@ export default {
         }
       } catch (error) {
         console.error('获取黑名单配置失败:', error)
-        toast.error('获取黑名单配置失败')
+        ElMessage.error('获取黑名单配置失败')
       } finally {
         loading.value = false
       }
     }
 
     // 获取已处理事件
-    const loadProcessedMarkets = async (offset = 0) => {
+    const loadProcessedMarkets = async (page = 1) => {
       loadingProcessed.value = true
-      processedOffset.value = offset
+      const offset = (page - 1) * processedLimit.value
       try {
         const response = await getProcessedMarkets({
           limit: processedLimit.value,
@@ -280,17 +295,22 @@ export default {
         loadingProcessed.value = false
       }
     }
+    
+    const handlePageChange = (page) => {
+       currentPage.value = page
+       loadProcessedMarkets(page)
+    }
 
     // 刷新数据
     const refreshData = () => {
       loadBlacklist()
-      loadProcessedMarkets(processedOffset.value)
+      loadProcessedMarkets(currentPage.value)
     }
 
     // 添加黑名单
     const addBlacklist = async () => {
       if (!newBlacklist.value.value.trim()) {
-        toast.warning('请输入黑名单值')
+        ElMessage.warning('请输入黑名单值')
         return
       }
 
@@ -301,16 +321,16 @@ export default {
         })
 
         if (response.success) {
-          toast.success('添加成功')
+          ElMessage.success('添加成功')
           showAddDialog.value = false
           newBlacklist.value.value = ''
           loadBlacklist()
         } else {
-          toast.error(response.message || '添加失败')
+          ElMessage.error(response.message || '添加失败')
         }
       } catch (error) {
         console.error('添加黑名单失败:', error)
-        toast.error('添加黑名单失败')
+        ElMessage.error('添加黑名单失败')
       }
     }
 
@@ -321,20 +341,29 @@ export default {
 
         if (response.success) {
           loadBlacklist()
+          ElMessage.success(item.is_active ? '已禁用' : '已激活')
         } else {
-          toast.error(response.message || '操作失败')
+          ElMessage.error(response.message || '操作失败')
         }
       } catch (error) {
         console.error('切换黑名单状态失败:', error)
-        toast.error('操作失败')
+        ElMessage.error('操作失败')
       }
     }
 
     // 确认删除黑名单
     const confirmDelete = async (item) => {
-      const result = await confirm(`确定要删除黑名单项 "${item.value}" 吗？`)
-      if (result) {
+      try {
+        await ElMessageBox.confirm(
+          `确定要删除黑名单项 "${item.value}" 吗？`,
+          '警告',
+          { type: 'warning' }
+        )
         deleteBlacklist(item.id)
+      } catch (error) {
+        if (error !== 'cancel') {
+          console.error(error)
+        }
       }
     }
 
@@ -344,46 +373,59 @@ export default {
         const response = await deleteBlacklistApi(id)
 
         if (response.success) {
-          toast.success('删除成功')
+          ElMessage.success('删除成功')
           loadBlacklist()
         } else {
-          toast.error(response.message || '删除失败')
+          ElMessage.error(response.message || '删除失败')
         }
       } catch (error) {
         console.error('删除黑名单失败:', error)
-        toast.error('删除失败')
+        ElMessage.error('删除失败')
       }
     }
 
     // 删除已处理事件
     const deleteProcessedMarket = async (marketId) => {
-      const result = await confirm(`确定要删除已处理事件 "${marketId}" 吗？`)
-      if (!result) {
-        return
-      }
-
       try {
+        await ElMessageBox.confirm(
+          `确定要删除已处理事件 "${marketId}" 吗？`,
+          '警告',
+          { type: 'warning' }
+        )
+        
         const response = await deleteProcessedMarketApi(marketId)
 
         if (response.success) {
-          loadProcessedMarkets(processedOffset.value)
+          ElMessage.success('删除成功')
+          loadProcessedMarkets(currentPage.value)
         } else {
-          toast.error(response.message || '删除失败')
+          ElMessage.error(response.message || '删除失败')
         }
       } catch (error) {
-        console.error('删除已处理事件失败:', error)
-        toast.error('删除失败')
+        if (error !== 'cancel') {
+           console.error('删除已处理事件失败:', error)
+           ElMessage.error('删除失败')
+        }
       }
     }
 
     // 确认清空已处理事件
     const confirmClearProcessed = async () => {
-      const result = await confirm({
-        message: '确定要清空所有已处理事件吗？此操作不可恢复！',
-        type: 'danger'
-      })
-      if (result) {
+      try {
+        await ElMessageBox.confirm(
+          '确定要清空所有已处理事件吗？此操作不可恢复！',
+          '危险',
+          { 
+             type: 'error',
+             confirmButtonText: '清空',
+             cancelButtonText: '取消'
+          }
+        )
         clearProcessedMarkets()
+      } catch (error) {
+         if (error !== 'cancel') {
+            console.error(error)
+         }
       }
     }
 
@@ -393,14 +435,15 @@ export default {
         const response = await clearProcessedMarketsApi()
 
         if (response.success) {
-          toast.success(`已清空 ${response.data.cleared_count} 条记录`)
-          loadProcessedMarkets(0)
+          ElMessage.success(`已清空 ${response.data.cleared_count} 条记录`)
+          loadProcessedMarkets(1)
+          currentPage.value = 1
         } else {
-          toast.error(response.message || '清空失败')
+          ElMessage.error(response.message || '清空失败')
         }
       } catch (error) {
         console.error('清空已处理事件失败:', error)
-        toast.error('清空失败')
+        ElMessage.error('清空失败')
       }
     }
 
@@ -420,11 +463,20 @@ export default {
       }
       return labels[type] || type
     }
+    
+    const getTypeTag = (type) => {
+       const map = {
+          'tag': '',
+          'title_keyword': 'warning',
+          'description_keyword': 'success'
+       }
+       return map[type] || 'info'
+    }
 
     // 初始化
     onMounted(() => {
       loadBlacklist()
-      loadProcessedMarkets(0)
+      loadProcessedMarkets(1)
     })
 
     return {
@@ -438,7 +490,7 @@ export default {
       processedMarkets,
       processedTotal,
       processedLimit,
-      processedOffset,
+      currentPage,
       showAddDialog,
       newBlacklist,
       refreshData,
@@ -448,8 +500,11 @@ export default {
       deleteProcessedMarket,
       confirmClearProcessed,
       loadProcessedMarkets,
+      handlePageChange,
       formatDate,
-      getTypeLabel
+      getTypeLabel,
+      getTypeTag,
+      Plus, Delete, VideoPlay, VideoPause
     }
   }
 }
@@ -458,316 +513,56 @@ export default {
 <style scoped>
 .filter-management {
   padding: 20px;
+  max-width: 1400px;
+  margin: 0 auto;
 }
 
-/* 标题栏 */
-.header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
+.stats-container {
   margin-bottom: 20px;
 }
 
 .header h2 {
   margin: 0;
-  font-size: 24px;
-  color: #333;
+  font-size: 18px;
+  color: #303133;
 }
 
-.header-actions {
-  display: flex;
-  gap: 10px;
-}
-
-/* 统计卡片 */
-.stats-cards {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: 15px;
-  margin-bottom: 30px;
-}
-
-.stat-card {
-  background: #fff;
-  border: 1px solid #e0e0e0;
-  padding: 15px;
-  text-align: center;
-}
-
-.stat-label {
-  font-size: 12px;
-  color: #666;
-  margin-bottom: 8px;
-}
-
-.stat-value {
-  font-size: 24px;
-  font-weight: bold;
-  color: #333;
-}
-
-.stat-value.active {
-  color: #52c41a;
-}
-
-.stat-value.inactive {
-  color: #999;
-}
-
-/* 主体区域 */
 .main-content {
   display: flex;
   flex-direction: column;
-  gap: 30px;
+  gap: 20px;
 }
 
-/* 区块 */
-.section {
-  background: #fff;
-  border: 1px solid #e0e0e0;
-  padding: 20px;
+.section-card {
+  margin-bottom: 20px;
 }
 
 .section-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 20px;
 }
 
 .section-header h3 {
   margin: 0;
-  font-size: 18px;
-  color: #333;
+  font-size: 16px;
+  font-weight: 600;
+  color: #303133;
 }
 
-/* 过滤器 */
-.filters {
-  display: flex;
-  gap: 10px;
+.filter-form {
   margin-bottom: 20px;
 }
 
-.filter-select {
-  padding: 8px 12px;
-  border: 1px solid #d9d9d9;
-  background: #fff;
-  font-size: 14px;
-  cursor: pointer;
-  color: #333;
-}
-
-/* 表格 */
-.blacklist-table table,
-.processed-table table {
-  width: 100%;
-  border-collapse: collapse;
-}
-
-.blacklist-table th,
-.blacklist-table td,
-.processed-table th,
-.processed-table td {
-  padding: 12px;
-  text-align: left;
-  border-bottom: 1px solid #f0f0f0;
-  color: #333;
-}
-
-.blacklist-table th,
-.processed-table th {
-  background: #fafafa;
-  font-weight: 600;
-  color: #333;
-}
-
-.blacklist-table tbody tr:hover,
-.processed-table tbody tr:hover {
-  background: #fafafa;
-}
-
-/* 类型标签 */
-.type-badge {
-  display: inline-block;
-  padding: 4px 8px;
-  font-size: 12px;
-  border-radius: 2px;
-  background: #e6f7ff;
-  color: #1890ff;
-}
-
-.type-badge.title_keyword {
-  background: #fff7e6;
-  color: #fa8c16;
-}
-
-.type-badge.description_keyword {
-  background: #f6ffed;
-  color: #52c41a;
-}
-
-/* 状态标签 */
-.status-badge {
-  display: inline-block;
-  padding: 4px 8px;
-  font-size: 12px;
-  border-radius: 2px;
-}
-
-.status-badge.active {
-  background: #f6ffed;
-  color: #52c41a;
-}
-
-.status-badge.inactive {
-  background: #f5f5f5;
-  color: #999;
-}
-
-/* 单元格 */
-.value-cell {
-  max-width: 300px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.market-id-cell {
-  font-family: monospace;
-  font-size: 12px;
-  color: #666;
-}
-
-.actions-cell {
-  white-space: nowrap;
-}
-
-/* 按钮 */
-.btn-refresh,
-.btn-primary,
-.btn-secondary,
-.btn-danger,
-.btn-toggle,
-.btn-delete,
-.btn-close {
-  padding: 8px 16px;
-  border: none;
-  cursor: pointer;
-  font-size: 14px;
-  background: #fff;
-  border: 1px solid #d9d9d9;
-  color: #333;
-}
-
-.btn-refresh:hover,
-.btn-toggle:hover,
-.btn-delete:hover {
-  background: #f5f5f5;
-}
-
-.btn-primary {
-  background: #1890ff;
-  color: #fff;
-  border-color: #1890ff;
-}
-
-.btn-primary:hover {
-  background: #40a9ff;
-  border-color: #40a9ff;
-}
-
-.btn-danger {
-  background: #ff4d4f;
-  color: #fff;
-  border-color: #ff4d4f;
-}
-
-.btn-danger:hover {
-  background: #ff7875;
-  border-color: #ff7875;
-}
-
-.btn-toggle {
-  padding: 4px 8px;
-  font-size: 16px;
-}
-
-.btn-delete {
-  padding: 4px 8px;
-  font-size: 16px;
-  margin-left: 5px;
-}
-
-/* 分页 */
-.pagination {
+.pagination-container {
+  margin-top: 20px;
   display: flex;
   justify-content: center;
-  align-items: center;
-  gap: 15px;
-  margin-top: 20px;
 }
 
-.pagination button {
-  padding: 8px 16px;
-  border: 1px solid #d9d9d9;
-  background: #fff;
-  cursor: pointer;
-  color: #333;
-}
-
-.pagination button:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.pagination button:not(:disabled):hover {
-  background: #f5f5f5;
-}
-
-.page-info {
-  color: #666;
-  font-size: 14px;
-}
-
-/* 加载和空状态 */
-.loading,
-.empty {
-  text-align: center;
-  padding: 40px;
-  color: #999;
-}
-
-
-
-/* 表单 */
-.form-group {
-  margin-bottom: 20px;
-}
-
-.form-group:last-child {
-  margin-bottom: 0;
-}
-
-.form-group label {
-  display: block;
-  margin-bottom: 8px;
-  font-weight: 600;
-  color: #333;
-}
-
-.form-control {
-  width: 100%;
-  padding: 8px 12px;
-  border: 1px solid #d9d9d9;
-  font-size: 14px;
-  box-sizing: border-box;
-  color: #333;
-  background: #fff;
-}
-
-.form-control:focus {
-  outline: none;
-  border-color: #1890ff;
+.monospace-font {
+   font-family: monospace;
+   color: #606266;
 }
 </style>
 

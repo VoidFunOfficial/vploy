@@ -1,247 +1,222 @@
 <template>
   <div class="profit-chart">
     <!-- 标题栏 -->
-    <div class="header">
-      <h2>收益曲线</h2>
-      <div class="header-actions">
-        <button class="btn-config" @click="openConfigDialog">钱包配置</button>
-        <button class="btn-primary" @click="showAddDialog = true">添加记录</button>
+    <div class="header-actions mb-4">
+      <div class="left">
+        <h2>收益曲线</h2>
+      </div>
+      <div class="right">
+        <el-button-group>
+          <el-button type="primary" :icon="Wallet" @click="openConfigDialog">钱包配置</el-button>
+          <el-button type="success" :icon="Plus" @click="showAddDialog = true">添加记录</el-button>
+        </el-button-group>
       </div>
     </div>
 
     <!-- 筛选区域 -->
-    <div class="filter-section">
-      <div class="filter-item">
-        <label>开始日期:</label>
-        <input type="date" v-model="filters.startDate" @change="loadData" />
-      </div>
-      <div class="filter-item">
-        <label>结束日期:</label>
-        <input type="date" v-model="filters.endDate" @change="loadData" />
-      </div>
-      <div class="filter-item">
-        <button class="btn-secondary" @click="resetFilters">重置</button>
-      </div>
-    </div>
+    <el-card shadow="never" class="mb-4">
+      <el-form :inline="true" :model="filters" class="filter-form">
+        <el-form-item label="开始日期">
+          <el-date-picker
+            v-model="filters.startDate"
+            type="date"
+            placeholder="选择开始日期"
+            value-format="YYYY-MM-DD"
+            @change="loadData"
+            style="width: 150px"
+          />
+        </el-form-item>
+        <el-form-item label="结束日期">
+          <el-date-picker
+            v-model="filters.endDate"
+            type="date"
+            placeholder="选择结束日期"
+            value-format="YYYY-MM-DD"
+            @change="loadData"
+            style="width: 150px"
+          />
+        </el-form-item>
+        <el-form-item>
+          <el-button @click="resetFilters" :icon="Refresh">重置</el-button>
+        </el-form-item>
+      </el-form>
+    </el-card>
 
     <!-- 图表区域 -->
-    <div class="chart-container">
+    <el-card shadow="hover" class="mb-4 chart-card">
       <div ref="chartRef" class="chart"></div>
-    </div>
+    </el-card>
 
     <!-- 数据表格 -->
-    <div class="data-table">
-      <h3>收益记录</h3>
-      <table>
-        <thead>
-          <tr>
-            <th>日期</th>
-            <th>预期收益</th>
-            <th>实际收益</th>
-            <th>总资金</th>
-            <th>成功市场</th>
-            <th>失败市场</th>
-            <th>备注</th>
-            <th>操作</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="record in records" :key="record.record_date">
-            <td>{{ record.record_date }}</td>
-            <td :class="getProfitClass(record.expect_profit)">
-              {{ formatNumber(record.expect_profit) }}
-            </td>
-            <td :class="getProfitClass(record.real_profit)">
-              {{ formatNumber(record.real_profit) }}
-            </td>
-            <td>{{ formatNumber(record.total_fund) }}</td>
-            <td>{{ record.success_market }}</td>
-            <td>{{ record.lost_market }}</td>
-            <td>{{ record.notes || '-' }}</td>
-            <td>
-              <button class="btn-edit" @click="editRecord(record)">编辑</button>
-              <button class="btn-delete" @click="deleteRecord(record.record_date)">删除</button>
-            </td>
-          </tr>
-          <tr v-if="records.length === 0">
-            <td colspan="8" style="text-align: center; color: #999;">暂无数据</td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
+    <el-card shadow="hover" class="data-table-card">
+      <template #header>
+        <div class="card-header">
+          <span>收益记录</span>
+        </div>
+      </template>
+      <el-table :data="records" style="width: 100%" border stripe v-loading="loading">
+        <el-table-column prop="record_date" label="日期" width="120" sortable />
+        <el-table-column prop="expect_profit" label="预期收益" width="120">
+          <template #default="scope">
+            <span :class="getProfitClass(scope.row.expect_profit)">
+              {{ formatNumber(scope.row.expect_profit) }}
+            </span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="real_profit" label="实际收益" width="120">
+          <template #default="scope">
+            <span :class="getProfitClass(scope.row.real_profit)">
+              {{ formatNumber(scope.row.real_profit) }}
+            </span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="total_fund" label="总资金" width="120">
+          <template #default="scope">{{ formatNumber(scope.row.total_fund) }}</template>
+        </el-table-column>
+        <el-table-column prop="success_market" label="成功市场" width="100" align="center" />
+        <el-table-column prop="lost_market" label="失败市场" width="100" align="center" />
+        <el-table-column prop="notes" label="备注" show-overflow-tooltip />
+        <el-table-column label="操作" width="150" fixed="right" align="center">
+          <template #default="scope">
+            <el-button link type="primary" size="small" :icon="Edit" @click="editRecord(scope.row)">编辑</el-button>
+            <el-popconfirm title="确定要删除此记录吗？" @confirm="deleteRecord(scope.row.record_date)">
+              <template #reference>
+                <el-button link type="danger" size="small" :icon="Delete">删除</el-button>
+              </template>
+            </el-popconfirm>
+          </template>
+        </el-table-column>
+      </el-table>
+    </el-card>
 
     <!-- 添加/编辑对话框 -->
-    <Modal
-      v-model:visible="showAddDialog"
+    <el-dialog
+      v-model="showAddDialog"
       :title="editingRecord ? '编辑记录' : '添加记录'"
-      @confirm="handleSave"
+      width="500px"
+      @closed="handleDialogClose"
     >
-      <div class="form-group">
-        <label>日期 *</label>
-        <input
-          type="date"
-          v-model="formData.record_date"
-          :disabled="!!editingRecord"
-        />
-      </div>
-      <div class="form-group">
-        <label>预期收益 *</label>
-        <input
-          type="number"
-          step="0.01"
-          v-model.number="formData.expect_profit"
-          placeholder="请输入预期收益"
-        />
-      </div>
-      <div class="form-group">
-        <label>实际收益 *</label>
-        <input
-          type="number"
-          step="0.01"
-          v-model.number="formData.real_profit"
-          placeholder="请输入实际收益"
-        />
-      </div>
-      <div class="form-group">
-        <label>总资金</label>
-        <input
-          type="number"
-          step="0.01"
-          v-model.number="formData.total_fund"
-          placeholder="留空则使用当前总资金"
-        />
-      </div>
-      <div class="form-group">
-        <label>成功市场数</label>
-        <input
-          type="number"
-          v-model.number="formData.success_market"
-          placeholder="留空则使用当前值"
-        />
-      </div>
-      <div class="form-group">
-        <label>失败市场数</label>
-        <input
-          type="number"
-          v-model.number="formData.lost_market"
-          placeholder="留空则使用当前值"
-        />
-      </div>
-      <div class="form-group">
-        <label>备注</label>
-        <textarea
-          v-model="formData.notes"
-          placeholder="请输入备注信息"
-          rows="3"
-        ></textarea>
-      </div>
-    </Modal>
+      <el-form :model="formData" label-width="100px">
+        <el-form-item label="日期" required>
+          <el-date-picker
+            v-model="formData.record_date"
+            type="date"
+            placeholder="选择日期"
+            value-format="YYYY-MM-DD"
+            :disabled="!!editingRecord"
+            style="width: 100%"
+          />
+        </el-form-item>
+        <el-form-item label="预期收益" required>
+          <el-input-number v-model="formData.expect_profit" :precision="2" :step="0.1" style="width: 100%" controls-position="right" />
+        </el-form-item>
+        <el-form-item label="实际收益" required>
+          <el-input-number v-model="formData.real_profit" :precision="2" :step="0.1" style="width: 100%" controls-position="right" />
+        </el-form-item>
+        <el-form-item label="总资金">
+          <el-input-number v-model="formData.total_fund" :precision="2" :step="100" placeholder="留空则使用当前总资金" style="width: 100%" controls-position="right" />
+        </el-form-item>
+        <el-form-item label="成功市场数">
+          <el-input-number v-model="formData.success_market" :step="1" placeholder="留空则使用当前值" style="width: 100%" controls-position="right" />
+        </el-form-item>
+        <el-form-item label="失败市场数">
+          <el-input-number v-model="formData.lost_market" :step="1" placeholder="留空则使用当前值" style="width: 100%" controls-position="right" />
+        </el-form-item>
+        <el-form-item label="备注">
+          <el-input type="textarea" v-model="formData.notes" rows="3" placeholder="请输入备注信息" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <span class="dialog-footer">
+          <el-button @click="showAddDialog = false">取消</el-button>
+          <el-button type="primary" @click="handleSave" :loading="saving">保存</el-button>
+        </span>
+      </template>
+    </el-dialog>
 
     <!-- 钱包配置对话框 -->
-    <Modal
-      v-model:visible="showConfigDialog"
+    <el-dialog
+      v-model="showConfigDialog"
       title="钱包参数配置"
-      @confirm="handleConfigSave"
       width="600px"
     >
-      <div class="config-form">
-        <div class="config-section">
-          <h4>资金状态</h4>
-          <div class="form-row">
-            <div class="form-group">
-              <label>总资金</label>
-              <input
-                type="number"
-                step="0.01"
-                v-model.number="configData.total_fund"
-                placeholder="总资金"
-              />
-            </div>
-            <div class="form-group">
-              <label>锁定资金</label>
-              <input
-                type="number"
-                step="0.01"
-                v-model.number="configData.locked_fund"
-                placeholder="锁定资金"
-              />
-            </div>
-          </div>
-          <div class="form-row">
-            <div class="form-group">
-              <label>可用现金</label>
-              <input
-                type="number"
-                step="0.01"
-                v-model.number="configData.available_cash"
-                placeholder="可用现金"
-              />
-            </div>
-          </div>
-        </div>
+      <el-alert
+        title="提示：修改这些参数会直接更新钱包状态，请谨慎操作！"
+        type="warning"
+        show-icon
+        :closable="false"
+        class="mb-4"
+      />
+      
+      <el-form :model="configData" label-width="100px">
+        <div class="section-title">资金状态</div>
+        <el-row :gutter="20">
+          <el-col :span="12">
+            <el-form-item label="总资金">
+              <el-input-number v-model="configData.total_fund" :precision="2" :step="100" style="width: 100%" controls-position="right" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="锁定资金">
+              <el-input-number v-model="configData.locked_fund" :precision="2" :step="100" style="width: 100%" controls-position="right" />
+            </el-form-item>
+          </el-col>
+        </el-row>
+        <el-row :gutter="20">
+          <el-col :span="12">
+            <el-form-item label="可用现金">
+              <el-input-number v-model="configData.available_cash" :precision="2" :step="100" style="width: 100%" controls-position="right" />
+            </el-form-item>
+          </el-col>
+        </el-row>
 
-        <div class="config-section">
-          <h4>盈亏数据</h4>
-          <div class="form-row">
-            <div class="form-group">
-              <label>总亏损</label>
-              <input
-                type="number"
-                step="0.01"
-                v-model.number="configData.loss"
-                placeholder="总亏损"
-              />
-            </div>
-            <div class="form-group">
-              <label>预期盈利</label>
-              <input
-                type="number"
-                step="0.01"
-                v-model.number="configData.expect_profit"
-                placeholder="预期盈利"
-              />
-            </div>
-          </div>
-          <div class="form-row">
-            <div class="form-group">
-              <label>实际盈利</label>
-              <input
-                type="number"
-                step="0.01"
-                v-model.number="configData.real_profit"
-                placeholder="实际盈利"
-              />
-            </div>
-          </div>
-        </div>
+        <el-divider />
+        
+        <div class="section-title">盈亏数据</div>
+        <el-row :gutter="20">
+          <el-col :span="12">
+            <el-form-item label="总亏损">
+              <el-input-number v-model="configData.loss" :precision="2" :step="10" style="width: 100%" controls-position="right" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="预期盈利">
+              <el-input-number v-model="configData.expect_profit" :precision="2" :step="10" style="width: 100%" controls-position="right" />
+            </el-form-item>
+          </el-col>
+        </el-row>
+        <el-row :gutter="20">
+          <el-col :span="12">
+            <el-form-item label="实际盈利">
+              <el-input-number v-model="configData.real_profit" :precision="2" :step="10" style="width: 100%" controls-position="right" />
+            </el-form-item>
+          </el-col>
+        </el-row>
 
-        <div class="config-section">
-          <h4>市场统计</h4>
-          <div class="form-row">
-            <div class="form-group">
-              <label>成功市场数</label>
-              <input
-                type="number"
-                v-model.number="configData.success_market"
-                placeholder="成功市场数"
-              />
-            </div>
-            <div class="form-group">
-              <label>失败市场数</label>
-              <input
-                type="number"
-                v-model.number="configData.lost_market"
-                placeholder="失败市场数"
-              />
-            </div>
-          </div>
-        </div>
+        <el-divider />
 
-        <div class="config-tip">
-          <p>💡 提示：修改这些参数会直接更新钱包状态，请谨慎操作！</p>
-        </div>
-      </div>
-    </Modal>
+        <div class="section-title">市场统计</div>
+        <el-row :gutter="20">
+          <el-col :span="12">
+            <el-form-item label="成功市场数">
+              <el-input-number v-model="configData.success_market" :step="1" style="width: 100%" controls-position="right" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="失败市场数">
+              <el-input-number v-model="configData.lost_market" :step="1" style="width: 100%" controls-position="right" />
+            </el-form-item>
+          </el-col>
+        </el-row>
+      </el-form>
+
+      <template #footer>
+        <span class="dialog-footer">
+          <el-button @click="showConfigDialog = false">取消</el-button>
+          <el-button type="primary" @click="handleConfigSave" :loading="configSaving">更新配置</el-button>
+        </span>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -249,19 +224,20 @@
 import { ref, reactive, onMounted, nextTick } from 'vue'
 import * as echarts from 'echarts'
 import { getDailyRecords, addDailyRecord, updateDailyRecord, deleteDailyRecord, getPurseStatus, updatePurseStatus } from '@/api/purse'
-import { toast, confirm, Modal } from '@/components/Notification'
+import { ElMessage } from 'element-plus'
+import { Wallet, Plus, Refresh, Edit, Delete } from '@element-plus/icons-vue'
 
 export default {
   name: 'ProfitChart',
-  components: {
-    Modal
-  },
   setup() {
     const chartRef = ref(null)
     let chartInstance = null
     const records = ref([])
     const showAddDialog = ref(false)
     const editingRecord = ref(null)
+    const loading = ref(false)
+    const saving = ref(false)
+    const configSaving = ref(false)
 
     // 钱包配置对话框
     const showConfigDialog = ref(false)
@@ -382,6 +358,7 @@ export default {
 
     // 加载数据
     const loadData = async () => {
+      loading.value = true
       try {
         const params = {}
         if (filters.startDate) params.start_date = filters.startDate
@@ -393,11 +370,13 @@ export default {
           await nextTick()
           updateChart()
         } else {
-          toast.error(response.message || '加载数据失败')
+          ElMessage.error(response.message || '加载数据失败')
         }
       } catch (error) {
         console.error('加载数据失败:', error)
-        toast.error('加载数据失败')
+        ElMessage.error('加载数据失败')
+      } finally {
+        loading.value = false
       }
     }
 
@@ -436,16 +415,17 @@ export default {
           configData.lost_market = status.lost_market || 0
           showConfigDialog.value = true
         } else {
-          toast.error(response.message || '加载钱包状态失败')
+          ElMessage.error(response.message || '加载钱包状态失败')
         }
       } catch (error) {
         console.error('加载钱包状态失败:', error)
-        toast.error('加载钱包状态失败')
+        ElMessage.error('加载钱包状态失败')
       }
     }
 
     // 保存钱包配置
     const handleConfigSave = async () => {
+      configSaving.value = true
       try {
         // 构建更新数据
         const updateData = {
@@ -461,16 +441,18 @@ export default {
 
         const response = await updatePurseStatus(updateData)
         if (response.success) {
-          toast.success('钱包配置更新成功')
+          ElMessage.success('钱包配置更新成功')
           showConfigDialog.value = false
           // 刷新数据
           loadData()
         } else {
-          toast.error(response.message || '更新失败')
+          ElMessage.error(response.message || '更新失败')
         }
       } catch (error) {
         console.error('更新钱包配置失败:', error)
-        toast.error('更新钱包配置失败')
+        ElMessage.error('更新钱包配置失败')
+      } finally {
+        configSaving.value = false
       }
     }
 
@@ -491,18 +473,19 @@ export default {
     const handleSave = async () => {
       // 验证必填字段
       if (!formData.record_date) {
-        toast.error('请选择日期')
+        ElMessage.warning('请选择日期')
         return
       }
       if (formData.expect_profit === null || formData.expect_profit === undefined) {
-        toast.error('请输入预期收益')
+        ElMessage.warning('请输入预期收益')
         return
       }
       if (formData.real_profit === null || formData.real_profit === undefined) {
-        toast.error('请输入实际收益')
+        ElMessage.warning('请输入实际收益')
         return
       }
 
+      saving.value = true
       try {
         const data = {
           record_date: formData.record_date,
@@ -534,36 +517,35 @@ export default {
         }
 
         if (response.success) {
-          toast.success(response.message || '保存成功')
+          ElMessage.success(response.message || '保存成功')
           showAddDialog.value = false
           editingRecord.value = null
           resetForm()
           loadData()
         } else {
-          toast.error(response.message || '保存失败')
+          ElMessage.error(response.message || '保存失败')
         }
       } catch (error) {
         console.error('保存失败:', error)
-        toast.error('保存失败')
+        ElMessage.error('保存失败')
+      } finally {
+        saving.value = false
       }
     }
 
     // 删除记录
     const deleteRecord = async (recordDate) => {
-      const confirmed = await confirm(`确定要删除 ${recordDate} 的记录吗？`)
-      if (!confirmed) return
-
       try {
         const response = await deleteDailyRecord(recordDate)
         if (response.success) {
-          toast.success(response.message || '删除成功')
+          ElMessage.success(response.message || '删除成功')
           loadData()
         } else {
-          toast.error(response.message || '删除失败')
+          ElMessage.error(response.message || '删除失败')
         }
       } catch (error) {
         console.error('删除失败:', error)
-        toast.error('删除失败')
+        ElMessage.error('删除失败')
       }
     }
 
@@ -575,8 +557,8 @@ export default {
 
     // 获取收益样式类
     const getProfitClass = (value) => {
-      if (value > 0) return 'profit-positive'
-      if (value < 0) return 'profit-negative'
+      if (value > 0) return 'text-success font-weight-bold'
+      if (value < 0) return 'text-danger font-weight-bold'
       return ''
     }
 
@@ -610,6 +592,9 @@ export default {
       filters,
       formData,
       configData,
+      loading,
+      saving,
+      configSaving,
       loadData,
       resetFilters,
       editRecord,
@@ -619,81 +604,38 @@ export default {
       getProfitClass,
       handleDialogClose,
       openConfigDialog,
-      handleConfigSave
+      handleConfigSave,
+      Wallet,
+      Plus,
+      Refresh,
+      Edit,
+      Delete
     }
   }
 }
 </script>
 
 <style scoped>
-/* 主容器 */
 .profit-chart {
-  padding: 20px;
-  background-color: #f5f5f5;
-  min-height: 100%;
-}
-
-/* 标题栏 */
-.header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 12px;
-  padding: 10px 15px;
-  background-color: #fff;
-  border: 1px solid #ddd;
-  border-radius: 8px;
-}
-
-.header h2 {
-  margin: 0;
-  font-size: 18px;
-  color: #333;
+  /* 使用 page-container 替代 */
 }
 
 .header-actions {
   display: flex;
-  gap: 10px;
-}
-
-/* 筛选区域 */
-.filter-section {
-  display: flex;
-  gap: 15px;
+  justify-content: space-between;
   align-items: center;
-  margin-bottom: 20px;
-  padding: 15px 20px;
-  background-color: #fff;
-  border: 1px solid #ddd;
-  border-radius: 8px;
 }
 
-.filter-item {
+.header-actions h2 {
+  font-size: 20px;
+  color: var(--el-text-color-primary);
+  margin: 0;
+}
+
+.filter-form {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
-}
-
-.filter-item label {
-  font-size: 14px;
-  color: #666;
-  white-space: nowrap;
-}
-
-.filter-item input[type="date"] {
-  padding: 6px 10px;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  font-size: 14px;
-}
-
-/* 图表容器 */
-.chart-container {
-  margin-bottom: 20px;
-  padding: 20px;
-  background-color: #fff;
-  border: 1px solid #ddd;
-  border-radius: 8px;
 }
 
 .chart {
@@ -701,215 +643,15 @@ export default {
   height: 400px;
 }
 
-/* 数据表格 */
-.data-table {
-  background-color: #fff;
-  border: 1px solid #ddd;
-  border-radius: 8px;
-  padding: 20px;
-}
-
-.data-table h3 {
-  margin: 0 0 15px 0;
+.section-title {
   font-size: 16px;
-  color: #333;
-}
-
-.data-table table {
-  width: 100%;
-  border-collapse: collapse;
-}
-
-.data-table th,
-.data-table td {
-  padding: 12px;
-  text-align: left;
-  border-bottom: 1px solid #eee;
-}
-
-.data-table th {
-  background-color: #f8f8f8;
   font-weight: 600;
-  color: #333;
-  font-size: 14px;
-}
-
-.data-table td {
-  font-size: 14px;
-  color: #666;
-}
-
-.data-table tbody tr:hover {
-  background-color: #f9f9f9;
-}
-
-/* 收益样式 */
-.profit-positive {
-  color: #52c41a;
-  font-weight: 600;
-}
-
-.profit-negative {
-  color: #f5222d;
-  font-weight: 600;
-}
-
-/* 按钮样式 */
-.btn-primary,
-.btn-secondary,
-.btn-refresh,
-.btn-config,
-.btn-edit,
-.btn-delete {
-  padding: 8px 16px;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 14px;
-  transition: opacity 0.2s;
-}
-
-.btn-primary {
-  background-color: #1890ff;
-  color: white;
-}
-
-.btn-primary:hover {
-  opacity: 0.8;
-}
-
-.btn-config {
-  background-color: #722ed1;
-  color: white;
-}
-
-.btn-config:hover {
-  opacity: 0.8;
-}
-
-.btn-secondary {
-  background-color: #d9d9d9;
-  color: #333;
-}
-
-.btn-secondary:hover {
-  opacity: 0.8;
-}
-
-.btn-refresh {
-  background-color: #52c41a;
-  color: white;
-}
-
-.btn-refresh:hover {
-  opacity: 0.8;
-}
-
-.btn-edit {
-  padding: 4px 12px;
-  background-color: #1890ff;
-  color: white;
-  margin-right: 5px;
-}
-
-.btn-edit:hover {
-  opacity: 0.8;
-}
-
-.btn-delete {
-  padding: 4px 12px;
-  background-color: #ff4d4f;
-  color: white;
-}
-
-.btn-delete:hover {
-  opacity: 0.8;
-}
-
-/* 表单样式 */
-.form-group {
+  color: var(--el-text-color-primary);
   margin-bottom: 15px;
+  margin-top: 10px;
 }
 
-.form-group label {
-  display: block;
-  margin-bottom: 5px;
-  font-size: 14px;
-  color: #333;
-  font-weight: 500;
-}
-
-.form-group input,
-.form-group textarea {
-  width: 100%;
-  padding: 8px 12px;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  font-size: 14px;
-  box-sizing: border-box;
-}
-
-.form-group input:focus,
-.form-group textarea:focus {
-  outline: none;
-  border-color: #1890ff;
-}
-
-.form-group input:disabled {
-  background-color: #f5f5f5;
-  cursor: not-allowed;
-}
-
-/* 配置表单样式 */
-.config-form {
-  max-height: 600px;
-  overflow-y: auto;
-}
-
-.config-section {
-  margin-bottom: 24px;
-  padding-bottom: 20px;
-  border-bottom: 1px solid #eee;
-}
-
-.config-section:last-of-type {
-  border-bottom: none;
-}
-
-.config-section h4 {
-  margin: 0 0 16px 0;
-  font-size: 15px;
-  color: #333;
-  font-weight: 600;
-}
-
-.form-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 16px;
-  margin-bottom: 16px;
-}
-
-.form-row:last-child {
-  margin-bottom: 0;
-}
-
-.form-row .form-group {
-  margin-bottom: 0;
-}
-
-.config-tip {
-  margin-top: 20px;
-  padding: 12px 16px;
-  background-color: #e6f7ff;
-  border: 1px solid #91d5ff;
-  border-radius: 4px;
-}
-
-.config-tip p {
-  margin: 0;
-  font-size: 13px;
-  color: #0050b3;
-  line-height: 1.5;
-}
+.text-success { color: var(--el-color-success); }
+.text-danger { color: var(--el-color-danger); }
+.font-weight-bold { font-weight: bold; }
 </style>

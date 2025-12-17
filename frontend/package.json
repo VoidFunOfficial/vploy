@@ -9,10 +9,11 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@element-plus/icons-vue": "^2.3.2",
     "apexcharts": "^5.3.6",
     "axios": "latest",
     "echarts": "latest",
-    "voidpoly-admin": "link:",
+    "element-plus": "^2.12.0",
     "vue": "latest",
     "vue-router": "latest",
     "vue3-apexcharts": "^1.10.0"

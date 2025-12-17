@@ -1,52 +1,66 @@
 <template>
   <div class="login-container">
-    <div class="login-box">
-      <!-- 标题 -->
-      <div class="login-header">
-        <h1>VoidPoly 管理面板</h1>
-        <p>Polymarket 自动化交易系统</p>
-      </div>
+    <el-card class="login-card">
+      <template #header>
+        <div class="login-header">
+          <div class="logo-box">
+             <el-icon :size="40" color="var(--el-color-primary)"><ElementPlus /></el-icon>
+          </div>
+          <h1>VoidPoly</h1>
+          <p class="subtitle">自动化交易系统管理面板</p>
+        </div>
+      </template>
 
-      <!-- 登录表单 -->
-      <div class="login-form">
-        <div class="form-group">
-          <label class="form-label">用户名</label>
-          <input
-            type="text"
-            v-model="formData.username"
-            placeholder="请输入用户名"
+      <el-form
+        ref="loginFormRef"
+        :model="formData"
+        :rules="rules"
+        label-position="top"
+        @submit.prevent="handleLogin"
+        size="large"
+      >
+        <el-form-item label="用户名" prop="username">
+          <el-input 
+            v-model="formData.username" 
+            placeholder="请输入用户名" 
+            :prefix-icon="User"
+          />
+        </el-form-item>
+
+        <el-form-item label="密码" prop="password">
+          <el-input 
+            v-model="formData.password" 
+            type="password" 
+            placeholder="请输入密码" 
+            :prefix-icon="Lock" 
+            show-password
             @keyup.enter="handleLogin"
           />
-          <div class="form-error" v-if="errors.username">{{ errors.username }}</div>
-        </div>
+        </el-form-item>
 
-        <div class="form-group">
-          <label class="form-label">密码</label>
-          <input
-            type="password"
-            v-model="formData.password"
-            placeholder="请输入密码"
-            @keyup.enter="handleLogin"
-          />
-          <div class="form-error" v-if="errors.password">{{ errors.password }}</div>
-        </div>
+        <el-alert
+          v-if="errors.general"
+          :title="errors.general"
+          type="error"
+          show-icon
+          :closable="false"
+          class="mb-4"
+        />
 
-        <div class="form-error" v-if="errors.general">{{ errors.general }}</div>
-
-        <button
-          class="btn btn-block mt-20"
+        <el-button 
+          type="primary" 
+          class="w-full mt-4" 
+          :loading="loading" 
           @click="handleLogin"
-          :disabled="loading"
         >
-          {{ loading ? '登录中...' : '登录' }}
-        </button>
-      </div>
+          登录
+        </el-button>
+      </el-form>
 
-      <!-- 底部信息 -->
       <div class="login-footer">
         <p>默认账号：admin / admin123</p>
       </div>
-    </div>
+    </el-card>
   </div>
 </template>
 
@@ -55,184 +69,149 @@ import { ref, reactive } from 'vue'
 import { useRouter } from 'vue-router'
 import { login } from '@/api/auth'
 import { setToken, setUser } from '@/utils/auth'
+import { User, Lock, ElementPlus } from '@element-plus/icons-vue'
 
 export default {
   name: 'Login',
+  components: {
+    ElementPlus
+  },
   setup() {
     const router = useRouter()
+    const loginFormRef = ref(null)
     const loading = ref(false)
     
-    // 表单数据
     const formData = reactive({
       username: '',
       password: ''
     })
     
-    // 错误信息
+    const rules = {
+      username: [{ required: true, message: '请输入用户名', trigger: 'blur' }],
+      password: [{ required: true, message: '请输入密码', trigger: 'blur' }]
+    }
+    
     const errors = reactive({
-      username: '',
-      password: '',
       general: ''
     })
     
-    // 清除错误信息
-    const clearErrors = () => {
-      errors.username = ''
-      errors.password = ''
-      errors.general = ''
-    }
-    
-    // 表单验证
-    const validateForm = () => {
-      clearErrors()
-      let isValid = true
-      
-      if (!formData.username.trim()) {
-        errors.username = '请输入用户名'
-        isValid = false
-      }
-      
-      if (!formData.password.trim()) {
-        errors.password = '请输入密码'
-        isValid = false
-      }
-      
-      return isValid
-    }
-    
-    // 处理登录
     const handleLogin = async () => {
-      if (!validateForm()) {
-        return
-      }
+      if (!loginFormRef.value) return
       
-      loading.value = true
-      clearErrors()
-      
-      try {
-        const response = await login(formData.username, formData.password)
-        
-        if (response.success) {
-          // 保存令牌和用户信息
-          setToken(response.data.token)
-          setUser(response.data.user)
+      await loginFormRef.value.validate(async (valid) => {
+        if (valid) {
+          loading.value = true
+          errors.general = ''
           
-          // 跳转到首页
-          router.push('/')
-        } else {
-          errors.general = response.message || '登录失败'
+          try {
+            const response = await login(formData.username, formData.password)
+            
+            if (response.success) {
+              setToken(response.data.token)
+              setUser(response.data.user)
+              router.push('/')
+            } else {
+              errors.general = response.message || '登录失败'
+            }
+          } catch (error) {
+             if (error.response && error.response.data) {
+              errors.general = error.response.data.message || '登录失败，请检查用户名和密码'
+            } else {
+              errors.general = '网络错误，请稍后重试'
+            }
+          } finally {
+            loading.value = false
+          }
         }
-      } catch (error) {
-        if (error.response && error.response.data) {
-          errors.general = error.response.data.message || '登录失败，请检查用户名和密码'
-        } else {
-          errors.general = '网络错误，请稍后重试'
-        }
-      } finally {
-        loading.value = false
-      }
+      })
     }
     
     return {
+      loginFormRef,
       formData,
+      rules,
       errors,
       loading,
-      handleLogin
+      handleLogin,
+      User,
+      Lock
     }
   }
 }
 </script>
 
 <style scoped>
-/* 登录容器 - 全屏居中 */
 .login-container {
-  width: 100%;
-  height: 100vh;
+  min-height: 100vh;
   display: flex;
   align-items: center;
   justify-content: center;
-  background-color: #f5f5f5;
+  background-color: var(--bg-color-page);
+  background-image: radial-gradient(var(--el-color-primary-light-9) 1px, transparent 1px);
+  background-size: 20px 20px;
 }
 
-/* 登录框 */
-.login-box {
-  width: 400px;
-  background-color: #fff;
-  border: 1px solid #ddd;
-  padding: 0;
+.login-card {
+  width: 100%;
+  max-width: 420px;
+  border-radius: 16px !important;
+  padding: 20px;
 }
 
-/* 移动端适配 */
-@media (max-width: 768px) {
-  .login-box {
-    width: 90%;
-    max-width: 400px;
-  }
-}
-
-@media (max-width: 480px) {
-  .login-box {
-    width: 95%;
-  }
-}
-
-/* 登录头部 */
 .login-header {
-  padding: 30px 30px 20px;
-  border-bottom: 1px solid #ddd;
   text-align: center;
+  padding: 10px 0 20px;
+}
+
+.logo-box {
+  margin-bottom: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px;
+  background-color: var(--el-color-primary-light-9);
+  border-radius: 16px;
 }
 
 .login-header h1 {
   font-size: 24px;
-  color: #20a53a;
-  margin-bottom: 10px;
-  font-weight: 500;
+  font-weight: 700;
+  color: var(--text-color-primary);
+  margin: 0 0 8px;
+  letter-spacing: -0.5px;
 }
 
-.login-header p {
+.subtitle {
+  color: var(--text-color-secondary);
   font-size: 14px;
-  color: #666;
+  margin: 0;
 }
 
-/* 移动端头部 */
-@media (max-width: 480px) {
-  .login-header {
-    padding: 20px 20px 15px;
-  }
-
-  .login-header h1 {
-    font-size: 20px;
-  }
-
-  .login-header p {
-    font-size: 12px;
-  }
+.w-full {
+  width: 100%;
 }
 
-/* 登录表单 */
-.login-form {
-  padding: 30px;
+.mt-4 {
+  margin-top: 1rem;
 }
 
-/* 移动端表单 */
-@media (max-width: 480px) {
-  .login-form {
-    padding: 20px;
-  }
+.mb-4 {
+  margin-bottom: 1rem;
 }
 
-/* 登录底部 */
 .login-footer {
-  padding: 15px 30px;
-  border-top: 1px solid #ddd;
-  background-color: #fafafa;
+  margin-top: 32px;
   text-align: center;
+  color: var(--text-color-placeholder);
+  font-size: 13px;
 }
 
-.login-footer p {
-  font-size: 12px;
-  color: #999;
+:deep(.el-card__header) {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+:deep(.el-input__wrapper) {
+  padding: 8px 12px;
 }
 </style>
-

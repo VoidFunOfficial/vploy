@@ -1,130 +1,162 @@
 <template>
-  <div class="event-card">
+  <el-card class="event-card mb-4" shadow="hover">
     <!-- 卡片头部 -->
-    <div class="card-header">
-      <div class="header-left">
-        <h3 class="event-title">{{ event.title }}</h3>
-        <div class="event-meta">
-          <span v-if="event.end_date" class="meta-item">
-            <span class="meta-icon">⏰</span>
-            {{ formatDate(event.end_date) }}
-          </span>
+    <template #header>
+      <div class="card-header-content">
+        <div class="header-left">
+          <h3 class="event-title">{{ event.title }}</h3>
+          <div class="event-meta mt-2">
+            <el-tag v-if="event.end_date" type="info" effect="plain" size="small">
+              <el-icon class="mr-1"><Timer /></el-icon>
+              {{ formatDate(event.end_date) }}
+            </el-tag>
+          </div>
+        </div>
+        <div class="event-badges">
+          <el-tag :type="event.active ? 'success' : 'info'" effect="dark" class="mr-1">
+            {{ event.active ? '活跃' : '已关闭' }}
+          </el-tag>
+          <el-tag v-if="event.negRisk" type="warning" effect="dark">
+            负风险
+          </el-tag>
         </div>
       </div>
-      <div class="event-badges">
-        <span v-if="event.active" class="badge badge-success">活跃</span>
-        <span v-else class="badge badge-gray">已关闭</span>
-        <span v-if="event.negRisk" class="badge badge-warning">负风险</span>
-      </div>
-    </div>
+    </template>
 
     <!-- 事件描述 -->
-    <div v-if="event.description" class="event-description">
-      <div class="description-icon">📋</div>
-      <div class="description-text">{{ event.description }}</div>
+    <div v-if="event.description" class="event-description mb-4">
+      <el-alert :closable="false" type="info" show-icon>
+        <template #title>
+          <span class="description-text" style="white-space: pre-wrap;">{{ event.description }}</span>
+        </template>
+      </el-alert>
     </div>
 
     <!-- 统计数据卡片 -->
-    <div class="stats-grid">
-      <div v-if="event.volume !== null && event.volume !== undefined" class="stat-card">
-        <div class="stat-icon">💰</div>
-        <div class="stat-content">
-          <div class="stat-label">交易量</div>
-          <div class="stat-value">${{ formatNumber(event.volume) }}</div>
-        </div>
-      </div>
-      <div v-if="event.liquidity !== null && event.liquidity !== undefined" class="stat-card">
-        <div class="stat-icon">💧</div>
-        <div class="stat-content">
-          <div class="stat-label">流动性</div>
-          <div class="stat-value">${{ formatNumber(event.liquidity) }}</div>
-        </div>
-      </div>
-      <div v-if="event.markets && event.markets.length > 0" class="stat-card">
-        <div class="stat-icon">📊</div>
-        <div class="stat-content">
-          <div class="stat-label">关联市场</div>
-          <div class="stat-value">{{ event.markets.length }} 个</div>
-        </div>
-      </div>
-    </div>
+    <el-row :gutter="20" class="mb-4">
+      <el-col :xs="24" :sm="8" v-if="event.volume !== null && event.volume !== undefined">
+        <el-card shadow="never" class="stat-card">
+          <div class="stat-content">
+            <div class="stat-icon-wrapper"><el-icon><Money /></el-icon></div>
+            <div>
+              <div class="stat-label">交易量</div>
+              <div class="stat-value">${{ formatNumber(event.volume) }}</div>
+            </div>
+          </div>
+        </el-card>
+      </el-col>
+      <el-col :xs="24" :sm="8" v-if="event.liquidity !== null && event.liquidity !== undefined">
+        <el-card shadow="never" class="stat-card">
+          <div class="stat-content">
+            <div class="stat-icon-wrapper"><el-icon><Coin /></el-icon></div>
+            <div>
+              <div class="stat-label">流动性</div>
+              <div class="stat-value">${{ formatNumber(event.liquidity) }}</div>
+            </div>
+          </div>
+        </el-card>
+      </el-col>
+      <el-col :xs="24" :sm="8" v-if="event.markets && event.markets.length > 0">
+        <el-card shadow="never" class="stat-card">
+          <div class="stat-content">
+            <div class="stat-icon-wrapper"><el-icon><DataLine /></el-icon></div>
+            <div>
+              <div class="stat-label">关联市场</div>
+              <div class="stat-value">{{ event.markets.length }} 个</div>
+            </div>
+          </div>
+        </el-card>
+      </el-col>
+    </el-row>
 
     <!-- 事件详细信息 -->
-    <div class="event-details">
-      <div class="detail-item">
-        <span class="detail-label">事件ID</span>
-        <span class="detail-value">{{ event.id }}</span>
-      </div>
-      <div class="detail-item">
-        <span class="detail-label">Slug</span>
-        <span class="detail-value">{{ event.slug }}</span>
-      </div>
-      <div v-if="event.start_date" class="detail-item">
-        <span class="detail-label">开始时间</span>
-        <span class="detail-value">{{ formatDate(event.start_date) }}</span>
-      </div>
-    </div>
+    <el-descriptions border :column="1" class="mb-4">
+      <el-descriptions-item label="事件ID">
+        <span class="font-monospace">{{ event.id }}</span>
+      </el-descriptions-item>
+      <el-descriptions-item label="Slug">
+        <span class="font-monospace">{{ event.slug }}</span>
+      </el-descriptions-item>
+      <el-descriptions-item v-if="event.start_date" label="开始时间">
+        {{ formatDate(event.start_date) }}
+      </el-descriptions-item>
+    </el-descriptions>
 
     <!-- 标签 -->
-    <div v-if="event.tags && event.tags.length > 0" class="event-tags">
-      <div class="section-title">
-        <span class="title-icon">🏷️</span>
+    <div v-if="event.tags && event.tags.length > 0" class="mb-4">
+      <div class="section-title mb-2">
+        <el-icon class="mr-1"><PriceTag /></el-icon>
         <span>标签</span>
       </div>
       <div class="tags-list">
-        <span v-for="tag in event.tags" :key="tag.id" class="tag">
+        <el-tag v-for="tag in event.tags" :key="tag.id" size="small" class="mr-2 mb-2">
           {{ tag.label }}
-        </span>
+        </el-tag>
       </div>
     </div>
 
     <!-- 自定义标记 -->
-    <div v-if="event.marks && event.marks.length > 0" class="event-marks">
-      <div class="section-title">
-        <span class="title-icon">⭐</span>
+    <div v-if="event.marks && event.marks.length > 0" class="mb-4">
+      <div class="section-title mb-2">
+        <el-icon class="mr-1"><Star /></el-icon>
         <span>标记</span>
       </div>
       <div class="marks-list">
-        <span v-for="mark in event.marks" :key="mark" class="mark">
+        <el-tag v-for="mark in event.marks" :key="mark" type="warning" size="small" class="mr-2 mb-2">
           {{ mark }}
-        </span>
+        </el-tag>
       </div>
     </div>
 
     <!-- 关联市场列表 -->
     <div v-if="event.markets && event.markets.length > 0" class="related-markets">
-      <div class="markets-header" @click="toggleMarkets">
-        <div class="section-title">
-          <span class="title-icon">📈</span>
-          <span>关联市场 ({{ event.markets.length }})</span>
-        </div>
-        <button class="toggle-btn">
-          {{ marketsExpanded ? '收起' : '展开' }}
-          <span class="arrow">{{ marketsExpanded ? '▲' : '▼' }}</span>
-        </button>
-      </div>
-
-      <div v-show="marketsExpanded" class="markets-list">
-        <div
-          v-for="(market, index) in event.markets"
-          :key="market.id || index"
-          class="market-item"
-        >
-          <MarketMiniCard :market="market" />
-        </div>
-      </div>
+      <el-collapse v-model="activeNames">
+        <el-collapse-item name="1">
+          <template #title>
+            <div class="section-title" style="margin-bottom: 0;">
+              <el-icon class="mr-1"><TrendCharts /></el-icon>
+              <span>关联市场 ({{ event.markets.length }})</span>
+            </div>
+          </template>
+          <div class="markets-list pt-2">
+            <div
+              v-for="(market, index) in event.markets"
+              :key="market.id || index"
+              class="mb-3"
+            >
+              <MarketMiniCard :market="market" />
+            </div>
+          </div>
+        </el-collapse-item>
+      </el-collapse>
     </div>
-  </div>
+  </el-card>
 </template>
 
 <script>
 import { ref } from 'vue'
 import MarketMiniCard from './MarketMiniCard.vue'
+import {
+  Timer,
+  Money,
+  Coin,
+  DataLine,
+  PriceTag,
+  Star,
+  TrendCharts
+} from '@element-plus/icons-vue'
 
 export default {
   name: 'EventCard',
   components: {
-    MarketMiniCard
+    MarketMiniCard,
+    Timer,
+    Money,
+    Coin,
+    DataLine,
+    PriceTag,
+    Star,
+    TrendCharts
   },
   props: {
     event: {
@@ -134,15 +166,10 @@ export default {
   },
   setup() {
     // 控制关联市场的展开/收起状态
-    const marketsExpanded = ref(false)
-
-    const toggleMarkets = () => {
-      marketsExpanded.value = !marketsExpanded.value
-    }
+    const activeNames = ref([])
 
     return {
-      marketsExpanded,
-      toggleMarkets
+      activeNames
     }
   },
   methods: {
@@ -180,27 +207,14 @@ export default {
 
 <style scoped>
 .event-card {
-  background-color: #fff;
-  border: 1px solid #e0e0e0;
   border-radius: 8px;
-  padding: 24px;
-  margin-bottom: 20px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
   transition: box-shadow 0.2s ease;
 }
 
-.event-card:hover {
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-}
-
-/* 卡片头部 */
-.card-header {
+.card-header-content {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  margin-bottom: 20px;
-  padding-bottom: 16px;
-  border-bottom: 2px solid #f5f5f5;
 }
 
 .header-left {
@@ -209,362 +223,85 @@ export default {
 }
 
 .event-title {
-  font-size: 20px;
+  font-size: 18px;
   font-weight: 600;
-  color: #1a1a1a;
-  margin: 0 0 8px 0;
+  color: var(--el-text-color-primary);
+  margin: 0;
   line-height: 1.4;
-}
-
-.event-meta {
-  display: flex;
-  gap: 12px;
-  margin-top: 6px;
-}
-
-.meta-item {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 13px;
-  color: #666;
-}
-
-.meta-icon {
-  font-size: 14px;
 }
 
 .event-badges {
   display: flex;
-  gap: 8px;
   flex-shrink: 0;
-}
-
-.badge {
-  padding: 5px 12px;
-  border-radius: 4px;
-  font-size: 12px;
-  font-weight: 600;
-  white-space: nowrap;
-}
-
-.badge-success {
-  background-color: #e8f5e9;
-  color: #2e7d32;
-  border: 1px solid #c8e6c9;
-}
-
-.badge-gray {
-  background-color: #f5f5f5;
-  color: #757575;
-  border: 1px solid #e0e0e0;
-}
-
-.badge-warning {
-  background-color: #fff3e0;
-  color: #e65100;
-  border: 1px solid #ffe0b2;
-}
-
-/* 事件描述 */
-.event-description {
-  display: flex;
-  gap: 12px;
-  margin-bottom: 20px;
-  padding: 16px;
-  background-color: #f8f9fa;
-  border-left: 4px solid #20a53a;
-  border-radius: 4px;
-}
-
-.description-icon {
-  font-size: 18px;
-  flex-shrink: 0;
-}
-
-.description-text {
-  flex: 1;
-  color: #424242;
-  font-size: 14px;
-  line-height: 1.6;
-}
-
-/* 统计数据卡片 */
-.stats-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: 12px;
-  margin-bottom: 20px;
 }
 
 .stat-card {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 14px 16px;
-  background-color: #f8f9fa;
-  border: 1px solid #e9ecef;
-  border-radius: 6px;
-  transition: all 0.2s ease;
-}
-
-.stat-card:hover {
-  background-color: #e9ecef;
-  border-color: #dee2e6;
-}
-
-.stat-icon {
-  font-size: 24px;
-  flex-shrink: 0;
+  height: 100%;
+  background-color: var(--el-fill-color-light);
+  border: none;
 }
 
 .stat-content {
-  flex: 1;
-  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.stat-icon-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background-color: var(--el-color-primary-light-9);
+  color: var(--el-color-primary);
+  font-size: 20px;
 }
 
 .stat-label {
   font-size: 12px;
-  color: #6c757d;
-  margin-bottom: 4px;
+  color: var(--el-text-color-secondary);
+  margin-bottom: 2px;
 }
 
 .stat-value {
   font-size: 16px;
   font-weight: 600;
-  color: #212529;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  color: var(--el-text-color-primary);
 }
 
-/* 事件详细信息 */
-.event-details {
-  margin-bottom: 20px;
-  padding: 16px;
-  background-color: #fafafa;
-  border-radius: 6px;
-}
-
-.detail-item {
-  display: flex;
-  justify-content: space-between;
-  padding: 8px 0;
-  border-bottom: 1px solid #f0f0f0;
-}
-
-.detail-item:last-child {
-  border-bottom: none;
-}
-
-.detail-label {
-  font-size: 13px;
-  color: #757575;
-  font-weight: 500;
-}
-
-.detail-value {
-  font-size: 13px;
-  color: #424242;
-  text-align: right;
-  word-break: break-all;
-  max-width: 60%;
-}
-
-/* 通用区块标题 */
 .section-title {
   display: flex;
   align-items: center;
-  gap: 6px;
   font-size: 14px;
   font-weight: 600;
-  color: #424242;
-  margin-bottom: 12px;
-}
-
-.title-icon {
-  font-size: 16px;
-}
-
-/* 标签 */
-.event-tags,
-.event-marks {
-  margin-bottom: 20px;
+  color: var(--el-text-color-regular);
 }
 
 .tags-list,
 .marks-list {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
 }
 
-.tag {
-  padding: 6px 12px;
-  background-color: #e3f2fd;
-  color: #1565c0;
-  border: 1px solid #bbdefb;
-  border-radius: 4px;
-  font-size: 12px;
-  font-weight: 500;
-  transition: all 0.2s ease;
-}
-
-.tag:hover {
-  background-color: #bbdefb;
-}
-
-.mark {
-  padding: 6px 12px;
-  background-color: #f3e5f5;
-  color: #6a1b9a;
-  border: 1px solid #e1bee7;
-  border-radius: 4px;
-  font-size: 12px;
-  font-weight: 500;
-  transition: all 0.2s ease;
-}
-
-.mark:hover {
-  background-color: #e1bee7;
-}
-
-/* 关联市场 */
-.related-markets {
-  margin-top: 20px;
-  padding-top: 20px;
-  border-top: 2px solid #f5f5f5;
-}
-
-.markets-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  cursor: pointer;
-  padding: 12px 16px;
-  background-color: #f8f9fa;
-  border-radius: 6px;
-  transition: background-color 0.2s ease;
-}
-
-.markets-header:hover {
-  background-color: #e9ecef;
-}
-
-.toggle-btn {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 12px;
-  background-color: #fff;
-  border: 1px solid #dee2e6;
-  border-radius: 4px;
-  color: #495057;
-  font-size: 13px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.toggle-btn:hover {
-  background-color: #f8f9fa;
-  border-color: #adb5bd;
-}
-
-.arrow {
-  font-size: 10px;
-  transition: transform 0.2s ease;
-}
-
-.markets-list {
-  margin-top: 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.market-item {
-  padding-left: 16px;
-  border-left: 3px solid #e9ecef;
+.font-monospace {
+  font-family: var(--font-family-monospace, monospace);
 }
 
 /* 移动端适配 */
 @media (max-width: 768px) {
-  .event-card {
-    padding: 16px;
-  }
-
-  .card-header {
+  .card-header-content {
     flex-direction: column;
-    gap: 12px;
+    gap: 10px;
   }
 
   .header-left {
     margin-right: 0;
   }
 
-  .event-title {
-    font-size: 18px;
-  }
-
   .event-badges {
     align-self: flex-start;
-  }
-
-  .stats-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .stat-card {
-    padding: 12px 14px;
-  }
-
-  .stat-icon {
-    font-size: 20px;
-  }
-
-  .stat-value {
-    font-size: 15px;
-  }
-
-  .detail-value {
-    max-width: 50%;
-  }
-
-  .markets-header {
-    padding: 10px 12px;
-  }
-
-  .toggle-btn {
-    padding: 5px 10px;
-    font-size: 12px;
-  }
-}
-
-@media (max-width: 480px) {
-  .event-card {
-    padding: 14px;
-  }
-
-  .event-title {
-    font-size: 16px;
-  }
-
-  .description-text {
-    font-size: 13px;
-  }
-
-  .stat-label {
-    font-size: 11px;
-  }
-
-  .stat-value {
-    font-size: 14px;
-  }
-
-  .detail-label,
-  .detail-value {
-    font-size: 12px;
   }
 }
 </style>

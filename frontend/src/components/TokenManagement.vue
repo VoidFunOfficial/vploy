@@ -3,193 +3,210 @@
     <div class="header">
       <h2>API Token 管理</h2>
       <div class="header-actions">
-        <button class="btn-quick-import" @click="showQuickImportDialog = true">
+        <el-button type="primary" :icon="Download" @click="showQuickImportDialog = true">
           快捷导入
-        </button>
-        <button class="btn-refresh" @click="refreshStatus" :disabled="loading">
-          {{ loading ? '刷新中...' : '刷新状态' }}
-        </button>
-        <button class="btn-check" @click="checkAllTokens" :disabled="loading">
+        </el-button>
+        <el-button :loading="loading" :icon="Refresh" @click="refreshStatus">
+          刷新状态
+        </el-button>
+        <el-button type="success" :loading="loading" :icon="Check" @click="checkAllTokens">
           立即检查
-        </button>
+        </el-button>
       </div>
     </div>
 
     <!-- 系统状态 -->
-    <div class="system-status">
-      <div class="status-item">
-        <span class="label">后台检查状态:</span>
-        <span :class="['value', systemStatus.is_running ? 'running' : 'stopped']">
-          {{ systemStatus.is_running ? '运行中' : '已停止' }}
-        </span>
-      </div>
-      <div class="status-item">
-        <span class="label">检查间隔:</span>
-        <span class="value">{{ systemStatus.check_interval_minutes }} 分钟</span>
-        <button class="btn-edit" @click="showIntervalDialog = true">修改</button>
-      </div>
-    </div>
+    <el-card class="box-card mb-4" shadow="hover">
+      <template #header>
+        <div class="card-header">
+          <span>系统状态</span>
+          <el-button type="primary" link :icon="Edit" @click="showIntervalDialog = true">
+            修改设置
+          </el-button>
+        </div>
+      </template>
+      <el-descriptions :column="2" border>
+        <el-descriptions-item label="后台检查状态">
+          <el-tag :type="systemStatus.is_running ? 'success' : 'danger'">
+            {{ systemStatus.is_running ? '运行中' : '已停止' }}
+          </el-tag>
+        </el-descriptions-item>
+        <el-descriptions-item label="检查间隔">
+          {{ systemStatus.check_interval_minutes }} 分钟
+        </el-descriptions-item>
+      </el-descriptions>
+    </el-card>
 
     <!-- Token 列表 -->
-    <div class="token-list">
-      <div
-        v-for="(token, tokenType) in tokens"
-        :key="tokenType"
-        :class="['token-card', { expired: token.is_expired }]"
-      >
-        <div class="token-header">
-          <div class="token-title">
-            <h3>{{ token.description }}</h3>
-            <span class="token-type">{{ tokenType }}</span>
+    <el-row :gutter="20">
+      <el-col :xs="24" :sm="12" :md="12" :lg="8" v-for="(token, tokenType) in tokens" :key="tokenType" class="mb-4">
+        <el-card :class="['token-card', { 'is-expired': token.is_expired }]" shadow="hover">
+          <template #header>
+            <div class="card-header">
+              <div class="token-title-group">
+                <span class="token-title">{{ token.description }}</span>
+                <el-tag size="small" type="info" effect="plain">{{ tokenType }}</el-tag>
+              </div>
+              <el-tag :type="token.is_expired ? 'danger' : 'success'">
+                {{ token.is_expired ? '已过期' : '有效' }}
+              </el-tag>
+            </div>
+          </template>
+          
+          <div class="token-info">
+            <div class="info-item">
+              <span class="label">有效期:</span>
+              <span class="value">{{ token.validity_days }} 天</span>
+            </div>
+            <div class="info-item">
+              <span class="label">过期时间:</span>
+              <span class="value">{{ formatDateTime(token.expires_at) }}</span>
+            </div>
+            <div class="info-item">
+              <span class="label">最后检查:</span>
+              <span class="value">{{ token.last_checked_at ? formatDateTime(token.last_checked_at) : '未检查' }}</span>
+            </div>
+            <div class="info-item">
+              <span class="label">Token 值:</span>
+              <el-tooltip :content="token.token_value || '未设置'" placement="top" :disabled="!token.token_value">
+                <span class="value token-value">{{ token.token_value ? maskToken(token.token_value) : '未设置' }}</span>
+              </el-tooltip>
+            </div>
           </div>
-          <div class="token-status">
-            <span :class="['status-badge', token.is_expired ? 'expired' : 'valid']">
-              {{ token.is_expired ? '已过期' : '有效' }}
-            </span>
-          </div>
-        </div>
 
-        <div class="token-info">
-          <div class="info-row">
-            <span class="info-label">有效期:</span>
-            <span class="info-value">{{ token.validity_days }} 天</span>
+          <div class="card-actions">
+            <el-button type="primary" size="small" :icon="Edit" @click="openUpdateDialog(tokenType, token)">
+              更新
+            </el-button>
+            <el-button 
+              type="danger" 
+              size="small" 
+              :icon="Warning" 
+              :disabled="token.is_expired"
+              @click="expireToken(tokenType)"
+            >
+              标记过期
+            </el-button>
           </div>
-          <div class="info-row">
-            <span class="info-label">过期时间:</span>
-            <span class="info-value">{{ formatDateTime(token.expires_at) }}</span>
-          </div>
-          <div class="info-row">
-            <span class="info-label">最后检查:</span>
-            <span class="info-value">
-              {{ token.last_checked_at ? formatDateTime(token.last_checked_at) : '未检查' }}
-            </span>
-          </div>
-          <div class="info-row">
-            <span class="info-label">Token 值:</span>
-            <span class="info-value token-value">
-              {{ token.token_value ? maskToken(token.token_value) : '未设置' }}
-            </span>
-          </div>
-        </div>
-
-        <div class="token-actions">
-          <button class="btn-update" @click="openUpdateDialog(tokenType, token)">
-            更新 Token
-          </button>
-          <button
-            class="btn-expire"
-            @click="expireToken(tokenType)"
-            :disabled="token.is_expired"
-          >
-            标记过期
-          </button>
-        </div>
-      </div>
-    </div>
+        </el-card>
+      </el-col>
+    </el-row>
 
     <!-- 更新 Token 对话框 -->
-    <Modal
-      v-model:visible="showUpdateDialog"
+    <el-dialog
+      v-model="showUpdateDialog"
       title="更新 Token"
-      confirm-text="确认更新"
-      @confirm="submitUpdate"
+      width="500px"
+      @close="closeUpdateDialog"
     >
-      <div class="form-group">
-        <label>Token 类型</label>
-        <input type="text" :value="updateForm.token_type" disabled />
-      </div>
-      <div class="form-group">
-        <label>Token 值</label>
-        <textarea
-          v-model="updateForm.token_value"
-          rows="3"
-          placeholder="输入新的 Token 值"
-        ></textarea>
-      </div>
-      <div class="form-group">
-        <label>
-          <input type="checkbox" v-model="updateForm.custom_expiry" />
-          自定义过期时间
-        </label>
-      </div>
-      <div v-if="updateForm.custom_expiry" class="form-group">
-        <label>过期时间</label>
-        <input type="datetime-local" v-model="updateForm.expires_at" />
-      </div>
-    </Modal>
+      <el-form :model="updateForm" label-width="100px">
+        <el-form-item label="Token 类型">
+          <el-input v-model="updateForm.token_type" disabled />
+        </el-form-item>
+        <el-form-item label="Token 值">
+          <el-input
+            v-model="updateForm.token_value"
+            type="textarea"
+            :rows="4"
+            placeholder="输入新的 Token 值"
+          />
+        </el-form-item>
+        <el-form-item>
+          <el-checkbox v-model="updateForm.custom_expiry">自定义过期时间</el-checkbox>
+        </el-form-item>
+        <el-form-item label="过期时间" v-if="updateForm.custom_expiry">
+          <el-date-picker
+            v-model="updateForm.expires_at"
+            type="datetime"
+            placeholder="选择过期时间"
+            style="width: 100%"
+          />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <span class="dialog-footer">
+          <el-button @click="showUpdateDialog = false">取消</el-button>
+          <el-button type="primary" :loading="updating" @click="submitUpdate">
+            确认更新
+          </el-button>
+        </span>
+      </template>
+    </el-dialog>
 
     <!-- 修改检查间隔对话框 -->
-    <Modal
-      v-model:visible="showIntervalDialog"
+    <el-dialog
+      v-model="showIntervalDialog"
       title="修改检查间隔"
-      size="small"
-      confirm-text="确认修改"
-      @confirm="submitInterval"
+      width="400px"
     >
-      <div class="form-group">
-        <label>检查间隔（分钟）</label>
-        <input
-          type="number"
-          v-model.number="intervalForm.minutes"
-          min="1"
-          placeholder="输入检查间隔"
-        />
-      </div>
-    </Modal>
+      <el-form :model="intervalForm" label-width="120px">
+        <el-form-item label="检查间隔(分)">
+          <el-input-number v-model="intervalForm.minutes" :min="1" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <span class="dialog-footer">
+          <el-button @click="showIntervalDialog = false">取消</el-button>
+          <el-button type="primary" :loading="updating" @click="submitInterval">
+            确认修改
+          </el-button>
+        </span>
+      </template>
+    </el-dialog>
 
     <!-- 快捷导入对话框 -->
-    <Modal
-      v-model:visible="showQuickImportDialog"
+    <el-dialog
+      v-model="showQuickImportDialog"
       title="快捷导入 Token"
-      size="large"
-      confirm-text="确认导入"
-      @confirm="submitQuickImport"
+      width="800px"
+      @close="closeQuickImportDialog"
     >
-          <div class="form-group">
-            <label>粘贴 HTTP Header 或 Cookie 字符串</label>
-            <textarea
-              v-model="quickImportForm.headerString"
-              rows="8"
-              placeholder="支持多种格式，例如：&#10;&#10;Cookie 格式：&#10;__Secure-auth_token=xxx;__Secure-access_token=yyy;&#10;&#10;Header 格式：&#10;Authorization: Bearer eyJhbGc...&#10;Access-Token: abc123...&#10;&#10;或直接粘贴 cURL 命令"
-              @input="parseHeaderString"
-            ></textarea>
-            <div class="hint">
-              支持格式：Cookie 字符串、HTTP Header、cURL 命令、或直接粘贴 token 值
-            </div>
-          </div>
+      <el-form :model="quickImportForm" label-position="top">
+        <el-form-item label="粘贴 HTTP Header 或 Cookie 字符串">
+          <el-input
+            v-model="quickImportForm.headerString"
+            type="textarea"
+            :rows="6"
+            placeholder="支持多种格式，例如：&#10;Cookie 格式：__Secure-auth_token=xxx;__Secure-access_token=yyy;&#10;Header 格式：Authorization: Bearer eyJhbGc...&#10;或直接粘贴 cURL 命令"
+            @input="parseHeaderString"
+          />
+          <div class="form-hint">支持格式：Cookie 字符串、HTTP Header、cURL 命令、或直接粘贴 token 值</div>
+        </el-form-item>
+      </el-form>
 
-          <!-- 解析结果预览 -->
-          <div v-if="quickImportForm.parsedTokens.length > 0" class="parsed-tokens">
-            <h4>检测到的 Token:</h4>
-            <div
-              v-for="(item, index) in quickImportForm.parsedTokens"
-              :key="index"
-              class="parsed-token-item"
-            >
-              <div class="parsed-token-header">
-                <label>
-                  <input
-                    type="checkbox"
-                    v-model="item.selected"
-                  />
-                  <strong>{{ item.type }}</strong> - {{ item.description }}
-                </label>
-              </div>
-              <div class="parsed-token-value">
-                {{ maskToken(item.value) }}
-              </div>
-            </div>
+      <!-- 解析结果预览 -->
+      <div v-if="quickImportForm.parsedTokens.length > 0" class="parsed-tokens-area">
+        <h4>检测到的 Token:</h4>
+        <div
+          v-for="(item, index) in quickImportForm.parsedTokens"
+          :key="index"
+          class="parsed-token-item"
+        >
+          <div class="parsed-token-header">
+            <el-checkbox v-model="item.selected">
+              <strong>{{ item.type }}</strong> - {{ item.description }}
+            </el-checkbox>
           </div>
-
-          <div v-else-if="quickImportForm.headerString.trim()" class="no-tokens-found">
-            未检测到有效的 Token，请检查输入格式
+          <div class="parsed-token-value">
+            {{ maskToken(item.value) }}
           </div>
-    </Modal>
+        </div>
+      </div>
+      <el-empty 
+        v-else-if="quickImportForm.headerString.trim()" 
+        description="未检测到有效的 Token，请检查输入格式" 
+        :image-size="60"
+      />
 
-    <!-- 消息提示 -->
-    <div v-if="message.show" :class="['message', message.type]">
-      {{ message.text }}
-    </div>
+      <template #footer>
+        <span class="dialog-footer">
+          <el-button @click="showQuickImportDialog = false">取消</el-button>
+          <el-button type="primary" :loading="updating" @click="submitQuickImport">
+            确认导入
+          </el-button>
+        </span>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -202,13 +219,11 @@ import {
   expireToken as expireTokenApi,
   setCheckInterval
 } from '@/api/token'
-import { confirm, Modal } from '@/components/Notification'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { Refresh, Check, Edit, Warning, Download } from '@element-plus/icons-vue'
 
 export default {
   name: 'TokenManagement',
-  components: {
-    Modal
-  },
   setup() {
     // 状态管理
     const loading = ref(false)
@@ -241,23 +256,6 @@ export default {
       parsedTokens: []
     })
 
-    // 消息提示
-    const message = reactive({
-      show: false,
-      type: 'success',
-      text: ''
-    })
-
-    // 显示消息
-    const showMessage = (text, type = 'success') => {
-      message.text = text
-      message.type = type
-      message.show = true
-      setTimeout(() => {
-        message.show = false
-      }, 3000)
-    }
-
     // 格式化日期时间
     const formatDateTime = (dateStr) => {
       if (!dateStr) return '-'
@@ -288,10 +286,10 @@ export default {
           systemStatus.is_running = res.data.is_running
           systemStatus.check_interval_minutes = res.data.check_interval_minutes
         } else {
-          showMessage(res.message || '获取状态失败', 'error')
+          ElMessage.error(res.message || '获取状态失败')
         }
       } catch (error) {
-        showMessage('获取状态失败: ' + error.message, 'error')
+        ElMessage.error('获取状态失败: ' + error.message)
       } finally {
         loading.value = false
       }
@@ -303,13 +301,13 @@ export default {
       try {
         const res = await checkAllTokensApi()
         if (res.success) {
-          showMessage('检查完成')
+          ElMessage.success('检查完成')
           await refreshStatus()
         } else {
-          showMessage(res.message || '检查失败', 'error')
+          ElMessage.error(res.message || '检查失败')
         }
       } catch (error) {
-        showMessage('检查失败: ' + error.message, 'error')
+        ElMessage.error('检查失败: ' + error.message)
       } finally {
         loading.value = false
       }
@@ -332,7 +330,7 @@ export default {
     // 提交更新
     const submitUpdate = async () => {
       if (!updateForm.token_value.trim()) {
-        showMessage('请输入 Token 值', 'error')
+        ElMessage.warning('请输入 Token 值')
         return
       }
 
@@ -349,14 +347,14 @@ export default {
 
         const res = await updateToken(data)
         if (res.success) {
-          showMessage('更新成功')
+          ElMessage.success('更新成功')
           closeUpdateDialog()
           await refreshStatus()
         } else {
-          showMessage(res.message || '更新失败', 'error')
+          ElMessage.error(res.message || '更新失败')
         }
       } catch (error) {
-        showMessage('更新失败: ' + error.message, 'error')
+        ElMessage.error('更新失败: ' + error.message)
       } finally {
         updating.value = false
       }
@@ -364,42 +362,40 @@ export default {
 
     // 标记过期
     const expireToken = async (tokenType) => {
-      const result = await confirm('确定要将此 Token 标记为过期吗？这将立即发送告警邮件。')
-      if (!result) {
-        return
-      }
-
-      loading.value = true
       try {
-        const res = await expireTokenApi(tokenType)
-        if (res.success) {
-          showMessage(res.message || '已标记为过期')
-          await refreshStatus()
-        } else {
-          showMessage(res.message || '标记失败', 'error')
+        await ElMessageBox.confirm(
+          '确定要将此 Token 标记为过期吗？这将立即发送告警邮件。',
+          '警告',
+          {
+            confirmButtonText: '确定',
+            cancelButtonText: '取消',
+            type: 'warning'
+          }
+        )
+        
+        loading.value = true
+        try {
+          const res = await expireTokenApi(tokenType)
+          if (res.success) {
+            ElMessage.success(res.message || '已标记为过期')
+            await refreshStatus()
+          } else {
+            ElMessage.error(res.message || '标记失败')
+          }
+        } catch (error) {
+          ElMessage.error('标记失败: ' + error.message)
+        } finally {
+          loading.value = false
         }
-      } catch (error) {
-        showMessage('标记失败: ' + error.message, 'error')
-      } finally {
-        loading.value = false
+      } catch {
+        // 取消操作
       }
-    }
-
-    // 打开间隔对话框
-    const openIntervalDialog = () => {
-      intervalForm.minutes = systemStatus.check_interval_minutes
-      showIntervalDialog.value = true
-    }
-
-    // 关闭间隔对话框
-    const closeIntervalDialog = () => {
-      showIntervalDialog.value = false
     }
 
     // 提交间隔修改
     const submitInterval = async () => {
       if (!intervalForm.minutes || intervalForm.minutes <= 0) {
-        showMessage('请输入有效的检查间隔', 'error')
+        ElMessage.warning('请输入有效的检查间隔')
         return
       }
 
@@ -407,14 +403,14 @@ export default {
       try {
         const res = await setCheckInterval(intervalForm.minutes)
         if (res.success) {
-          showMessage(res.message || '修改成功')
-          closeIntervalDialog()
+          ElMessage.success(res.message || '修改成功')
+          showIntervalDialog.value = false
           await refreshStatus()
         } else {
-          showMessage(res.message || '修改失败', 'error')
+          ElMessage.error(res.message || '修改失败')
         }
       } catch (error) {
-        showMessage('修改失败: ' + error.message, 'error')
+        ElMessage.error('修改失败: ' + error.message)
       } finally {
         updating.value = false
       }
@@ -515,13 +511,6 @@ export default {
       quickImportForm.parsedTokens = parsedTokens
     }
 
-    // 打开快捷导入对话框
-    const openQuickImportDialog = () => {
-      quickImportForm.headerString = ''
-      quickImportForm.parsedTokens = []
-      showQuickImportDialog.value = true
-    }
-
     // 关闭快捷导入对话框
     const closeQuickImportDialog = () => {
       showQuickImportDialog.value = false
@@ -532,7 +521,7 @@ export default {
       const selectedTokens = quickImportForm.parsedTokens.filter(t => t.selected)
 
       if (selectedTokens.length === 0) {
-        showMessage('请至少选择一个 Token', 'error')
+        ElMessage.warning('请至少选择一个 Token')
         return
       }
 
@@ -558,14 +547,14 @@ export default {
         }
 
         if (successCount > 0) {
-          showMessage(`成功导入 ${successCount} 个 Token${failCount > 0 ? `，失败 ${failCount} 个` : ''}`)
+          ElMessage.success(`成功导入 ${successCount} 个 Token${failCount > 0 ? `，失败 ${failCount} 个` : ''}`)
           closeQuickImportDialog()
           await refreshStatus()
         } else {
-          showMessage('导入失败', 'error')
+          ElMessage.error('导入失败')
         }
       } catch (error) {
-        showMessage('导入失败: ' + error.message, 'error')
+        ElMessage.error('导入失败: ' + error.message)
       } finally {
         updating.value = false
       }
@@ -587,7 +576,6 @@ export default {
       updateForm,
       intervalForm,
       quickImportForm,
-      message,
       formatDateTime,
       maskToken,
       refreshStatus,
@@ -596,26 +584,21 @@ export default {
       closeUpdateDialog,
       submitUpdate,
       expireToken,
-      openIntervalDialog,
-      closeIntervalDialog,
       submitInterval,
       parseHeaderString,
-      openQuickImportDialog,
       closeQuickImportDialog,
       submitQuickImport,
-      showMessage
+      Refresh, Check, Edit, Warning, Download
     }
   }
 }
 </script>
 
 <style scoped>
-/* 容器 */
 .token-management {
   padding: 20px;
 }
 
-/* 头部 */
 .header {
   display: flex;
   justify-content: space-between;
@@ -626,7 +609,7 @@ export default {
 .header h2 {
   margin: 0;
   font-size: 20px;
-  color: #333;
+  color: var(--text-color);
 }
 
 .header-actions {
@@ -634,344 +617,106 @@ export default {
   gap: 10px;
 }
 
-.btn-refresh,
-.btn-check,
-.btn-quick-import {
-  padding: 8px 16px;
-  border: 1px solid #ddd;
-  background: white;
-  color: #333;
-  cursor: pointer;
-  font-size: 13px;
-}
-
-.btn-quick-import {
-  background: #1890ff;
-  color: white;
-  border-color: #1890ff;
-}
-
-.btn-quick-import:hover {
-  background: #40a9ff;
-}
-
-.btn-refresh:hover,
-.btn-check:hover {
-  background: #f5f5f5;
-}
-
-.btn-refresh:disabled,
-.btn-check:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-/* 系统状态 */
-.system-status {
-  background: white;
-  border: 1px solid #ddd;
-  padding: 15px;
+.mb-4 {
   margin-bottom: 20px;
-  display: flex;
-  gap: 30px;
 }
 
-.status-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.status-item .label {
-  color: #666;
-  font-size: 13px;
-}
-
-.status-item .value {
-  font-weight: 500;
-  font-size: 13px;
-}
-
-.status-item .value.running {
-  color: #52c41a;
-}
-
-.status-item .value.stopped {
-  color: #ff4d4f;
-}
-
-.btn-edit {
-  padding: 4px 12px;
-  border: 1px solid #ddd;
-  background: white;
-  color: #333;
-  cursor: pointer;
-  font-size: 12px;
-}
-
-.btn-edit:hover {
-  background: #f5f5f5;
-}
-
-/* Token 列表 */
-.token-list {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
-  gap: 20px;
-}
-
-/* Token 卡片 */
-.token-card {
-  background: white;
-  border: 1px solid #ddd;
-  padding: 20px;
-}
-
-.token-card.expired {
-  border-color: #ff4d4f;
-  background: #fff1f0;
-}
-
-.token-header {
+.card-header {
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 15px;
-  padding-bottom: 15px;
-  border-bottom: 1px solid #f0f0f0;
+  align-items: center;
 }
 
-.token-title h3 {
-  margin: 0 0 5px 0;
+.token-title-group {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.token-title {
+  font-weight: bold;
   font-size: 16px;
-  color: #333;
 }
 
-.token-type {
-  font-size: 12px;
-  color: #999;
-  font-family: monospace;
-}
-
-.status-badge {
-  padding: 4px 12px;
-  font-size: 12px;
-  font-weight: 500;
-}
-
-.status-badge.valid {
-  background: #f6ffed;
-  color: #52c41a;
-  border: 1px solid #b7eb8f;
-}
-
-.status-badge.expired {
-  background: #fff1f0;
-  color: #ff4d4f;
-  border: 1px solid #ffccc7;
-}
-
-/* Token 信息 */
 .token-info {
   margin-bottom: 15px;
 }
 
-.info-row {
+.info-item {
   display: flex;
   justify-content: space-between;
-  padding: 8px 0;
-  font-size: 13px;
+  margin-bottom: 8px;
+  font-size: 14px;
 }
 
-.info-label {
-  color: #666;
+.info-item .label {
+  color: #909399;
 }
 
-.info-value {
-  color: #333;
-  font-weight: 500;
+.info-item .value {
+  color: #303133;
 }
 
-.info-value.token-value {
+.token-value {
   font-family: monospace;
-  font-size: 12px;
-  color: #666;
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-/* Token 操作 */
-.token-actions {
+.card-actions {
   display: flex;
+  justify-content: flex-end;
   gap: 10px;
+  border-top: 1px solid #EBEEF5;
+  padding-top: 15px;
 }
 
-.btn-update,
-.btn-expire {
-  flex: 1;
-  padding: 8px 16px;
-  border: 1px solid #ddd;
-  background: white;
-  color: #333;
-  cursor: pointer;
-  font-size: 13px;
-}
-
-.btn-update:hover {
-  background: #f5f5f5;
-}
-
-.btn-expire {
-  color: #ff4d4f;
-  border-color: #ff4d4f;
-}
-
-.btn-expire:hover {
-  background: #fff1f0;
-}
-
-.btn-expire:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-/* 对话框 */
-
-.form-group {
-  margin-bottom: 15px;
-}
-
-.form-group label {
-  display: block;
-  margin-bottom: 5px;
-  font-size: 13px;
-  color: #666;
-}
-
-.form-group input[type="text"],
-.form-group input[type="number"],
-.form-group input[type="datetime-local"],
-.form-group textarea {
-  width: 100%;
-  padding: 8px 12px;
-  border: 1px solid #ddd;
-  font-size: 13px;
-  box-sizing: border-box;
-}
-
-.form-group input[type="checkbox"] {
-  margin-right: 5px;
-}
-
-/* 消息提示 */
-.message {
-  position: fixed;
-  top: 20px;
-  right: 20px;
-  padding: 12px 20px;
-  background: white;
-  border: 1px solid #ddd;
-  font-size: 13px;
-  z-index: 2000;
-  min-width: 200px;
-}
-
-.message.success {
-  border-color: #52c41a;
-  background: #f6ffed;
-  color: #52c41a;
-}
-
-.message.error {
-  border-color: #ff4d4f;
-  background: #fff1f0;
-  color: #ff4d4f;
-}
-
-/* 快捷导入相关样式 */
-.hint {
+.form-hint {
   font-size: 12px;
-  color: #999;
+  color: #909399;
   margin-top: 5px;
 }
 
-.parsed-tokens {
+.parsed-tokens-area {
   margin-top: 20px;
   padding: 15px;
-  background: #f5f5f5;
-  border: 1px solid #ddd;
+  background: #f5f7fa;
+  border-radius: 4px;
 }
 
-.parsed-tokens h4 {
+.parsed-tokens-area h4 {
   margin: 0 0 10px 0;
   font-size: 14px;
-  color: #333;
+  color: #606266;
 }
 
 .parsed-token-item {
   background: white;
-  border: 1px solid #ddd;
+  border: 1px solid #dcdfe6;
   padding: 10px;
   margin-bottom: 10px;
-}
-
-.parsed-token-item:last-child {
-  margin-bottom: 0;
+  border-radius: 4px;
 }
 
 .parsed-token-header {
   margin-bottom: 5px;
 }
 
-.parsed-token-header label {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  cursor: pointer;
-  font-size: 13px;
-}
-
-.parsed-token-header input[type="checkbox"] {
-  margin: 0;
-}
-
 .parsed-token-value {
   font-family: monospace;
   font-size: 12px;
-  color: #666;
-  padding: 5px 10px;
+  color: #606266;
+  padding: 5px;
   background: #f9f9f9;
-  border: 1px solid #eee;
+  border-radius: 2px;
   word-break: break-all;
 }
 
-.no-tokens-found {
-  padding: 20px;
-  text-align: center;
-  color: #999;
-  font-size: 13px;
-  background: #f5f5f5;
-  border: 1px solid #ddd;
-}
-
-/* 响应式 */
-@media (max-width: 768px) {
-  .token-list {
-    grid-template-columns: 1fr;
-  }
-
-  .system-status {
-    flex-direction: column;
-    gap: 10px;
-  }
-
-  .header {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 10px;
-  }
-
-  .dialog-large {
-    max-width: 95%;
-  }
+/* Expired card styling */
+.token-card.is-expired :deep(.el-card__body) {
+  background-color: #fef0f0;
 }
 </style>
 

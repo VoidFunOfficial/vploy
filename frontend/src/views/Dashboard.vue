@@ -40,11 +40,12 @@
     <SystemSettings v-else-if="activeMenu === 'settings'" />
 
     <!-- 其他菜单项的占位内容 -->
-    <div v-else class="placeholder-content">
-      <div class="placeholder-card">
-        <h2>{{ getMenuTitle(activeMenu) }}</h2>
-        <p class="mt-20">此功能正在开发中...</p>
-      </div>
+    <div v-else class="h-full flex items-center justify-center bg-white rounded-lg m-4">
+      <el-empty :description="`${getMenuTitle(activeMenu)} 功能正在开发中...`">
+        <template #extra>
+          <el-button type="primary" @click="handleMenuChange('overview')">返回概览</el-button>
+        </template>
+      </el-empty>
     </div>
   </MainLayout>
 </template>
@@ -125,46 +126,25 @@ export default {
 </script>
 
 <style scoped>
-/* 占位内容 */
-.placeholder-content {
-  padding: 20px;
+.h-full {
+  height: 100%;
 }
-
-.placeholder-card {
+.flex {
+  display: flex;
+}
+.items-center {
+  align-items: center;
+}
+.justify-center {
+  justify-content: center;
+}
+.bg-white {
   background-color: #fff;
-  border: 1px solid #ddd;
-  padding: 30px;
-  text-align: center;
 }
-
-.placeholder-card h2 {
-  font-size: 18px;
-  color: #333;
-  font-weight: 500;
+.rounded-lg {
+  border-radius: 0.5rem;
 }
-
-.placeholder-card p {
-  font-size: 14px;
-  color: #666;
-}
-
-/* 移动端适配 */
-@media (max-width: 768px) {
-  .placeholder-content {
-    padding: 10px;
-  }
-
-  .placeholder-card {
-    padding: 20px;
-  }
-
-  .placeholder-card h2 {
-    font-size: 16px;
-  }
-
-  .placeholder-card p {
-    font-size: 13px;
-  }
+.m-4 {
+  margin: 1rem;
 }
 </style>
-

@@ -1,73 +1,93 @@
 <template>
-  <div class="main-layout">
-    <!-- 顶部导航栏 -->
-    <div class="top-navbar">
-      <div class="navbar-left">
-        <!-- 移动端菜单按钮 -->
-        <button class="menu-toggle" @click="toggleSidebar">☰</button>
-        <h1>VoidPoly 管理面板</h1>
-      </div>
-      <div class="navbar-right">
-        <span class="user-info">{{ user?.username }}</span>
-        <button class="btn-logout" @click="handleLogout">退出</button>
-      </div>
-    </div>
-
-    <!-- 主体区域 -->
-    <div class="main-body">
-      <!-- 遮罩层（移动端） -->
-      <div
-        v-if="sidebarOpen"
-        class="sidebar-overlay"
-        @click="closeSidebar"
-      ></div>
-
-      <!-- 左侧导航栏 -->
-      <div :class="['sidebar', { open: sidebarOpen, collapsed: sidebarCollapsed }]">
-        <!-- 收缩/展开按钮 -->
-        <div class="sidebar-toggle-btn" @click="toggleCollapse">
-          <span v-if="!sidebarCollapsed">«</span>
-          <span v-else>»</span>
+  <el-container class="layout-container">
+    <!-- 侧边栏 -->
+    <el-aside :width="isCollapse ? '64px' : '260px'" class="aside">
+      <div class="logo-container" :class="{ 'collapsed': isCollapse }">
+        <div class="logo-box" @click="toggleCollapse">
+          <el-icon :size="24" class="logo-icon" v-if="isCollapse"><ElementPlus /></el-icon>
+          <div v-else class="logo-full">
+             <el-icon :size="24" class="logo-icon"><ElementPlus /></el-icon>
+             <span class="logo-text">VoidPoly</span>
+          </div>
         </div>
-
-        <div
-          v-for="item in menuItems"
-          :key="item.id"
-          :class="['menu-item', { active: activeMenu === item.id }]"
-          @click="handleMenuClick(item.id)"
-          :title="sidebarCollapsed ? item.name : ''"
+      </div>
+      
+      <el-scrollbar>
+        <el-menu
+          :default-active="activeMenu"
+          class="sidebar-menu"
+          :collapse="isCollapse"
+          @select="handleMenuSelect"
+          background-color="transparent"
+          text-color="#475569"
+          active-text-color="#3B82F6"
         >
-          <span class="menu-icon">{{ item.icon }}</span>
-          <span class="menu-text" v-if="!sidebarCollapsed">{{ item.name }}</span>
+          <el-menu-item v-for="item in menuItems" :key="item.id" :index="item.id">
+            <el-icon><component :is="item.icon" /></el-icon>
+            <template #title>{{ item.name }}</template>
+          </el-menu-item>
+        </el-menu>
+      </el-scrollbar>
+    </el-aside>
+
+    <el-container class="main-wrapper">
+      <!-- 顶部导航 -->
+      <el-header class="header">
+        <div class="header-left">
+          <el-button link @click="toggleCollapse" class="collapse-btn">
+            <el-icon :size="20"><component :is="isCollapse ? 'Expand' : 'Fold'" /></el-icon>
+          </el-button>
+          <h2 class="page-title">{{ currentPageTitle }}</h2>
         </div>
-      </div>
+        <div class="header-right">
+          <el-tooltip content="全局刷新" placement="bottom">
+            <el-button circle text @click="handleGlobalRefresh" :loading="isRefreshing" class="icon-btn">
+              <el-icon :size="18"><Refresh /></el-icon>
+            </el-button>
+          </el-tooltip>
+          
+          <el-dropdown @command="handleCommand" trigger="click">
+            <div class="user-profile">
+              <el-avatar :size="32" class="user-avatar">{{ userInitial }}</el-avatar>
+              <span class="username">{{ user?.username || 'Admin' }}</span>
+              <el-icon class="el-icon--right"><ArrowDown /></el-icon>
+            </div>
+            <template #dropdown>
+              <el-dropdown-menu>
+                <el-dropdown-item command="settings">个人设置</el-dropdown-item>
+                <el-dropdown-item divided command="logout" style="color: var(--el-color-danger)">退出登录</el-dropdown-item>
+              </el-dropdown-menu>
+            </template>
+          </el-dropdown>
+        </div>
+      </el-header>
 
-      <!-- 右侧内容区 -->
-      <div :class="['content-area', { expanded: sidebarCollapsed }]">
+      <!-- 主要内容 -->
+      <el-main class="main-content">
         <slot></slot>
-      </div>
-    </div>
-
-    <!-- 全局刷新按钮 -->
-    <button
-      class="global-refresh-btn"
-      @click="handleGlobalRefresh"
-      :class="{ refreshing: isRefreshing }"
-      title="刷新当前页面"
-    >
-      <span class="refresh-icon">↻</span>
-    </button>
-  </div>
+      </el-main>
+    </el-container>
+  </el-container>
 </template>
 
 <script>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { logout } from '@/api/auth'
 import { getUser, clearAuth } from '@/utils/auth'
+import { 
+  Odometer, Monitor, Money, List, Filter, TrendCharts, Cpu, 
+  Switch, PieChart, Document, Link, DataLine, Timer, Setting,
+  Expand, Fold, Refresh, ArrowDown, ElementPlus
+} from '@element-plus/icons-vue'
 
 export default {
   name: 'MainLayout',
+  components: {
+    Odometer, Monitor, Money, List, Filter, TrendCharts, Cpu,
+    Switch, PieChart, Document, Link, DataLine, Timer, Setting,
+    Expand, Fold, Refresh, ArrowDown, ElementPlus
+  },
   props: {
     activeMenu: {
       type: String,
@@ -78,65 +98,73 @@ export default {
   setup(props, { emit }) {
     const router = useRouter()
     const user = ref(null)
-    const sidebarOpen = ref(false)
-    const sidebarCollapsed = ref(false) // 侧边栏收缩状态
-    const isRefreshing = ref(false) // 刷新状态
+    const isCollapse = ref(false)
+    const isRefreshing = ref(false)
 
-    // 菜单项配置
+    // 菜单项配置 - 映射到 Element Plus 图标
     const menuItems = ref([
-      { id: 'overview', name: '系统宏观信息', icon: '' },
-      { id: 'system', name: '系统信息', icon: '' },
-      { id: 'profit', name: '盈亏情况', icon: '' },
-      { id: 'tasks', name: '任务管理', icon: '' },
-      { id: 'filter', name: '过滤', icon: '' },
-      { id: 'analysis', name: '分析', icon: '' },
-      { id: 'decision', name: '决策', icon: '' },
-      { id: 'trade', name: '交易', icon: '' },
-      { id: 'positions', name: '持仓监控', icon: '' },
-      { id: 'logs', name: '日志管理', icon: '' },
-      { id: 'api', name: 'API 刷新', icon: '' },
-      { id: 'database', name: '数据库管理', icon: '' },
-      { id: 'scheduler', name: '定时任务管理', icon: '' },
-      { id: 'settings', name: '设置', icon: '' }
+      { id: 'overview', name: '系统宏观信息', icon: 'Odometer' },
+      { id: 'system', name: '系统信息', icon: 'Monitor' },
+      { id: 'profit', name: '盈亏情况', icon: 'Money' },
+      { id: 'tasks', name: '任务管理', icon: 'List' },
+      { id: 'filter', name: '过滤', icon: 'Filter' },
+      { id: 'analysis', name: '分析', icon: 'TrendCharts' },
+      { id: 'decision', name: '决策', icon: 'Cpu' },
+      { id: 'trade', name: '交易', icon: 'Switch' },
+      { id: 'positions', name: '持仓监控', icon: 'PieChart' },
+      { id: 'logs', name: '日志管理', icon: 'Document' },
+      { id: 'api', name: 'API 刷新', icon: 'Link' },
+      { id: 'database', name: '数据库管理', icon: 'DataLine' },
+      { id: 'scheduler', name: '定时任务管理', icon: 'Timer' },
+      { id: 'settings', name: '设置', icon: 'Setting' }
     ])
 
-    // 加载用户信息
-    onMounted(() => {
-      user.value = getUser()
-      // 从localStorage读取侧边栏收缩状态
-      const savedCollapsed = localStorage.getItem('sidebarCollapsed')
-      if (savedCollapsed !== null) {
-        sidebarCollapsed.value = savedCollapsed === 'true'
-      }
+    const currentPageTitle = computed(() => {
+      const item = menuItems.value.find(i => i.id === props.activeMenu)
+      return item ? item.name : 'Dashboard'
     })
 
-    // 切换侧边栏（移动端）
-    const toggleSidebar = () => {
-      sidebarOpen.value = !sidebarOpen.value
-    }
+    const userInitial = computed(() => {
+      const name = user.value?.username || 'A'
+      return name.charAt(0).toUpperCase()
+    })
 
-    // 关闭侧边栏（移动端）
-    const closeSidebar = () => {
-      sidebarOpen.value = false
-    }
+    onMounted(() => {
+      user.value = getUser()
+      // 读取侧边栏状态
+      const savedCollapse = localStorage.getItem('sidebarCollapse')
+      if (savedCollapse !== null) {
+        isCollapse.value = savedCollapse === 'true'
+      }
+      
+      // 响应式处理
+      checkScreenSize()
+      window.addEventListener('resize', checkScreenSize)
+    })
 
-    // 切换侧边栏收缩状态（桌面端）
-    const toggleCollapse = () => {
-      sidebarCollapsed.value = !sidebarCollapsed.value
-      // 保存状态到localStorage
-      localStorage.setItem('sidebarCollapsed', sidebarCollapsed.value)
-    }
-
-    // 处理菜单点击
-    const handleMenuClick = (menuId) => {
-      emit('menu-change', menuId)
-      // 移动端点击菜单后关闭侧边栏
+    const checkScreenSize = () => {
       if (window.innerWidth <= 768) {
-        closeSidebar()
+        isCollapse.value = true
       }
     }
 
-    // 处理登出
+    const toggleCollapse = () => {
+      isCollapse.value = !isCollapse.value
+      localStorage.setItem('sidebarCollapse', isCollapse.value)
+    }
+
+    const handleMenuSelect = (index) => {
+      emit('menu-change', index)
+    }
+
+    const handleCommand = (command) => {
+      if (command === 'logout') {
+        handleLogout()
+      } else if (command === 'settings') {
+        emit('menu-change', 'settings')
+      }
+    }
+
     const handleLogout = async () => {
       try {
         await logout()
@@ -148,15 +176,10 @@ export default {
       }
     }
 
-    // 处理全局刷新
     const handleGlobalRefresh = () => {
       if (isRefreshing.value) return
-
       isRefreshing.value = true
-      // 触发页面刷新事件
       window.dispatchEvent(new CustomEvent('global-refresh'))
-
-      // 1秒后恢复按钮状态
       setTimeout(() => {
         isRefreshing.value = false
       }, 1000)
@@ -165,14 +188,13 @@ export default {
     return {
       user,
       menuItems,
-      sidebarOpen,
-      sidebarCollapsed,
+      isCollapse,
       isRefreshing,
-      toggleSidebar,
-      closeSidebar,
+      currentPageTitle,
+      userInitial,
       toggleCollapse,
-      handleMenuClick,
-      handleLogout,
+      handleMenuSelect,
+      handleCommand,
       handleGlobalRefresh
     }
   }
@@ -180,323 +202,160 @@ export default {
 </script>
 
 <style scoped>
-/* 主布局容器 */
-.main-layout {
-  width: 100%;
+.layout-container {
   height: 100vh;
-  display: flex;
-  flex-direction: column;
-  background-color: #f5f5f5;
+  background-color: var(--bg-color-page);
 }
 
-/* 顶部导航栏 */
-.top-navbar {
-  height: 50px;
-  background-color: #20a53a;
-  border-bottom: 1px solid #1a8c31;
+.aside {
+  background-color: #fff;
+  border-right: 1px solid var(--border-color-light);
+  display: flex;
+  flex-direction: column;
+  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  z-index: 10;
+  overflow: hidden;
+}
+
+.logo-container {
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-bottom: 1px solid var(--border-color-light);
+  cursor: pointer;
+}
+
+.logo-box {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+}
+
+.logo-full {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.logo-icon {
+  color: var(--el-color-primary);
+}
+
+.logo-text {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text-color-primary);
+  letter-spacing: -0.5px;
+  font-family: 'Inter', sans-serif;
+}
+
+.sidebar-menu {
+  border-right: none;
+  padding: 8px 0;
+}
+
+.header {
+  background-color: #fff;
+  height: 64px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 20px;
-  flex-shrink: 0;
+  padding: 0 24px;
+  border-bottom: 1px solid var(--border-color-light);
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
 }
 
-.navbar-left {
+.header-left {
   display: flex;
   align-items: center;
-  gap: 15px;
+  gap: 16px;
 }
 
-.navbar-left h1 {
-  font-size: 16px;
-  color: #fff;
-  font-weight: 500;
-}
-
-/* 移动端菜单按钮 */
-.menu-toggle {
-  display: none;
-  width: 40px;
-  height: 40px;
-  border: none;
-  background-color: transparent;
-  color: #fff;
-  font-size: 24px;
-  cursor: pointer;
-  padding: 0;
-  line-height: 1;
-}
-
-.navbar-right {
-  display: flex;
-  align-items: center;
-  gap: 15px;
-}
-
-.user-info {
-  color: #fff;
-  font-size: 13px;
-}
-
-.btn-logout {
-  height: 30px;
-  padding: 0 15px;
-  border: none;
-  background-color: #fff;
-  color: #20a53a;
-  font-size: 12px;
-  cursor: pointer;
-  outline: none;
-}
-
-.btn-logout:hover {
-  background-color: #f0f0f0;
-}
-
-/* 主体区域 */
-.main-body {
-  flex: 1;
-  display: flex;
-  overflow: hidden;
-}
-
-/* 遮罩层（移动端） */
-.sidebar-overlay {
-  display: none;
-}
-
-/* 左侧导航栏 */
-.sidebar {
-  width: 200px;
-  background-color: #2c3e50;
-  overflow-y: auto;
-  flex-shrink: 0;
-  transition: width 0.3s ease;
-  position: relative;
-}
-
-/* 侧边栏收缩状态 */
-.sidebar.collapsed {
-  width: 60px;
-}
-
-/* 侧边栏收缩/展开按钮 */
-.sidebar-toggle-btn {
-  position: absolute;
-  top: 10px;
-  right: 10px;
-  width: 30px;
-  height: 30px;
-  background-color: #34495e;
-  color: #fff;
-  border: none;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+.collapse-btn {
   font-size: 18px;
-  z-index: 10;
+  color: var(--text-color-regular);
+}
+
+.page-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-color-primary);
+  margin: 0;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.user-profile {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  padding: 6px 12px;
+  border-radius: 20px;
   transition: background-color 0.2s;
+  border: 1px solid transparent;
 }
 
-.sidebar-toggle-btn:hover {
-  background-color: #20a53a;
+.user-profile:hover {
+  background-color: var(--bg-color-page);
+  border-color: var(--border-color-light);
 }
 
-/* 菜单项 */
-.menu-item {
-  height: 45px;
-  padding: 0 20px;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  cursor: pointer;
-  border-bottom: 1px solid #34495e;
-  color: #bdc3c7;
-  font-size: 13px;
-  white-space: nowrap;
-  overflow: hidden;
-}
-
-.sidebar.collapsed .menu-item {
-  padding: 0 10px;
-  justify-content: center;
-}
-
-.menu-item:hover {
-  background-color: #34495e;
+.user-avatar {
+  background-color: var(--el-color-primary);
   color: #fff;
+  font-weight: 600;
+  font-size: 14px;
 }
 
-.menu-item.active {
-  background-color: #20a53a;
-  color: #fff;
-  border-left: 3px solid #1a8c31;
+.username {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-color-primary);
 }
 
-.menu-icon {
-  font-size: 16px;
-  width: 20px;
-  text-align: center;
-  flex-shrink: 0;
-}
-
-.menu-text {
-  flex: 1;
-  transition: opacity 0.3s ease;
-}
-
-.sidebar.collapsed .menu-text {
-  opacity: 0;
-  width: 0;
-}
-
-/* 右侧内容区 */
-.content-area {
-  flex: 1;
+.main-content {
+  padding: 0;
+  background-color: var(--bg-color-page);
   overflow-y: auto;
-  background-color: #f5f5f5;
-  transition: margin-left 0.3s ease;
 }
 
-/* 滚动条样式 */
-.sidebar::-webkit-scrollbar,
-.content-area::-webkit-scrollbar {
-  width: 6px;
+/* 覆盖 Element Plus 样式 */
+:deep(.el-menu-item) {
+  margin: 4px 12px;
+  width: auto;
+  border-radius: 8px;
+  height: 48px;
+  line-height: 48px;
 }
 
-.sidebar::-webkit-scrollbar-thumb,
-.content-area::-webkit-scrollbar-thumb {
-  background-color: #555;
+:deep(.el-menu-item.is-active) {
+  background-color: var(--el-color-primary-light-9);
+  color: var(--el-color-primary);
+  font-weight: 600;
 }
 
-.sidebar::-webkit-scrollbar-track,
-.content-area::-webkit-scrollbar-track {
-  background-color: #2c3e50;
+:deep(.el-menu-item:hover) {
+  background-color: var(--bg-color-page);
 }
 
-.content-area::-webkit-scrollbar-track {
-  background-color: #e0e0e0;
-}
-
-/* 全局刷新按钮 */
-.global-refresh-btn {
-  position: fixed;
-  bottom: 30px;
-  right: 30px;
-  width: 56px;
-  height: 56px;
-  border-radius: 50%;
-  background-color: #20a53a;
-  border: none;
-  color: #fff;
-  font-size: 28px;
-  cursor: pointer;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+/* 折叠时的微调 */
+:deep(.el-menu--collapse .el-menu-item) {
+  margin: 4px 0;
+  padding: 0 !important;
   display: flex;
-  align-items: center;
   justify-content: center;
-  transition: all 0.3s ease;
-  z-index: 1000;
+  width: 100%;
 }
 
-.global-refresh-btn:hover {
-  background-color: #1a8c31;
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
-  transform: scale(1.05);
-}
-
-.global-refresh-btn:active {
-  transform: scale(0.95);
-}
-
-.global-refresh-btn.refreshing .refresh-icon {
-  animation: rotate 1s linear;
-}
-
-@keyframes rotate {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-.refresh-icon {
-  display: inline-block;
-  line-height: 1;
-}
-
-/* 移动端适配 */
-@media (max-width: 768px) {
-  /* 显示菜单按钮 */
-  .menu-toggle {
-    display: block;
-  }
-
-  /* 顶部导航栏 */
-  .top-navbar {
-    padding: 0 10px;
-  }
-
-  .navbar-left h1 {
-    font-size: 14px;
-  }
-
-  .user-info {
-    display: none;
-  }
-
-  .btn-logout {
-    font-size: 11px;
-    padding: 0 10px;
-    height: 28px;
-  }
-
-  /* 侧边栏默认隐藏 */
-  .sidebar {
-    position: fixed;
-    left: 0;
-    top: 50px;
-    bottom: 0;
-    z-index: 1000;
-    transform: translateX(-100%);
-  }
-
-  .sidebar.open {
-    transform: translateX(0);
-  }
-
-  /* 显示遮罩层 */
-  .sidebar-overlay {
-    display: block;
-    position: fixed;
-    top: 50px;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background-color: rgba(0, 0, 0, 0.5);
-    z-index: 999;
-  }
-
-  /* 内容区占满宽度 */
-  .content-area {
-    width: 100%;
-  }
-}
-
-/* 小屏幕优化 */
-@media (max-width: 480px) {
-  .navbar-left h1 {
-    font-size: 12px;
-  }
-
-  .btn-logout {
-    font-size: 10px;
-    padding: 0 8px;
-    height: 26px;
-  }
+:deep(.el-menu--collapse .el-menu-item .el-icon) {
+  margin: 0;
 }
 </style>
-

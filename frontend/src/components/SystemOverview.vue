@@ -1,181 +1,121 @@
 <template>
-  <div class="system-overview">
-    <h2 class="page-title">系统宏观信息</h2>
-
-    <!-- 状态卡片区域 -->
-    <div class="status-cards">
-      <!-- CPU 占用率 -->
-      <div class="status-card">
-        <div class="card-header">
-          <span class="card-title">CPU 占用率</span>
-        </div>
-        <div class="card-body">
-          <div class="progress-circle">
-            <svg width="120" height="120">
-              <circle
-                cx="60"
-                cy="60"
-                r="50"
-                fill="none"
-                stroke="#e0e0e0"
-                stroke-width="10"
-              />
-              <circle
-                cx="60"
-                cy="60"
-                r="50"
-                fill="none"
-                :stroke="getColorByValue(systemData.cpu_percent)"
-                stroke-width="10"
-                :stroke-dasharray="circumference"
-                :stroke-dashoffset="getCpuOffset"
-                transform="rotate(-90 60 60)"
-              />
-            </svg>
-            <div class="progress-text">
-              <span class="progress-value">{{ systemData.cpu_percent }}%</span>
-            </div>
-          </div>
-          <div class="card-info">{{ systemData.cpu_count }} 核心</div>
-        </div>
-      </div>
-
-      <!-- 内存占用率 -->
-      <div class="status-card">
-        <div class="card-header">
-          <span class="card-title">内存占用率</span>
-        </div>
-        <div class="card-body">
-          <div class="progress-circle">
-            <svg width="120" height="120">
-              <circle
-                cx="60"
-                cy="60"
-                r="50"
-                fill="none"
-                stroke="#e0e0e0"
-                stroke-width="10"
-              />
-              <circle
-                cx="60"
-                cy="60"
-                r="50"
-                fill="none"
-                :stroke="getColorByValue(systemData.memory_percent)"
-                stroke-width="10"
-                :stroke-dasharray="circumference"
-                :stroke-dashoffset="getMemoryOffset"
-                transform="rotate(-90 60 60)"
-              />
-            </svg>
-            <div class="progress-text">
-              <span class="progress-value">{{ systemData.memory_percent }}%</span>
-            </div>
-          </div>
-          <div class="card-info">
-            {{ formatBytes(systemData.memory_used) }} / {{ formatBytes(systemData.memory_total) }}
-          </div>
-        </div>
-      </div>
-
-      <!-- 磁盘占用率 -->
-      <div class="status-card">
-        <div class="card-header">
-          <span class="card-title">磁盘占用率</span>
-        </div>
-        <div class="card-body">
-          <div class="progress-circle">
-            <svg width="120" height="120">
-              <circle
-                cx="60"
-                cy="60"
-                r="50"
-                fill="none"
-                stroke="#e0e0e0"
-                stroke-width="10"
-              />
-              <circle
-                cx="60"
-                cy="60"
-                r="50"
-                fill="none"
-                :stroke="getColorByValue(systemData.disk_percent)"
-                stroke-width="10"
-                :stroke-dasharray="circumference"
-                :stroke-dashoffset="getDiskOffset"
-                transform="rotate(-90 60 60)"
-              />
-            </svg>
-            <div class="progress-text">
-              <span class="progress-value">{{ systemData.disk_percent }}%</span>
-            </div>
-          </div>
-          <div class="card-info">
-            {{ formatBytes(systemData.disk_used) }} / {{ formatBytes(systemData.disk_total) }}
-          </div>
-        </div>
-      </div>
-
-      <!-- 累计运行时间 -->
-      <div class="status-card">
-        <div class="card-header">
-          <span class="card-title">累计运行时间</span>
-        </div>
-        <div class="card-body">
-          <div class="uptime-display">
-            <div class="uptime-value">{{ formatUptime(systemData.uptime) }}</div>
-          </div>
-          <div class="card-info">启动时间: {{ systemData.boot_time }}</div>
-        </div>
-      </div>
-    </div>
-
-    <!-- TPS 统计区域 -->
-    <div class="tps-section">
-      <div class="section-card">
-        <div class="section-header">
-          <span class="section-title">TPS 统计（近 3 小时）</span>
-        </div>
-        <div class="section-body">
-          <div class="tps-stats">
-            <div class="stat-item">
-              <div class="stat-label">当前 TPS</div>
-              <div class="stat-value">{{ systemData.current_tps }}</div>
-            </div>
-            <div class="stat-item">
-              <div class="stat-label">平均 TPS</div>
-              <div class="stat-value">{{ systemData.avg_tps }}</div>
-            </div>
-            <div class="stat-item">
-              <div class="stat-label">峰值 TPS</div>
-              <div class="stat-value">{{ systemData.max_tps }}</div>
-            </div>
-            <div class="stat-item">
-              <div class="stat-label">总事务数</div>
-              <div class="stat-value">{{ systemData.total_transactions }}</div>
-            </div>
-          </div>
-        </div>
-      </div>
+  <div class="page-container">
+    <div class="page-header mb-4">
+      <h2 class="text-xl font-bold text-gray-800">系统宏观信息</h2>
     </div>
 
     <!-- 首次加载状态 -->
-    <div v-if="isFirstLoading" class="loading-overlay">
-      <div class="loading-spinner"></div>
-      <div class="loading-text">加载中...</div>
+    <div v-if="isFirstLoading" class="loading-container" v-loading="true" element-loading-text="加载系统数据中...">
     </div>
+    
+    <template v-else>
+      <el-row :gutter="20">
+        <!-- CPU -->
+        <el-col :xs="24" :sm="12" :md="6" class="mb-4">
+          <el-card shadow="hover" class="monitor-card h-full">
+            <template #header>
+              <div class="flex justify-between items-center">
+                <span class="font-medium">CPU 占用率</span>
+                <el-tag size="small" effect="plain">{{ systemData.cpu_count }} 核心</el-tag>
+              </div>
+            </template>
+            <div class="flex flex-col items-center justify-center p-4">
+              <el-progress type="dashboard" :percentage="systemData.cpu_percent" :color="colors" :width="120" />
+            </div>
+          </el-card>
+        </el-col>
+
+        <!-- 内存 -->
+        <el-col :xs="24" :sm="12" :md="6" class="mb-4">
+          <el-card shadow="hover" class="monitor-card h-full">
+            <template #header>
+              <div class="flex justify-between items-center">
+                <span class="font-medium">内存占用率</span>
+              </div>
+            </template>
+            <div class="flex flex-col items-center justify-center p-4">
+              <el-progress type="dashboard" :percentage="systemData.memory_percent" :color="colors" :width="120" />
+              <div class="mt-4 text-gray-500 text-sm font-medium">
+                {{ formatBytes(systemData.memory_used) }} / {{ formatBytes(systemData.memory_total) }}
+              </div>
+            </div>
+          </el-card>
+        </el-col>
+
+        <!-- 磁盘 -->
+        <el-col :xs="24" :sm="12" :md="6" class="mb-4">
+          <el-card shadow="hover" class="monitor-card h-full">
+            <template #header>
+              <div class="flex justify-between items-center">
+                <span class="font-medium">磁盘占用率</span>
+              </div>
+            </template>
+            <div class="flex flex-col items-center justify-center p-4">
+              <el-progress type="dashboard" :percentage="systemData.disk_percent" :color="colors" :width="120" />
+              <div class="mt-4 text-gray-500 text-sm font-medium">
+                {{ formatBytes(systemData.disk_used) }} / {{ formatBytes(systemData.disk_total) }}
+              </div>
+            </div>
+          </el-card>
+        </el-col>
+
+        <!-- 运行时间 -->
+        <el-col :xs="24" :sm="12" :md="6" class="mb-4">
+          <el-card shadow="hover" class="monitor-card h-full flex flex-col">
+            <template #header>
+              <div class="flex justify-between items-center">
+                <span class="font-medium">系统运行时间</span>
+              </div>
+            </template>
+            <div class="flex flex-col items-center justify-center flex-grow p-4">
+              <div class="text-2xl font-bold text-primary mb-2">{{ formatUptime(systemData.uptime) }}</div>
+              <div class="text-gray-500 text-sm">启动时间: {{ systemData.boot_time }}</div>
+            </div>
+          </el-card>
+        </el-col>
+      </el-row>
+
+      <!-- TPS 统计 -->
+      <el-card shadow="hover" class="mt-4">
+        <template #header>
+          <div class="flex justify-between items-center">
+            <span class="font-medium">TPS 统计（近 3 小时）</span>
+          </div>
+        </template>
+        <el-row :gutter="20">
+          <el-col :xs="12" :sm="6">
+            <el-statistic title="当前 TPS" :value="systemData.current_tps" value-style="color: var(--el-color-primary)" />
+          </el-col>
+          <el-col :xs="12" :sm="6">
+            <el-statistic title="平均 TPS" :value="systemData.avg_tps" />
+          </el-col>
+          <el-col :xs="12" :sm="6">
+            <el-statistic title="峰值 TPS" :value="systemData.max_tps" value-style="color: var(--el-color-warning)" />
+          </el-col>
+          <el-col :xs="12" :sm="6">
+            <el-statistic title="总事务数" :value="systemData.total_transactions" />
+          </el-col>
+        </el-row>
+      </el-card>
+    </template>
   </div>
 </template>
 
 <script>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { getSystemMonitor } from '@/api/monitor'
 
 export default {
   name: 'SystemOverview',
   setup() {
-    const isFirstLoading = ref(true)  // 首次加载标志
-    const circumference = 2 * Math.PI * 50 // 圆周长
+    const isFirstLoading = ref(true)
+    
+    // 进度条颜色配置
+    const colors = [
+      { color: '#10B981', percentage: 50 },
+      { color: '#F59E0B', percentage: 80 },
+      { color: '#EF4444', percentage: 100 },
+    ]
 
     // 系统数据
     const systemData = ref({
@@ -194,31 +134,6 @@ export default {
       max_tps: 0,
       total_transactions: 0
     })
-
-    // 计算 CPU 进度条偏移
-    const getCpuOffset = computed(() => {
-      const percent = systemData.value.cpu_percent
-      return circumference - (percent / 100) * circumference
-    })
-
-    // 计算内存进度条偏移
-    const getMemoryOffset = computed(() => {
-      const percent = systemData.value.memory_percent
-      return circumference - (percent / 100) * circumference
-    })
-
-    // 计算磁盘进度条偏移
-    const getDiskOffset = computed(() => {
-      const percent = systemData.value.disk_percent
-      return circumference - (percent / 100) * circumference
-    })
-
-    // 根据数值获取颜色
-    const getColorByValue = (value) => {
-      if (value < 50) return '#20a53a'
-      if (value < 80) return '#ff9800'
-      return '#ff5722'
-    }
 
     // 格式化字节数
     const formatBytes = (bytes) => {
@@ -247,31 +162,21 @@ export default {
       } catch (error) {
         console.error('获取系统监控数据失败:', error)
       } finally {
-        // 首次加载完成后，关闭加载遮罩
         if (isFirstLoading.value) {
           isFirstLoading.value = false
         }
       }
     }
 
-    // 刷新数据
-    const refreshData = () => {
-      fetchSystemData()
-    }
-
-    // 定时刷新
     let refreshTimer = null
 
-    // 全局刷新事件处理
     const handleGlobalRefresh = () => {
       fetchSystemData()
     }
 
     onMounted(() => {
       fetchSystemData()
-      // 每 5 秒刷新一次
       refreshTimer = setInterval(fetchSystemData, 5000)
-      // 监听全局刷新事件
       window.addEventListener('global-refresh', handleGlobalRefresh)
     })
 
@@ -279,325 +184,42 @@ export default {
       if (refreshTimer) {
         clearInterval(refreshTimer)
       }
-      // 移除全局刷新事件监听
       window.removeEventListener('global-refresh', handleGlobalRefresh)
     })
 
     return {
       isFirstLoading,
       systemData,
-      circumference,
-      getCpuOffset,
-      getMemoryOffset,
-      getDiskOffset,
-      getColorByValue,
+      colors,
       formatBytes,
-      formatUptime,
-      refreshData
+      formatUptime
     }
   }
 }
 </script>
 
 <style scoped>
-/* 系统概览容器 */
-.system-overview {
-  padding: 20px;
-  position: relative;
-}
-
-/* 页面标题 */
-.page-title {
-  font-size: 18px;
-  color: #333;
-  margin-bottom: 20px;
-  font-weight: 500;
-}
-
-/* 状态卡片区域 */
-.status-cards {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  gap: 20px;
-  margin-bottom: 20px;
-}
-
-/* 移动端适配 */
-@media (max-width: 768px) {
-  .system-overview {
-    padding: 10px;
-  }
-
-  .page-title {
-    font-size: 16px;
-    margin-bottom: 15px;
-  }
-
-  .status-cards {
-    grid-template-columns: 1fr;
-    gap: 10px;
-    margin-bottom: 15px;
-  }
-}
-
-/* 状态卡片 */
-.status-card {
-  background-color: #fff;
-  border: 1px solid #ddd;
-  padding: 20px;
-}
-
-/* 移动端卡片样式 */
-@media (max-width: 768px) {
-  .status-card {
-    padding: 15px;
-  }
-}
-
-.card-header {
+.loading-container {
+  height: 300px;
   display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 15px;
-  padding-bottom: 10px;
-  border-bottom: 1px solid #f0f0f0;
-}
-
-.card-icon {
-  font-size: 18px;
-}
-
-.card-title {
-  font-size: 14px;
-  color: #333;
-  font-weight: 500;
-}
-
-.card-body {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-}
-
-/* 进度圆环 */
-.progress-circle {
-  position: relative;
-  width: 120px;
-  height: 120px;
-  margin-bottom: 10px;
-}
-
-.progress-text {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  text-align: center;
-}
-
-.progress-value {
-  font-size: 24px;
-  color: #333;
-  font-weight: 500;
-}
-
-.card-info {
-  font-size: 12px;
-  color: #666;
-  text-align: center;
-}
-
-/* 移动端进度圆环 */
-@media (max-width: 768px) {
-  .progress-circle {
-    width: 100px;
-    height: 100px;
-  }
-
-  .progress-value {
-    font-size: 20px;
-  }
-
-  .card-info {
-    font-size: 11px;
-  }
-}
-
-/* 运行时间显示 */
-.uptime-display {
-  width: 100%;
-  padding: 30px 0;
-  text-align: center;
-}
-
-.uptime-value {
-  font-size: 18px;
-  color: #20a53a;
-  font-weight: 500;
-}
-
-/* TPS 统计区域 */
-.tps-section {
-  margin-bottom: 20px;
-}
-
-.section-card {
-  background-color: #fff;
-  border: 1px solid #ddd;
-}
-
-/* 移动端 TPS 区域 */
-@media (max-width: 768px) {
-  .tps-section {
-    margin-bottom: 15px;
-  }
-}
-
-.section-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 15px;
-  border-bottom: 1px solid #ddd;
-}
-
-.section-icon {
-  font-size: 18px;
-}
-
-.section-title {
-  flex: 1;
-  font-size: 14px;
-  color: #333;
-  font-weight: 500;
-}
-
-.refresh-btn {
-  font-size: 12px;
-  color: #20a53a;
-  cursor: pointer;
-}
-
-.refresh-btn:hover {
-  color: #1a8c31;
-}
-
-.section-body {
-  padding: 20px;
-}
-
-/* 移动端区域头部 */
-@media (max-width: 768px) {
-  .section-header {
-    padding: 12px 15px;
-  }
-
-  .section-icon {
-    font-size: 16px;
-  }
-
-  .section-title {
-    font-size: 13px;
-  }
-
-  .section-body {
-    padding: 15px;
-  }
-}
-
-/* TPS 统计 */
-.tps-stats {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: 20px;
-}
-
-.stat-item {
-  text-align: center;
-  padding: 15px;
-  background-color: #f9f9f9;
-  border: 1px solid #e0e0e0;
-}
-
-.stat-label {
-  font-size: 12px;
-  color: #666;
-  margin-bottom: 8px;
-}
-
-.stat-value {
-  font-size: 24px;
-  color: #20a53a;
-  font-weight: 500;
-}
-
-/* 移动端 TPS 统计 */
-@media (max-width: 768px) {
-  .tps-stats {
-    grid-template-columns: repeat(2, 1fr);
-    gap: 10px;
-  }
-
-  .stat-item {
-    padding: 12px;
-  }
-
-  .stat-label {
-    font-size: 11px;
-  }
-
-  .stat-value {
-    font-size: 20px;
-  }
-}
-
-/* 加载状态 */
-.loading-overlay {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: rgba(255, 255, 255, 0.95);
-  display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 15px;
-  z-index: 1000;
 }
 
-.loading-spinner {
-  width: 40px;
-  height: 40px;
-  border: 4px solid #e0e0e0;
-  border-top-color: #20a53a;
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
+.text-primary {
+  color: var(--el-color-primary);
 }
 
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
+.h-full {
+  height: 100%;
 }
 
-.loading-text {
-  font-size: 14px;
-  color: #666;
+.monitor-card {
+  display: flex;
+  flex-direction: column;
 }
 
-/* 数据更新平滑过渡 */
-.progress-value,
-.uptime-value,
-.stat-value,
-.card-info {
-  transition: opacity 0.3s ease;
-}
-
-/* 圆环进度条平滑过渡 */
-.progress-circle circle {
-  transition: stroke-dashoffset 0.5s ease, stroke 0.3s ease;
+:deep(.el-card__body) {
+  flex-grow: 1;
 }
 </style>
-
