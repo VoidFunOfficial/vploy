@@ -16,15 +16,16 @@ from enum import Enum
 
 from ..task_manager.tasks import huey
 from ..task_manager.models import TaskDatabase, AsyncTask, TaskStage, TaskStatus
-from ..vlogger import get_logger, TraceContext
+from ..vlogger import TraceContext
 from .gpt_api import send_request, get_result, process_result, parse_cookie_string
 from ..sys_configs.token_refresher import get_token_refresher, TokenType
 from ..polymarket_api import GammaMarketsAPI
 from ..core.utils.helpers import market_to_dict
+from ..sys_configs.global_event_reg import vlogger
 
 
-# 初始化日志记录器
-logger = get_logger("ai_analysis")
+# 使用全局日志记录器
+logger = vlogger
 
 # 初始化数据库
 db = TaskDatabase()

@@ -3,9 +3,6 @@
     <!-- 标题栏 -->
     <div class="header">
       <h2>数据库管理</h2>
-      <div class="header-actions">
-        <button class="btn-refresh" @click="refreshData">🔄 刷新</button>
-      </div>
     </div>
 
     <!-- 主体区域 -->
@@ -20,7 +17,7 @@
             :class="['table-item', { active: selectedTable === table.name }]"
             @click="selectTable(table.name)"
           >
-            <span class="table-icon">📋</span>
+            <span class="table-icon"></span>
             <span class="table-name">{{ table.name }}</span>
           </div>
         </div>

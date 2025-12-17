@@ -14,10 +14,11 @@ from .models import TaskDatabase, ScheduledTask
 from .health_check import check_all_nodes, get_health_report, get_db as get_health_db
 from .email_report import generate_health_report_html, generate_plain_text_report
 from ..vlogger.email_helper import email_send_with_db_config
-from ..vlogger import get_logger, TraceContext
+from ..vlogger import TraceContext
+from ..sys_configs.global_event_reg import vlogger
 
 
-logger = get_logger("dynamic_scheduler")
+logger = vlogger
 
 
 class DynamicScheduler:

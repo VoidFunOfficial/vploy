@@ -23,23 +23,40 @@
       ></div>
 
       <!-- 左侧导航栏 -->
-      <div :class="['sidebar', { open: sidebarOpen }]">
+      <div :class="['sidebar', { open: sidebarOpen, collapsed: sidebarCollapsed }]">
+        <!-- 收缩/展开按钮 -->
+        <div class="sidebar-toggle-btn" @click="toggleCollapse">
+          <span v-if="!sidebarCollapsed">«</span>
+          <span v-else>»</span>
+        </div>
+
         <div
           v-for="item in menuItems"
           :key="item.id"
           :class="['menu-item', { active: activeMenu === item.id }]"
           @click="handleMenuClick(item.id)"
+          :title="sidebarCollapsed ? item.name : ''"
         >
           <span class="menu-icon">{{ item.icon }}</span>
-          <span class="menu-text">{{ item.name }}</span>
+          <span class="menu-text" v-if="!sidebarCollapsed">{{ item.name }}</span>
         </div>
       </div>
 
       <!-- 右侧内容区 -->
-      <div class="content-area">
+      <div :class="['content-area', { expanded: sidebarCollapsed }]">
         <slot></slot>
       </div>
     </div>
+
+    <!-- 全局刷新按钮 -->
+    <button
+      class="global-refresh-btn"
+      @click="handleGlobalRefresh"
+      :class="{ refreshing: isRefreshing }"
+      title="刷新当前页面"
+    >
+      <span class="refresh-icon">↻</span>
+    </button>
   </div>
 </template>
 
@@ -62,39 +79,52 @@ export default {
     const router = useRouter()
     const user = ref(null)
     const sidebarOpen = ref(false)
+    const sidebarCollapsed = ref(false) // 侧边栏收缩状态
+    const isRefreshing = ref(false) // 刷新状态
 
     // 菜单项配置
     const menuItems = ref([
-      { id: 'overview', name: '系统宏观信息', icon: '📊' },
-      { id: 'system', name: '系统信息', icon: '💻' },
-      { id: 'profit', name: '盈亏情况', icon: '💰' },
-      { id: 'tasks', name: '任务管理', icon: '📋' },
-      { id: 'filter', name: '过滤', icon: '🔍' },
-      { id: 'analysis', name: '分析', icon: '📈' },
-      { id: 'decision', name: '决策', icon: '🎯' },
-      { id: 'trade', name: '交易', icon: '💱' },
-      { id: 'positions', name: '仓位监听', icon: '📍' },
-      { id: 'monitor', name: '监控', icon: '👁️' },
-      { id: 'logs', name: '日志管理', icon: '📝' },
-      { id: 'api', name: 'API 刷新', icon: '🔄' },
-      { id: 'database', name: '数据库管理', icon: '🗄️' },
-      { id: 'scheduler', name: '定时任务管理', icon: '⏰' },
-      { id: 'settings', name: '设置', icon: '⚙️' }
+      { id: 'overview', name: '系统宏观信息', icon: '' },
+      { id: 'system', name: '系统信息', icon: '' },
+      { id: 'profit', name: '盈亏情况', icon: '' },
+      { id: 'tasks', name: '任务管理', icon: '' },
+      { id: 'filter', name: '过滤', icon: '' },
+      { id: 'analysis', name: '分析', icon: '' },
+      { id: 'decision', name: '决策', icon: '' },
+      { id: 'trade', name: '交易', icon: '' },
+      { id: 'positions', name: '持仓监控', icon: '' },
+      { id: 'logs', name: '日志管理', icon: '' },
+      { id: 'api', name: 'API 刷新', icon: '' },
+      { id: 'database', name: '数据库管理', icon: '' },
+      { id: 'scheduler', name: '定时任务管理', icon: '' },
+      { id: 'settings', name: '设置', icon: '' }
     ])
 
     // 加载用户信息
     onMounted(() => {
       user.value = getUser()
+      // 从localStorage读取侧边栏收缩状态
+      const savedCollapsed = localStorage.getItem('sidebarCollapsed')
+      if (savedCollapsed !== null) {
+        sidebarCollapsed.value = savedCollapsed === 'true'
+      }
     })
 
-    // 切换侧边栏
+    // 切换侧边栏（移动端）
     const toggleSidebar = () => {
       sidebarOpen.value = !sidebarOpen.value
     }
 
-    // 关闭侧边栏
+    // 关闭侧边栏（移动端）
     const closeSidebar = () => {
       sidebarOpen.value = false
+    }
+
+    // 切换侧边栏收缩状态（桌面端）
+    const toggleCollapse = () => {
+      sidebarCollapsed.value = !sidebarCollapsed.value
+      // 保存状态到localStorage
+      localStorage.setItem('sidebarCollapsed', sidebarCollapsed.value)
     }
 
     // 处理菜单点击
@@ -118,14 +148,32 @@ export default {
       }
     }
 
+    // 处理全局刷新
+    const handleGlobalRefresh = () => {
+      if (isRefreshing.value) return
+
+      isRefreshing.value = true
+      // 触发页面刷新事件
+      window.dispatchEvent(new CustomEvent('global-refresh'))
+
+      // 1秒后恢复按钮状态
+      setTimeout(() => {
+        isRefreshing.value = false
+      }, 1000)
+    }
+
     return {
       user,
       menuItems,
       sidebarOpen,
+      sidebarCollapsed,
+      isRefreshing,
       toggleSidebar,
       closeSidebar,
+      toggleCollapse,
       handleMenuClick,
-      handleLogout
+      handleLogout,
+      handleGlobalRefresh
     }
   }
 }
@@ -223,7 +271,36 @@ export default {
   background-color: #2c3e50;
   overflow-y: auto;
   flex-shrink: 0;
-  transition: transform 0.3s ease;
+  transition: width 0.3s ease;
+  position: relative;
+}
+
+/* 侧边栏收缩状态 */
+.sidebar.collapsed {
+  width: 60px;
+}
+
+/* 侧边栏收缩/展开按钮 */
+.sidebar-toggle-btn {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 30px;
+  height: 30px;
+  background-color: #34495e;
+  color: #fff;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  z-index: 10;
+  transition: background-color 0.2s;
+}
+
+.sidebar-toggle-btn:hover {
+  background-color: #20a53a;
 }
 
 /* 菜单项 */
@@ -237,6 +314,13 @@ export default {
   border-bottom: 1px solid #34495e;
   color: #bdc3c7;
   font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.sidebar.collapsed .menu-item {
+  padding: 0 10px;
+  justify-content: center;
 }
 
 .menu-item:hover {
@@ -254,10 +338,17 @@ export default {
   font-size: 16px;
   width: 20px;
   text-align: center;
+  flex-shrink: 0;
 }
 
 .menu-text {
   flex: 1;
+  transition: opacity 0.3s ease;
+}
+
+.sidebar.collapsed .menu-text {
+  opacity: 0;
+  width: 0;
 }
 
 /* 右侧内容区 */
@@ -265,6 +356,7 @@ export default {
   flex: 1;
   overflow-y: auto;
   background-color: #f5f5f5;
+  transition: margin-left 0.3s ease;
 }
 
 /* 滚动条样式 */
@@ -285,6 +377,55 @@ export default {
 
 .content-area::-webkit-scrollbar-track {
   background-color: #e0e0e0;
+}
+
+/* 全局刷新按钮 */
+.global-refresh-btn {
+  position: fixed;
+  bottom: 30px;
+  right: 30px;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background-color: #20a53a;
+  border: none;
+  color: #fff;
+  font-size: 28px;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
+  z-index: 1000;
+}
+
+.global-refresh-btn:hover {
+  background-color: #1a8c31;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
+  transform: scale(1.05);
+}
+
+.global-refresh-btn:active {
+  transform: scale(0.95);
+}
+
+.global-refresh-btn.refreshing .refresh-icon {
+  animation: rotate 1s linear;
+}
+
+@keyframes rotate {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.refresh-icon {
+  display: inline-block;
+  line-height: 1;
 }
 
 /* 移动端适配 */

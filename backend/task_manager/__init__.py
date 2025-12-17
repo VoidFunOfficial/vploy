@@ -116,9 +116,9 @@ def init_task_manager():
     2. 初始化预定义的定时任务
     3. 启动动态调度器
     """
-    from ..vlogger import get_logger
+    from ..sys_configs.global_event_reg import vlogger
 
-    logger = get_logger("task_manager")
+    logger = vlogger
     logger.info(
         "TASK_MANAGER.INIT.START",
         msg="初始化任务管理器"

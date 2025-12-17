@@ -4,9 +4,8 @@
     <div class="header">
       <h2>收益曲线</h2>
       <div class="header-actions">
-        <button class="btn-config" @click="openConfigDialog">⚙️ 钱包配置</button>
-        <button class="btn-primary" @click="showAddDialog = true">➕ 添加记录</button>
-        <button class="btn-refresh" @click="loadData">🔄 刷新</button>
+        <button class="btn-config" @click="openConfigDialog">钱包配置</button>
+        <button class="btn-primary" @click="showAddDialog = true">添加记录</button>
       </div>
     </div>
 
@@ -639,8 +638,8 @@ export default {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 20px;
-  padding: 15px 20px;
+  margin-bottom: 12px;
+  padding: 10px 15px;
   background-color: #fff;
   border: 1px solid #ddd;
   border-radius: 8px;
@@ -648,7 +647,7 @@ export default {
 
 .header h2 {
   margin: 0;
-  font-size: 20px;
+  font-size: 18px;
   color: #333;
 }
 

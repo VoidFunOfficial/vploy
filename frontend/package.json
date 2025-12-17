@@ -9,11 +9,13 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "apexcharts": "^5.3.6",
     "axios": "latest",
     "echarts": "latest",
     "voidpoly-admin": "link:",
     "vue": "latest",
-    "vue-router": "latest"
+    "vue-router": "latest",
+    "vue3-apexcharts": "^1.10.0"
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "latest",

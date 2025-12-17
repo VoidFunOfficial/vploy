@@ -12,10 +12,10 @@ from ...task_manager import (
     TaskStatus,
     TaskDatabase
 )
-from ...vlogger import get_logger
+from ...sys_configs.global_event_reg import vlogger
 
 tasks_bp = Blueprint('tasks', __name__, url_prefix='/api/tasks')
-logger = get_logger("tasks_api")
+logger = vlogger
 db = TaskDatabase()
 
 

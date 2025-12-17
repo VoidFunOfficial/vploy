@@ -10,7 +10,8 @@ from datetime import datetime
 
 from .config import get_config
 from .models import AsyncTask, TaskStage, TaskStatus, TaskDatabase
-from ..vlogger import get_logger, TraceContext
+from ..vlogger import TraceContext
+from ..sys_configs.global_event_reg import vlogger
 
 
 # 初始化Huey任务队列
@@ -21,8 +22,8 @@ huey = SqliteHuey(
     utc=True
 )
 
-# 初始化日志记录器
-logger = get_logger("task_manager")
+# 使用全局日志记录器
+logger = vlogger
 
 # 初始化数据库
 db = TaskDatabase()
@@ -800,7 +801,8 @@ def handle_trade_processing(task: AsyncTask) -> Dict[str, Any]:
         Dict[str, Any]: 处理结果
     """
     from ..auto_trade.auto_trade_exec import trade
-    from ..position_listener.database import get_db
+    from ..position_listener import record_trade
+    from ..types import TradeAllocation
     import json
 
     logger.info(
@@ -945,44 +947,46 @@ def handle_trade_processing(task: AsyncTask) -> Dict[str, Any]:
             }
         )
 
-        # 添加到仓位监听（带订单追踪）
+        # 添加到仓位监听（使用新的position_listener系统）
         try:
-            db = get_db()
-
-            # 准备marks信息
-            marks = task.metadata.get("marks", [])
-            marks_str = json.dumps(marks) if marks else None
-
             # 提取订单信息
             order_id = trade_result.get("order_id") or trade_result.get("orderID")
-            order_salt = str(trade_result.get("order_salt", ""))
 
-            # 提取交易哈希
-            transaction_hashes = trade_result.get("transactionsHashes") or trade_result.get("transaction_hashes")
-            if transaction_hashes and isinstance(transaction_hashes, list):
-                transaction_hashes = json.dumps(transaction_hashes)
+            # 创建TradeAllocation对象
+            # 从allocation中提取信息，如果没有则使用默认值
+            allocation_data = allocation or {}
 
-            # 提取订单状态
-            order_status = trade_result.get("status", "pending")
+            trade_allocation = TradeAllocation(
+                id=market.get("id"),  # 市场ID
+                side=side,  # 交易方向（YES/NO）
+                price=cost,  # 交易价格
+                p=allocation_data.get("p", 0.5),  # 主观概率（如果没有则默认0.5）
+                b=allocation_data.get("b", 2.0),  # 赔率（如果没有则默认2.0）
+                f=allocation_data.get("f", 0.0),  # 仓位比例
+                invest=dollars,  # 投资金额
+                shares=shares,  # 购买份额
+                settle_day=allocation_data.get("settle_day", 30)  # 结算日期（默认30天）
+            )
 
-            # 添加仓位监听记录（包含订单信息）
-            position_id = db.add_position(
-                market_id=market.get("id"),
-                buy_price=cost,  # 买入价格
-                buy_side=side,  # 买入方向 (YES/NO)
-                marks=marks_str,  # 标记信息
-                shares=shares,  # 持仓份额
-                threshold_config=None,  # 暂不设置阈值配置
-                order_id=order_id,  # 订单ID
-                order_salt=order_salt,  # 订单salt
-                transaction_hashes=transaction_hashes,  # 交易哈希
-                order_status=order_status,  # 订单状态
-                order_created_at=datetime.now().isoformat()  # 订单创建时间
+            # 准备任务元信息，传递给position_listener
+            task_metadata_for_position = {
+                "analysis": task.metadata.get("analysis"),
+                "market": task.metadata.get("market"),
+                "marks": task.metadata.get("marks"),
+                "source_analysis_task_id": task.metadata.get("source_analysis_task_id")
+            }
+
+            # 记录交易到position_listener（record_trade内部会自动创建订单记录）
+            position_id = record_trade(
+                allocation=trade_allocation,
+                order_id=order_id,
+                token_id=clobtoken,
+                task_metadata=task_metadata_for_position
             )
 
             logger.info(
                 "TASK.TRADE.POSITION_ADDED",
-                msg="已添加到仓位监听（含订单追踪）",
+                msg="已添加到仓位监听（新系统）",
                 extra={
                     "task_id": task.id,
                     "position_id": position_id,
@@ -990,8 +994,7 @@ def handle_trade_processing(task: AsyncTask) -> Dict[str, Any]:
                     "buy_price": cost,
                     "buy_side": side,
                     "shares": shares,
-                    "order_id": order_id,
-                    "order_status": order_status
+                    "order_id": order_id
                 }
             )
 
@@ -1001,7 +1004,7 @@ def handle_trade_processing(task: AsyncTask) -> Dict[str, Any]:
                 "status": "traded",
                 "message": "交易完成并已添加到仓位监听（挂best-bid-2限价单）",
                 "trade_result": trade_result,
-                "order_id": trade_result.get("order_id"),  # 保存order_id供LISTEN阶段使用
+                "order_id": order_id,  # 保存order_id供LISTEN阶段使用
                 "order_created_at": time.time(),  # 记录订单创建时间
                 "position_id": position_id,
                 "market_id": market.get("id"),
@@ -1069,6 +1072,9 @@ def handle_listen_processing(task: AsyncTask) -> Dict[str, Any]:
 
     监听订单状态，如果10分钟后仍未成交，则调用sweep_order进行扫单
 
+    注意：订单状态监控由position_listener系统自动处理（每2分钟），
+    此处主要处理超时扫单逻辑。
+
     参数:
         task: 任务实例
 
@@ -1077,6 +1083,7 @@ def handle_listen_processing(task: AsyncTask) -> Dict[str, Any]:
     """
     from ..auto_trade.auto_trade_exec import sweep_order
     from ..polymarket_api.clob_api import get_order, cancel_order
+    from ..position_listener import monitor_order
     import time
 
     logger.info(
@@ -1110,8 +1117,12 @@ def handle_listen_processing(task: AsyncTask) -> Dict[str, Any]:
             )
             return {"status": "failed", "message": error_msg}
 
-        # 检查订单状态
+        # 检查订单状态（使用新的position_listener系统）
         try:
+            # 先使用position_listener监控订单
+            monitor_result = monitor_order(order_id)
+
+            # 同时从CLOB API获取订单详情
             order_info = get_order(order_id)
             order_status = order_info.get("status", "").upper()
 
@@ -1122,6 +1133,7 @@ def handle_listen_processing(task: AsyncTask) -> Dict[str, Any]:
                     "task_id": task.id,
                     "order_id": order_id,
                     "order_status": order_status,
+                    "monitor_result": monitor_result,
                     "order_info": order_info
                 }
             )

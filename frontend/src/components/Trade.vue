@@ -2,7 +2,6 @@
   <div class="trade-container">
     <div class="trade-header">
       <h2>交易管理</h2>
-      <p class="header-desc">审核待交易任务，执行市场交易</p>
     </div>
 
     <!-- 操作面板 -->
@@ -23,7 +22,6 @@
       </div>
 
       <div v-if="pendingTasks.length === 0 && !loading" class="empty-state">
-        <div class="empty-icon">💱</div>
         <p>暂无待交易任务</p>
       </div>
 
@@ -219,7 +217,7 @@
 </template>
 
 <script>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onBeforeUnmount } from 'vue'
 import { getPendingTradeTasks, getTasks } from '@/api/tasks'
 
 export default {
@@ -335,9 +333,33 @@ export default {
       return 'neutral'
     }
 
+    // 自动刷新定时器
+    let autoRefreshTimer = null
+
+    // 全局刷新事件处理
+    const handleGlobalRefresh = () => {
+      loadPendingTasks()
+      loadFinishedTasks()
+    }
+
     onMounted(() => {
       loadPendingTasks()
       loadFinishedTasks()
+      // 每30秒自动刷新一次
+      autoRefreshTimer = setInterval(() => {
+        loadPendingTasks()
+        loadFinishedTasks()
+      }, 30000)
+      // 监听全局刷新事件
+      window.addEventListener('global-refresh', handleGlobalRefresh)
+    })
+
+    onBeforeUnmount(() => {
+      if (autoRefreshTimer) {
+        clearInterval(autoRefreshTimer)
+      }
+      // 移除全局刷新事件监听
+      window.removeEventListener('global-refresh', handleGlobalRefresh)
     })
 
     return {
@@ -360,9 +382,8 @@ export default {
 
 <style scoped>
 .trade-container { padding: 20px; max-width: 1400px; margin: 0 auto; }
-.trade-header { margin-bottom: 20px; }
-.trade-header h2 { font-size: 20px; color: #333; margin-bottom: 5px; }
-.header-desc { color: #666; font-size: 13px; }
+.trade-header { margin-bottom: 12px; }
+.trade-header h2 { font-size: 18px; color: #333; margin: 0; }
 
 .action-panel { display: flex; gap: 10px; margin-bottom: 20px; }
 .btn { height: 40px; padding: 0 20px; border: none; border-radius: 6px; font-size: 14px; cursor: pointer; transition: background 0.2s; }

@@ -3,7 +3,7 @@
     <!-- 标题栏 -->
     <div class="header">
       <div class="header-left">
-        <h2>📋 任务管理</h2>
+        <h2>任务管理</h2>
         <span class="task-count">共 {{ tasks.length }} 条任务</span>
       </div>
       <div class="header-actions">
@@ -12,16 +12,10 @@
           class="btn btn-danger"
           @click="batchDelete"
         >
-          <span class="btn-icon">🗑️</span>
           批量删除 ({{ selectedTasks.length }})
         </button>
         <button class="btn btn-primary" @click="showCreateDialog">
-          <span class="btn-icon">➕</span>
           新建任务
-        </button>
-        <button class="btn btn-refresh" @click="refreshTasks">
-          <span class="btn-icon">🔄</span>
-          刷新
         </button>
       </div>
     </div>
@@ -33,21 +27,21 @@
           <label>阶段</label>
           <select v-model="filters.stage" @change="refreshTasks">
             <option value="">全部阶段</option>
-            <option value="mark">📌 标记</option>
-            <option value="analysis">🔍 分析</option>
-            <option value="decision">🎯 决策</option>
-            <option value="trade">💱 交易</option>
-            <option value="listen">👂 监听</option>
+            <option value="mark">标记</option>
+            <option value="analysis">分析</option>
+            <option value="decision">决策</option>
+            <option value="trade">交易</option>
+            <option value="listen">监听</option>
           </select>
         </div>
         <div class="filter-item">
           <label>状态</label>
           <select v-model="filters.status" @change="refreshTasks">
             <option value="">全部状态</option>
-            <option value="waiting">⏳ 等待中</option>
-            <option value="processing">⚙️ 处理中</option>
-            <option value="finished">✅ 已完成</option>
-            <option value="failed">❌ 失败</option>
+            <option value="waiting">等待中</option>
+            <option value="processing">处理中</option>
+            <option value="finished">已完成</option>
+            <option value="failed">失败</option>
           </select>
         </div>
         <div class="filter-item">
@@ -70,7 +64,6 @@
       </div>
 
       <div v-else-if="tasks.length === 0" class="empty-state">
-        <div class="empty-icon">📭</div>
         <p>暂无任务数据</p>
         <button class="btn btn-primary" @click="showCreateDialog">创建第一个任务</button>
       </div>
@@ -141,10 +134,10 @@
               <td class="td-data">
                 <div class="btn-group">
                   <button class="btn-sm btn-view" @click="showMetadata(task.metadata)" title="查看元数据">
-                    👁️
+                    查看
                   </button>
                   <button class="btn-sm btn-edit" @click="editMetadata(task)" title="编辑元数据">
-                    ✏️
+                    编辑
                   </button>
                 </div>
               </td>
@@ -156,11 +149,11 @@
                     @click="showResult(task.result)"
                     title="查看结果"
                   >
-                    👁️
+                    查看
                   </button>
                   <span v-else class="text-muted">-</span>
                   <button class="btn-sm btn-edit" @click="editResult(task)" title="编辑结果">
-                    ✏️
+                    编辑
                   </button>
                 </div>
               </td>
@@ -184,7 +177,7 @@
                     @click="approveTask(task)"
                     title="同意并开始处理"
                   >
-                    ✓
+                    同意
                   </button>
                   <button
                     v-if="task.stage === 'analysis' && task.extended_info && (task.extended_info.analysis_status === 'polling' || task.extended_info.analysis_status === 'requesting')"
@@ -192,7 +185,7 @@
                     @click="pollAnalysisOnceHandler(task)"
                     title="手动轮询一次"
                   >
-                    🔍
+                    轮询
                   </button>
                   <button
                     v-if="task.stage === 'analysis' && task.extended_info && task.extended_info.analysis_status === 'success' && task.extended_info.market_count > 0"
@@ -200,7 +193,7 @@
                     @click="splitAnalysisTaskHandler(task)"
                     title="拆分为decision任务"
                   >
-                    ✂️
+                    拆分
                   </button>
                   <button
                     v-if="task.status === 'waiting' || task.status === 'processing'"
@@ -208,7 +201,7 @@
                     @click="cancelTask(task)"
                     title="取消任务"
                   >
-                    ⏸️
+                    取消
                   </button>
                   <button
                     v-if="task.status === 'failed' || task.status === 'finished'"
@@ -216,10 +209,10 @@
                     @click="retryTaskHandler(task)"
                     title="重新打回重试"
                   >
-                    🔄
+                    重试
                   </button>
                   <button class="btn-sm btn-delete" @click="confirmDelete(task)" title="删除任务">
-                    🗑️
+                    删除
                   </button>
                 </div>
               </td>
@@ -333,7 +326,7 @@
 </template>
 
 <script>
-import { ref, reactive, onMounted, computed } from 'vue'
+import { ref, reactive, onMounted, onBeforeUnmount, computed } from 'vue'
 import { getTasks, createTask, updateTask, deleteTask, batchDeleteTasks, retryTask, pollAnalysisOnce, splitAnalysisTask } from '@/api/tasks'
 import { toast, confirm, Modal } from '@/components/Notification'
 
@@ -677,14 +670,14 @@ export default {
 
           if (data.analysis_status === 'success') {
             // 分析成功
-            toast.success(`✅ 分析完成！成功解析 ${data.market_count} 个市场`)
+            toast.success(`分析完成！成功解析 ${data.market_count} 个市场`)
             refreshTasks()
           } else if (data.analysis_status === 'polling') {
             // 仍在思考
-            toast.info('⏳ AI仍在思考中，请稍后再试')
+            toast.info('AI仍在思考中，请稍后再试')
           } else if (data.analysis_status === 'failed') {
             // 分析失败
-            toast.error(`❌ 分析失败: ${data.error || '未知错误'}`)
+            toast.error(`分析失败: ${data.error || '未知错误'}`)
             refreshTasks()
           }
         } else {
@@ -713,7 +706,7 @@ export default {
 
         if (response.success) {
           const data = response.data
-          let message = `✅ 拆分成功！总市场数: ${data.total_markets}, 成功创建: ${data.success_count} 个decision任务`
+          let message = `拆分成功！总市场数: ${data.total_markets}, 成功创建: ${data.success_count} 个decision任务`
 
           if (data.failed_count > 0) {
             message += `, 失败: ${data.failed_count} 个市场`
@@ -722,7 +715,7 @@ export default {
           toast.success(message)
           refreshTasks()
         } else {
-          toast.error(`❌ 拆分失败: ${response.message}`)
+          toast.error(`拆分失败: ${response.message}`)
         }
       } catch (error) {
         console.error('拆分任务失败:', error)
@@ -797,8 +790,30 @@ export default {
       return date.toLocaleString('zh-CN')
     }
 
+    // 自动刷新定时器
+    let autoRefreshTimer = null
+
+    // 全局刷新事件处理
+    const handleGlobalRefresh = () => {
+      loadTasks()
+    }
+
     onMounted(() => {
       loadTasks()
+      // 每30秒自动刷新一次
+      autoRefreshTimer = setInterval(() => {
+        loadTasks()
+      }, 30000)
+      // 监听全局刷新事件
+      window.addEventListener('global-refresh', handleGlobalRefresh)
+    })
+
+    onBeforeUnmount(() => {
+      if (autoRefreshTimer) {
+        clearInterval(autoRefreshTimer)
+      }
+      // 移除全局刷新事件监听
+      window.removeEventListener('global-refresh', handleGlobalRefresh)
     })
 
     return {
@@ -860,7 +875,7 @@ export default {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 20px;
+  margin-bottom: 12px;
 }
 
 .header-left {
@@ -870,7 +885,7 @@ export default {
 }
 
 .header h2 {
-  font-size: 20px;
+  font-size: 18px;
   color: #333;
   margin: 0;
 }

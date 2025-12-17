@@ -7,7 +7,6 @@
       <!-- CPU 占用率 -->
       <div class="status-card">
         <div class="card-header">
-          <span class="card-icon">💻</span>
           <span class="card-title">CPU 占用率</span>
         </div>
         <div class="card-body">
@@ -44,7 +43,6 @@
       <!-- 内存占用率 -->
       <div class="status-card">
         <div class="card-header">
-          <span class="card-icon">🧠</span>
           <span class="card-title">内存占用率</span>
         </div>
         <div class="card-body">
@@ -83,7 +81,6 @@
       <!-- 磁盘占用率 -->
       <div class="status-card">
         <div class="card-header">
-          <span class="card-icon">💾</span>
           <span class="card-title">磁盘占用率</span>
         </div>
         <div class="card-body">
@@ -122,7 +119,6 @@
       <!-- 累计运行时间 -->
       <div class="status-card">
         <div class="card-header">
-          <span class="card-icon">⏱️</span>
           <span class="card-title">累计运行时间</span>
         </div>
         <div class="card-body">
@@ -138,9 +134,7 @@
     <div class="tps-section">
       <div class="section-card">
         <div class="section-header">
-          <span class="section-icon">📊</span>
           <span class="section-title">TPS 统计（近 3 小时）</span>
-          <span class="refresh-btn" @click="refreshData">🔄 刷新</span>
         </div>
         <div class="section-body">
           <div class="tps-stats">
@@ -268,16 +262,25 @@ export default {
     // 定时刷新
     let refreshTimer = null
 
+    // 全局刷新事件处理
+    const handleGlobalRefresh = () => {
+      fetchSystemData()
+    }
+
     onMounted(() => {
       fetchSystemData()
       // 每 5 秒刷新一次
       refreshTimer = setInterval(fetchSystemData, 5000)
+      // 监听全局刷新事件
+      window.addEventListener('global-refresh', handleGlobalRefresh)
     })
 
     onUnmounted(() => {
       if (refreshTimer) {
         clearInterval(refreshTimer)
       }
+      // 移除全局刷新事件监听
+      window.removeEventListener('global-refresh', handleGlobalRefresh)
     })
 
     return {
@@ -454,7 +457,7 @@ export default {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 15px 20px;
+  padding: 10px 15px;
   border-bottom: 1px solid #ddd;
 }
 

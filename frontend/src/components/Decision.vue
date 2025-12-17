@@ -2,7 +2,6 @@
   <div class="decision-container">
     <div class="decision-header">
       <h2>决策管理</h2>
-      <p class="header-desc">审核待决策任务，执行仓位分配</p>
     </div>
 
     <!-- 操作面板 -->
@@ -219,7 +218,7 @@
 </template>
 
 <script>
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, onBeforeUnmount, computed } from 'vue'
 import { getPendingDecisionTasks, executeDecision, getTasks } from '@/api/tasks'
 
 export default {
@@ -366,9 +365,33 @@ export default {
       return 'neutral'
     }
 
+    // 自动刷新定时器
+    let autoRefreshTimer = null
+
+    // 全局刷新事件处理
+    const handleGlobalRefresh = () => {
+      loadPendingTasks()
+      loadFinishedTasks()
+    }
+
     onMounted(() => {
       loadPendingTasks()
       loadFinishedTasks()
+      // 每30秒自动刷新一次
+      autoRefreshTimer = setInterval(() => {
+        loadPendingTasks()
+        loadFinishedTasks()
+      }, 30000)
+      // 监听全局刷新事件
+      window.addEventListener('global-refresh', handleGlobalRefresh)
+    })
+
+    onBeforeUnmount(() => {
+      if (autoRefreshTimer) {
+        clearInterval(autoRefreshTimer)
+      }
+      // 移除全局刷新事件监听
+      window.removeEventListener('global-refresh', handleGlobalRefresh)
     })
 
     return {
@@ -395,9 +418,8 @@ export default {
 
 <style scoped>
 .decision-container { padding: 20px; max-width: 1400px; margin: 0 auto; }
-.decision-header { margin-bottom: 20px; }
-.decision-header h2 { font-size: 20px; color: #333; margin-bottom: 5px; }
-.header-desc { color: #666; font-size: 13px; }
+.decision-header { margin-bottom: 12px; }
+.decision-header h2 { font-size: 18px; color: #333; margin: 0; }
 
 .action-panel { display: flex; gap: 10px; margin-bottom: 20px; }
 .btn { height: 40px; padding: 0 20px; border: none; border-radius: 6px; font-size: 14px; cursor: pointer; transition: background 0.2s; }

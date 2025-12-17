@@ -24,9 +24,9 @@ from contextlib import contextmanager
 
 # 导入VLogger日志系统
 try:
-    from backend.vlogger import get_logger
+    from backend.sys_configs.global_event_reg import vlogger
 except ImportError:
-    from vlogger import get_logger
+    from sys_configs.global_event_reg import vlogger
 
 
 class Purse:
@@ -58,7 +58,7 @@ class Purse:
             raise RuntimeError("Purse是单例类，请使用Purse.get_instance()获取实例")
 
         self.db_path = db_path
-        self.logger = get_logger("purse")
+        self.logger = vlogger
         self._db_lock = threading.Lock()  # 数据库操作锁
 
         # 初始化数据库

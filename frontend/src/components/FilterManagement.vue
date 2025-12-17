@@ -3,9 +3,6 @@
     <!-- 标题栏 -->
     <div class="header">
       <h2>过滤器管理</h2>
-      <div class="header-actions">
-        <button class="btn-refresh" @click="refreshData">🔄 刷新</button>
-      </div>
     </div>
 
     <!-- 统计卡片 -->

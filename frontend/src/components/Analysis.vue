@@ -2,7 +2,6 @@
   <div class="analysis-container">
     <div class="analysis-header">
       <h2>分析界面</h2>
-      <p class="header-desc">添加事件或市场进行分析</p>
     </div>
 
     <!-- 添加控制面板 -->
@@ -264,18 +263,13 @@ export default {
 
 /* 头部 */
 .analysis-header {
-  margin-bottom: 20px;
+  margin-bottom: 12px;
 }
 
 .analysis-header h2 {
-  font-size: 20px;
+  font-size: 18px;
   color: #333;
-  margin-bottom: 5px;
-}
-
-.header-desc {
-  color: #666;
-  font-size: 13px;
+  margin: 0;
 }
 
 /* 添加面板 */

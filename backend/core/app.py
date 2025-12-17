@@ -18,6 +18,7 @@ from .routes.tasks import tasks_bp
 from .routes.filter import filter_bp
 from .routes.sys_settings import sys_settings_bp
 from .routes.purse import purse_bp
+from .routes.positions import positions_bp
 from .handlers.errors import register_error_handlers
 
 
@@ -53,6 +54,7 @@ def create_app():
     app.register_blueprint(filter_bp)
     app.register_blueprint(sys_settings_bp)
     app.register_blueprint(purse_bp)
+    app.register_blueprint(positions_bp)
 
     # 注册错误处理器
     register_error_handlers(app)

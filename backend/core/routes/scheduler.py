@@ -13,10 +13,10 @@ from ...task_manager import (
     TaskDatabase,
     get_scheduler
 )
-from ...vlogger import get_logger
+from ...sys_configs.global_event_reg import vlogger
 
 scheduler_bp = Blueprint('scheduler', __name__, url_prefix='/api/scheduler')
-logger = get_logger("scheduler_api")
+logger = vlogger
 db = TaskDatabase()
 
 

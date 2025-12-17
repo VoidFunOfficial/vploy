@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from enum import Enum
 
 from .config_manager import get_config_manager
-from ..vlogger import get_logger, AlertLevel
+from .global_event_reg import vlogger, AlertLevel
 
 
 class TokenType(str, Enum):
@@ -84,7 +84,7 @@ class TokenRefresher:
         """
         self.db_path = db_path
         self.config_manager = get_config_manager(db_path)
-        self.logger = get_logger("TokenRefresher")
+        self.logger = vlogger
         
         # 从配置中读取检查间隔，如果没有则使用传入的参数
         self.check_interval_minutes = self._get_check_interval() or check_interval_minutes

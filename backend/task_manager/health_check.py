@@ -11,12 +11,13 @@ from datetime import datetime, timedelta
 from typing import List, Dict, Any, Optional
 from dataclasses import dataclass
 
-from ..vlogger import get_logger, TraceContext
+from ..vlogger import TraceContext
 from .config import get_config
+from ..sys_configs.global_event_reg import vlogger
 
 
-# 初始化日志记录器
-logger = get_logger("health_check")
+# 使用全局日志记录器
+logger = vlogger
 
 
 # ==================== 配置 ====================

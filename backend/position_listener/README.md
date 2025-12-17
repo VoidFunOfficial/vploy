@@ -1,267 +1,374 @@
-# Polymarket 仓位监听模块
+# Position Listener - 持仓监听系统
 
-## 概述
+全新的持仓监听系统，提供交易记录、市场监控、订单状态追踪等功能。
 
-仓位监听模块提供了对Polymarket仓位的实时监听和价格更新功能。通过Huey任务队列实现周期性轮询,自动更新仓位的当前价格和市场状态,并支持阈值触发检测。
+## 核心功能
 
-## 功能特性
+### 1. 交易记录功能
+- 根据TradeAllocation数据结构记录交易信息
+- 自动创建持仓记录和交易流水
+- 支持订单ID关联
+- 完整的交易历史追踪
 
-- ✅ **周期性监听**: 每5分钟自动轮询所有活跃仓位
-- ✅ **价格更新**: 实时获取并更新市场当前价格
-- ✅ **状态跟踪**: 自动检测市场是否已结束
-- ✅ **阈值检测**: 支持百分比和绝对值两种阈值触发方式
-- ✅ **日志记录**: 使用VLogger记录所有监听活动和异常
-- ✅ **独立数据库**: 使用独立的listen.db数据库存储数据
+### 2. 市场监控功能
+- 实时监控已交易市场的价格变化
+- 自动更新持仓的当前价格和盈亏
+- 检测市场结算状态
+- 定时任务自动执行（每5分钟）
 
-## 数据库说明
+### 3. 订单状态监控功能
+- 根据orderID追踪订单状态
+- 监控订单成交情况
+- 监控订单撤销状态
+- **订单取消自动处理**：
+  - 自动解锁purse中的锁定资金
+  - 自动更新关联任务的状态
+  - 支持部分成交的资金计算
+- 定时任务自动执行（每2分钟）
 
-### 数据库位置
+## 技术架构
 
-- **数据库文件**: `backend/position_listener/listen.db`
-- **独立存储**: 不依赖系统配置数据库,完全独立管理
+### 数据库设计
 
-### position_listen 表结构
+系统使用独立的SQLite数据库（`positions.db`），包含三个核心表：
 
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| id | INTEGER | 主键,自增 |
-| market_id | TEXT | 市场ID |
-| marks | TEXT | 标记/备注信息 |
-| buy_price | REAL | 买入价格 (0-1之间) |
-| buy_side | TEXT | 买入方向 (YES/NO) |
-| shares | REAL | 持仓数量 |
-| current_price | REAL | 当前价格 (自动更新) |
-| market_closed | INTEGER | 市场是否已结束 (0/1) |
-| threshold_config | TEXT | 阈值配置 (JSON格式) |
-| is_active | INTEGER | 是否激活 (0/1) |
-| created_at | TIMESTAMP | 创建时间 |
-| updated_at | TIMESTAMP | 更新时间 |
-
-## 使用方法
-
-### 1. 添加仓位监听
-
-```python
-from backend.sys_configs import add_position_listen
-import json
-
-# 配置阈值
-threshold_config = json.dumps({
-    "percent": 0.1,      # 价格变动10%触发
-    "absolute": 0.05     # 价格绝对变动0.05触发
-})
-
-# 添加监听
-success = add_position_listen(
-    market_id="705811",
-    buy_price=0.52,
-    buy_side="YES",
-    marks="我的第一个仓位",
-    shares=100.0,
-    threshold_config=threshold_config
+#### positions表（持仓表）
+```sql
+CREATE TABLE positions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    market_id TEXT NOT NULL,              -- 市场ID
+    side TEXT NOT NULL,                   -- 交易方向（YES/NO）
+    entry_price REAL NOT NULL,            -- 入场价格
+    shares REAL NOT NULL,                 -- 持有份额
+    invest_amount REAL NOT NULL,          -- 投资金额
+    settle_day INTEGER NOT NULL,          -- 预计结算日期
+    status TEXT NOT NULL DEFAULT 'open',  -- 持仓状态
+    current_price REAL,                   -- 当前价格
+    pnl REAL,                            -- 盈亏
+    is_settled INTEGER DEFAULT 0,         -- 是否已结算
+    settlement_result TEXT,               -- 结算结果
+    settlement_payout REAL,               -- 结算收益
+    create_time TIMESTAMP,
+    update_time TIMESTAMP,
+    close_time TIMESTAMP,
+    metadata TEXT                         -- JSON格式元数据
 )
 ```
 
-### 2. 查询仓位列表
-
-```python
-from backend.sys_configs import get_position_listen_list
-
-# 获取所有活跃仓位
-positions = get_position_listen_list(is_active=True)
-
-for pos in positions:
-    print(f"市场ID: {pos['market_id']}")
-    print(f"买入价格: {pos['buy_price']}")
-    print(f"当前价格: {pos['current_price']}")
-    print(f"市场状态: {'已结束' if pos['market_closed'] else '活跃'}")
-```
-
-### 3. 手动触发监听
-
-```python
-from backend.position_listener import monitor_all_positions
-
-# 手动执行一次监听
-result = monitor_all_positions()
-
-print(f"总仓位数: {result['total']}")
-print(f"成功更新: {result['success']}")
-print(f"更新失败: {result['failed']}")
-print(f"已结束市场: {result['closed_markets']}")
-```
-
-### 4. 更新仓位信息
-
-```python
-from backend.sys_configs import update_position_listen
-
-# 更新仓位
-success = update_position_listen(
-    listen_id=1,
-    marks="更新后的备注",
-    is_active=True
+#### trades表（交易记录表）
+```sql
+CREATE TABLE trades (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    position_id INTEGER,                  -- 关联持仓ID
+    market_id TEXT NOT NULL,              -- 市场ID
+    side TEXT NOT NULL,                   -- 交易方向
+    price REAL NOT NULL,                  -- 交易价格
+    shares REAL NOT NULL,                 -- 交易份额
+    amount REAL NOT NULL,                 -- 交易金额
+    trade_type TEXT NOT NULL,             -- 交易类型（OPEN/CLOSE）
+    order_id TEXT,                        -- 关联订单ID
+    trade_time TIMESTAMP,
+    metadata TEXT,
+    FOREIGN KEY (position_id) REFERENCES positions (id)
 )
 ```
 
-### 5. 停用仓位监听
-
-```python
-from backend.sys_configs import deactivate_position_listen
-
-# 软删除(停用)
-success = deactivate_position_listen(listen_id=1)
-```
-
-## 阈值配置说明
-
-阈值配置使用JSON格式存储,支持两种触发方式:
-
-### 百分比阈值
-
-```json
-{
-    "percent": 0.1
-}
-```
-
-当价格变动超过10%时触发。
-
-### 绝对值阈值
-
-```json
-{
-    "absolute": 0.05
-}
-```
-
-当价格绝对变动超过0.05时触发。
-
-### 组合阈值
-
-```json
-{
-    "percent": 0.1,
-    "absolute": 0.05
-}
-```
-
-满足任一条件即触发。
-
-## 定时任务配置
-
-仓位监听任务已自动注册到Huey任务队列中:
-
-- **任务名称**: `position_monitor`
-- **执行频率**: 每5分钟
-- **任务类型**: cron表达式 `*/5 * * * *`
-- **执行器**: 动态调度器 (DynamicScheduler)
-
-### 修改执行频率
-
-可以通过修改定时任务配置来调整执行频率:
-
-```python
-from backend.task_manager import update_scheduled_task
-
-# 修改为每10分钟执行一次
-update_scheduled_task(
-    name="position_monitor",
-    schedule="*/10 * * * *"
+#### orders表（订单状态表）
+```sql
+CREATE TABLE orders (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    order_id TEXT NOT NULL UNIQUE,        -- 订单ID
+    position_id INTEGER,                  -- 关联持仓ID
+    market_id TEXT NOT NULL,              -- 市场ID
+    token_id TEXT NOT NULL,               -- Token ID
+    side TEXT NOT NULL,                   -- 交易方向（BUY/SELL）
+    price REAL NOT NULL,                  -- 订单价格
+    size REAL NOT NULL,                   -- 订单数量
+    status TEXT NOT NULL DEFAULT 'pending', -- 订单状态
+    filled_size REAL DEFAULT 0,           -- 已成交数量
+    create_time TIMESTAMP,
+    update_time TIMESTAMP,
+    filled_time TIMESTAMP,
+    cancelled_time TIMESTAMP,
+    metadata TEXT,
+    FOREIGN KEY (position_id) REFERENCES positions (id)
 )
 ```
 
-## 日志事件类型
+### Huey任务调度
 
-模块使用以下VLogger事件类型:
+系统使用Huey任务队列处理异步任务：
 
-| 事件类型 | 说明 |
-|---------|------|
-| POSITION_MONITOR.MONITOR_START | 开始监听所有仓位 |
-| POSITION_MONITOR.POSITIONS_LOADED | 加载活跃仓位列表 |
-| POSITION_MONITOR.UPDATE_START | 开始更新单个仓位 |
-| POSITION_MONITOR.UPDATE_SUCCESS | 仓位更新成功 |
-| POSITION_MONITOR.UPDATE_FAILED | 仓位更新失败 |
-| POSITION_MONITOR.THRESHOLD_TRIGGERED | 阈值触发 |
-| POSITION_MONITOR.MONITOR_COMPLETE | 监听完成 |
-| POSITION_MONITOR.MARKET_NOT_FOUND | 市场未找到 |
-| POSITION_MONITOR.NO_PRICE_DATA | 无价格数据 |
-| POSITION_MONITOR.INVALID_PRICE_FORMAT | 价格格式无效 |
-| POSITION_MONITOR.GET_PRICE_ERROR | 获取价格失败 |
-| POSITION_MONITOR.CHECK_STATUS_ERROR | 检查状态失败 |
+#### 定时任务
+- `monitor_markets_task`: 每5分钟监控所有未平仓持仓的市场状态
+- `monitor_orders_task`: 每2分钟监控所有待成交订单的状态
 
-## 错误码
+#### 手动任务
+- `monitor_position_task(position_id)`: 监控单个持仓
+- `monitor_order_task(order_id)`: 监控单个订单
 
-| 错误码 | 说明 |
-|--------|------|
-| E-PM-001 | 价格解析失败 |
-| E-PM-002 | 获取市场价格失败 |
-| E-PM-003 | 检查市场状态失败 |
-| E-PM-004 | 更新仓位数据失败 |
-| E-PM-005 | 更新仓位数据异常 |
+## 使用示例
 
-## 测试
+### 1. 记录交易
 
-运行测试脚本:
+```python
+from backend.position_listener import record_trade
+from backend.types import TradeAllocation
 
-```bash
-python test_position_monitor.py
+# 创建TradeAllocation对象
+allocation = TradeAllocation(
+    id="market_123",
+    side="YES",
+    price=0.55,
+    p=0.60,
+    b=1.82,
+    f=0.05,
+    invest=100.0,
+    shares=181.82,
+    settle_day=30
+)
+
+# 记录交易（带订单ID）
+position_id = record_trade(
+    allocation=allocation,
+    order_id="ORDER-123456",
+    token_id="TOKEN-789"
+)
+
+print(f"创建持仓ID: {position_id}")
 ```
 
-测试脚本会执行以下操作:
-1. 添加测试仓位
-2. 查询仓位列表
-3. 执行监听任务
-4. 查看更新后的仓位状态
+### 2. 获取持仓信息
+
+```python
+from backend.position_listener import (
+    get_position,
+    get_open_positions,
+    get_position_summary
+)
+
+# 获取单个持仓
+position = get_position(position_id)
+print(f"持仓: {position.to_dict()}")
+
+# 获取所有未平仓持仓
+open_positions = get_open_positions()
+print(f"未平仓数量: {len(open_positions)}")
+
+# 获取持仓汇总
+summary = get_position_summary()
+print(f"总投资: {summary['total_invest']}")
+print(f"总盈亏: {summary['total_pnl']}")
+```
+
+### 3. 手动监控市场
+
+```python
+from backend.position_listener import monitor_position, monitor_all_positions
+
+# 监控单个持仓
+result = monitor_position(position_id)
+print(f"监控结果: {result}")
+
+# 监控所有持仓
+all_results = monitor_all_positions()
+print(f"监控了 {all_results['total_positions']} 个持仓")
+```
+
+### 4. 手动监控订单
+
+```python
+from backend.position_listener import monitor_order, monitor_all_orders
+
+# 监控单个订单
+result = monitor_order("ORDER-123456")
+print(f"订单状态: {result['status']}")
+
+# 监控所有待成交订单
+all_results = monitor_all_orders()
+print(f"监控了 {all_results['total_orders']} 个订单")
+```
+
+### 5. 更新持仓价格
+
+```python
+from backend.position_listener import update_position_price
+
+# 手动更新持仓价格
+success = update_position_price(position_id, current_price=0.58)
+if success:
+    print("价格更新成功")
+```
+
+### 6. 结算持仓
+
+```python
+from backend.position_listener import settle_position
+
+# 结算持仓
+success = settle_position(
+    position_id=position_id,
+    settlement_result="YES",
+    settlement_payout=181.82
+)
+if success:
+    print("持仓结算完成")
+```
+
+### 7. 使用Huey任务
+
+```python
+from backend.position_listener import (
+    monitor_position_task,
+    monitor_order_task
+)
+
+# 提交监控任务到Huey队列
+monitor_position_task(position_id)
+monitor_order_task("ORDER-123456")
+```
+
+### 8. 订单取消自动处理
+
+当订单监控检测到订单被取消时，系统会自动执行以下操作：
+
+```python
+# 订单监控会自动处理取消的订单
+# 无需手动调用，以下是内部处理流程：
+
+# 1. 检测订单状态为CANCELLED
+# 2. 计算需要解锁的资金
+#    - 完全未成交：解锁全部投资金额
+#    - 部分成交：解锁未成交部分的资金
+# 3. 调用purse.unlock_fund()解锁资金
+# 4. 更新关联任务的result字段
+#    - order_cancelled: true
+#    - order_cancelled_time: 时间戳
+#    - filled_size: 已成交数量
+#    - original_size: 原始订单数量
+#    - unlock_amount: 解锁金额
+```
+
+**示例场景**：
+
+```python
+# 场景1: 订单完全未成交被取消
+# order_id: "0x9f1d134dfb..."
+# market_id: "916392"
+# clob_status: "CANCELED"
+# filled_size: 0.0
+# original_size: 8.26
+# invest_amount: 100.0
+
+# 系统自动执行：
+# 1. purse.unlock_fund(100.0)  # 解锁全部投资金额
+# 2. 更新task.result["order_cancelled"] = True
+# 3. 记录TRADE级别日志
+
+# 场景2: 订单部分成交后被取消
+# filled_size: 3.0
+# original_size: 8.26
+# invest_amount: 100.0
+
+# 系统自动执行：
+# unfilled_ratio = (8.26 - 3.0) / 8.26 = 0.637
+# unlock_amount = 100.0 * 0.637 = 63.7
+# 1. purse.unlock_fund(63.7)  # 只解锁未成交部分
+# 2. 更新task.result
+```
+
+## 日志系统
+
+系统集成VLogger日志系统，提供完整的日志记录：
+
+### 日志等级
+- **INFO**: 正常操作日志
+- **TRADE**: 交易证据级流水（永不采样）
+- **WARN**: 警告信息
+- **ERROR**: 错误信息
+
+### 事件类型
+- `POSITION.DB.INIT`: 数据库初始化
+- `POSITION.CREATE`: 创建持仓
+- `POSITION.UPDATE`: 更新持仓
+- `POSITION.TRADE.CREATE`: 记录交易
+- `POSITION.ORDER.CREATE`: 创建订单记录
+- `MARKET_MONITOR.*`: 市场监控相关
+- `ORDER_MONITOR.*`: 订单监控相关
+
+### 错误码
+- `E-POSITION-001`: 数据库初始化失败
+- `E-POSITION-002`: 创建持仓记录失败
+- `E-POSITION-003`: 更新持仓记录失败
+- `E-POSITION-004`: 创建交易记录失败
+- `E-POSITION-005`: 创建订单记录失败
+- `E-POSITION-006`: 更新订单状态失败
+- `E-POSITION-007`: 记录交易分配失败
+- `E-POSITION-008~012`: 交易记录器相关错误
+- `E-POSITION-013~018`: 市场监控相关错误
+- `E-POSITION-019~023`: 订单监控相关错误
+- `E-POSITION-024`: 订单取消资金解锁失败
+- `E-POSITION-025`: 处理订单取消失败
+
+## API参考
+
+系统使用以下Polymarket API：
+
+### Gamma Markets API
+- `get_market(market_id)`: 获取市场信息
+- 用于检查市场状态和获取当前价格
+
+### CLOB API
+- `get_order(order_id)`: 获取订单详情
+- 用于查询订单成交和撤销状态
+
+## 数据结构参考
+
+### TradeAllocation
+```python
+@dataclass
+class TradeAllocation:
+    id: Any           # 市场ID
+    side: str         # 交易方向（YES/NO）
+    price: float      # 交易价格
+    p: float          # 主观概率
+    b: float          # 赔率
+    f: float          # 仓位比例
+    invest: float     # 投资金额
+    shares: float     # 购买份额
+    settle_day: int   # 结算日期
+```
 
 ## 注意事项
 
-1. **价格格式**: 买入价格必须在0到1之间
-2. **买入方向**: 只支持 "YES" 或 "NO"
-3. **市场ID**: 必须是有效的Polymarket市场ID
-4. **阈值配置**: 必须是有效的JSON字符串
-5. **API限制**: 注意Polymarket API的调用频率限制
+1. **数据库路径**: 默认为 `./backend/position_listener/positions.db`
+2. **定时任务**: 需要启动Huey worker才能执行定时任务
+3. **API限流**: 注意Polymarket API的调用频率限制
+4. **价格更新**: 市场监控任务每5分钟执行一次
+5. **订单监控**: 订单监控任务每2分钟执行一次
+6. **日志记录**: 所有交易操作都会记录TRADE级别日志
 
-## 架构说明
+## 与VoidPoly任务流程集成
+
+Position Listener可以与VoidPoly任务处理流程无缝集成：
 
 ```
-backend/position_listener/
-├── __init__.py              # 模块导出
-├── position_monitor.py      # 核心监听逻辑
-└── README.md               # 本文档
-
-backend/sys_configs/
-├── position_listen_config.py  # 数据库操作
-└── config_manager.py         # 数据库表结构
-
-backend/task_manager/
-├── scheduler.py             # 定时任务注册
-└── dynamic_scheduler.py     # 任务执行器
+TRADE(PROCESSING) → 执行交易 → record_trade() → 创建持仓和订单记录
+                                              ↓
+                                    monitor_orders_task (每2分钟)
+                                              ↓
+                                    订单成交 → LISTEN(WAITING)
+                                              ↓
+                                    monitor_markets_task (每5分钟)
+                                              ↓
+                                    市场结算 → settle_position()
 ```
-
-## 工作流程
-
-1. **初始化**: 系统启动时自动注册定时任务
-2. **周期执行**: 每5分钟触发一次监听任务
-3. **获取仓位**: 从数据库加载所有活跃仓位
-4. **更新数据**: 
-   - 调用Polymarket API获取市场数据
-   - 解析价格和状态信息
-   - 更新数据库记录
-5. **阈值检测**: 
-   - 计算价格变动
-   - 检查是否触发阈值
-   - 记录触发日志
-6. **完成**: 返回统计结果
 
 ## 未来扩展
 
-当前版本仅实现了基础监听和日志记录功能,未来可以扩展:
-
-- [ ] 阈值触发后的自动交易
-- [ ] 邮件/短信通知
-- [ ] WebSocket实时推送
-- [ ] 收益统计和报表
-- [ ] 风险预警机制
-- [ ] 多账户支持
+- [ ] 支持批量交易记录
+- [ ] 添加持仓分析和统计功能
+- [ ] 支持WebSocket实时价格更新
+- [ ] 添加持仓风险管理功能
+- [ ] 支持多账户管理
 

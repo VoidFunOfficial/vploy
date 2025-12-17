@@ -24,11 +24,11 @@ try:
 except ImportError:
     MATPLOTLIB_AVAILABLE = False
 
-from ..vlogger import get_logger
 from .health_check import NodeStats
+from ..sys_configs.global_event_reg import vlogger
 
 
-logger = get_logger("email_report")
+logger = vlogger
 
 
 # ==================== 图表生成 ====================
