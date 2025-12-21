@@ -44,7 +44,6 @@ from .tasks import (
     process_async_task,
     register_handler,
     get_handler,
-    execute_split_analysis_task,
     execute_scheduled_task,
     execute_poll_analysis_once
 )
@@ -84,7 +83,6 @@ __all__ = [
     "process_async_task",
     "register_handler",
     "get_handler",
-    "execute_split_analysis_task",
     "execute_scheduled_task",
     "execute_poll_analysis_once",
 

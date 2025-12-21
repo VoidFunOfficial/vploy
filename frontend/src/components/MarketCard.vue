@@ -314,12 +314,7 @@ export default {
   color: var(--el-text-color-primary);
 }
 
-/* Utility classes */
-.mb-2 { margin-bottom: 8px; }
-.mb-4 { margin-bottom: 16px; }
-.mt-2 { margin-top: 8px; }
-.mr-1 { margin-right: 4px; }
-.mr-2 { margin-right: 8px; }
+/* Utility classes removed - using global.css */
 .text-truncate {
   white-space: nowrap;
   overflow: hidden;

@@ -1333,52 +1333,6 @@ def _execute_sweep_order(task: AsyncTask) -> Dict[str, Any]:
 # ==================== 前端触发任务的Huey包装器 ====================
 
 @huey.task()
-def execute_split_analysis_task(async_task_id: int):
-    """
-    Huey任务: 拆分analysis任务为多个decision任务
-
-    参数:
-        async_task_id: 分析任务ID
-    """
-    from ..ai_analysis.analysis_tasks import split_analysis_task
-
-    with TraceContext() as trace_id:
-        logger.info(
-            "HUEY.SPLIT_ANALYSIS.START",
-            msg=f"开始执行拆分任务: {async_task_id}",
-            extra={"async_task_id": async_task_id},
-            trace_id=trace_id
-        )
-
-        try:
-            result = split_analysis_task(async_task_id)
-
-            logger.info(
-                "HUEY.SPLIT_ANALYSIS.SUCCESS",
-                msg=f"拆分任务完成: {async_task_id}",
-                extra={
-                    "async_task_id": async_task_id,
-                    "success": result.get("success"),
-                    "created_tasks": result.get("created_tasks", []),
-                    "success_count": result.get("success_count", 0)
-                },
-                trace_id=trace_id
-            )
-
-            return result
-
-        except Exception as e:
-            logger.error(
-                "HUEY.SPLIT_ANALYSIS.ERROR",
-                msg=f"拆分任务失败: {async_task_id}",
-                error_code="E-HUEY-SPLIT-001",
-                extra={"async_task_id": async_task_id, "error": str(e)},
-                trace_id=trace_id
-            )
-            raise
-
-
-@huey.task()
 def execute_scheduled_task(task_id: int):
     """
     Huey任务: 执行定时任务
@@ -1523,6 +1477,44 @@ def execute_poll_analysis_once(async_task_id: int):
                         trace_id=trace_id
                     )
 
+                    # 自动拆分为decision任务
+                    from ..ai_analysis.analysis_tasks import split_analysis_task
+                    try:
+                        split_result = split_analysis_task(async_task_id)
+                        if split_result.get("success"):
+                            logger.info(
+                                "HUEY.POLL_ONCE.AUTO_SPLIT_SUCCESS",
+                                msg=f"自动拆分成功,创建了{split_result.get('success_count')}个decision任务",
+                                extra={
+                                    "async_task_id": async_task_id,
+                                    "created_tasks": split_result.get("created_tasks"),
+                                    "success_count": split_result.get("success_count")
+                                },
+                                trace_id=trace_id
+                            )
+                        else:
+                            logger.error(
+                                "HUEY.POLL_ONCE.AUTO_SPLIT_FAILED",
+                                msg=f"自动拆分失败: {split_result.get('message')}",
+                                error_code="E-POLL-ONCE-003",
+                                extra={
+                                    "async_task_id": async_task_id,
+                                    "error": split_result.get("message")
+                                },
+                                trace_id=trace_id
+                            )
+                    except Exception as split_error:
+                        logger.error(
+                            "HUEY.POLL_ONCE.AUTO_SPLIT_EXCEPTION",
+                            msg=f"自动拆分异常: {str(split_error)}",
+                            error_code="E-POLL-ONCE-004",
+                            extra={
+                                "async_task_id": async_task_id,
+                                "exception": str(split_error)
+                            },
+                            trace_id=trace_id
+                        )
+
                     return {
                         "success": True,
                         "analysis_status": AnalysisStatus.SUCCESS.value,
@@ -1559,4 +1551,78 @@ def execute_poll_analysis_once(async_task_id: int):
                 trace_id=trace_id
             )
             raise
+
+
+# ==================== GPT额度相关定时任务 ====================
+
+@huey.task()
+def scheduled_gpt_quota_check():
+    """
+    定时检查GPT额度恢复任务
+
+    由定时任务调度器调用，检查等待额度的任务并在额度恢复后重新提交
+    """
+    from ..ai_analysis.analysis_tasks import check_quota_recovery
+
+    with TraceContext() as trace_id:
+        logger.info(
+            "SCHEDULED.GPT_QUOTA_CHECK.START",
+            msg="开始执行定时GPT额度检查",
+            trace_id=trace_id
+        )
+
+        try:
+            # 调用额度恢复检查任务
+            check_quota_recovery()
+
+            logger.info(
+                "SCHEDULED.GPT_QUOTA_CHECK.SUCCESS",
+                msg="定时GPT额度检查完成",
+                trace_id=trace_id
+            )
+
+        except Exception as e:
+            logger.error(
+                "SCHEDULED.GPT_QUOTA_CHECK.ERROR",
+                msg=f"定时GPT额度检查失败: {str(e)}",
+                error_code="E-SCHEDULED-GPT-001",
+                extra={"error": str(e)},
+                trace_id=trace_id
+            )
+
+
+@huey.task()
+def scheduled_gpt_quota_cleanup():
+    """
+    定时清理GPT请求记录任务
+
+    由定时任务调度器调用，清理30天前的GPT请求记录
+    """
+    from ..ai_analysis.analysis_tasks import cleanup_old_quota_records
+
+    with TraceContext() as trace_id:
+        logger.info(
+            "SCHEDULED.GPT_QUOTA_CLEANUP.START",
+            msg="开始执行定时GPT请求记录清理",
+            trace_id=trace_id
+        )
+
+        try:
+            # 清理30天前的记录
+            cleanup_old_quota_records(days=30)
+
+            logger.info(
+                "SCHEDULED.GPT_QUOTA_CLEANUP.SUCCESS",
+                msg="定时GPT请求记录清理完成",
+                trace_id=trace_id
+            )
+
+        except Exception as e:
+            logger.error(
+                "SCHEDULED.GPT_QUOTA_CLEANUP.ERROR",
+                msg=f"定时GPT请求记录清理失败: {str(e)}",
+                error_code="E-SCHEDULED-GPT-002",
+                extra={"error": str(e)},
+                trace_id=trace_id
+            )
 

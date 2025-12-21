@@ -1,8 +1,8 @@
 <template>
-  <div class="trade-container">
+  <div class="page-container">
     <div class="header-actions mb-4">
       <div class="left">
-        <h2>交易管理</h2>
+        <h2 class="text-xl font-bold">交易管理</h2>
       </div>
       <div class="right">
         <el-button type="primary" :loading="loading" :icon="Refresh" @click="loadPendingTasks">
@@ -382,12 +382,6 @@ export default {
 </script>
 
 <style scoped>
-.trade-container { 
-  padding: 20px; 
-  max-width: 1400px; 
-  margin: 0 auto; 
-}
-
 .header-actions {
   display: flex;
   justify-content: space-between;
@@ -395,9 +389,8 @@ export default {
 }
 
 .header-actions h2 {
-  font-size: 20px;
-  color: var(--text-color);
   margin: 0;
+  color: var(--el-text-color-primary);
 }
 
 .section-header {
@@ -407,7 +400,7 @@ export default {
 
 .section-header h3 {
   font-size: 18px;
-  color: var(--text-color);
+  color: var(--el-text-color-primary);
   margin: 0;
 }
 
@@ -431,7 +424,7 @@ export default {
 .market-question h3 {
   font-size: 16px;
   font-weight: 500;
-  color: var(--text-color);
+  color: var(--el-text-color-primary);
   margin: 0;
   line-height: 1.5;
 }

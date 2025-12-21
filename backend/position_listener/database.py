@@ -673,6 +673,45 @@ class PositionDatabase:
         finally:
             conn.close()
 
+    def delete_order(self, order_id: str) -> bool:
+        """
+        删除订单记录
+
+        参数:
+            order_id: 订单ID
+
+        返回:
+            bool: 是否删除成功
+        """
+        conn = self._get_connection()
+        cursor = conn.cursor()
+
+        try:
+            cursor.execute("DELETE FROM orders WHERE order_id = ?", (order_id,))
+            conn.commit()
+            success = cursor.rowcount > 0
+
+            if success:
+                vlogger.info(
+                    "POSITION.ORDER.DELETE",
+                    msg="删除订单记录",
+                    extra={"order_id": order_id}
+                )
+
+            return success
+
+        except Exception as e:
+            conn.rollback()
+            vlogger.error(
+                "POSITION.ORDER.DELETE.ERROR",
+                msg="删除订单记录失败",
+                error_code="E-POSITION-029",
+                extra={"error": str(e), "order_id": order_id}
+            )
+            raise
+        finally:
+            conn.close()
+
     def _row_to_order(self, row: sqlite3.Row) -> Order:
         """将数据库行转换为Order对象"""
         return Order(

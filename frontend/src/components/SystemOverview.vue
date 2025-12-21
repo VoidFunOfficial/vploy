@@ -1,7 +1,7 @@
 <template>
   <div class="page-container">
     <div class="page-header mb-4">
-      <h2 class="text-xl font-bold text-gray-800">系统宏观信息</h2>
+      <h2 class="text-xl font-bold">系统宏观信息</h2>
     </div>
 
     <!-- 首次加载状态 -->
@@ -35,7 +35,7 @@
             </template>
             <div class="flex flex-col items-center justify-center p-4">
               <el-progress type="dashboard" :percentage="systemData.memory_percent" :color="colors" :width="120" />
-              <div class="mt-4 text-gray-500 text-sm font-medium">
+              <div class="mt-4 text-secondary text-sm font-medium">
                 {{ formatBytes(systemData.memory_used) }} / {{ formatBytes(systemData.memory_total) }}
               </div>
             </div>
@@ -52,7 +52,7 @@
             </template>
             <div class="flex flex-col items-center justify-center p-4">
               <el-progress type="dashboard" :percentage="systemData.disk_percent" :color="colors" :width="120" />
-              <div class="mt-4 text-gray-500 text-sm font-medium">
+              <div class="mt-4 text-secondary text-sm font-medium">
                 {{ formatBytes(systemData.disk_used) }} / {{ formatBytes(systemData.disk_total) }}
               </div>
             </div>
@@ -69,7 +69,7 @@
             </template>
             <div class="flex flex-col items-center justify-center flex-grow p-4">
               <div class="text-2xl font-bold text-primary mb-2">{{ formatUptime(systemData.uptime) }}</div>
-              <div class="text-gray-500 text-sm">启动时间: {{ systemData.boot_time }}</div>
+              <div class="text-secondary text-sm">启动时间: {{ systemData.boot_time }}</div>
             </div>
           </el-card>
         </el-col>
@@ -208,6 +208,15 @@ export default {
 
 .text-primary {
   color: var(--el-color-primary);
+}
+
+.text-secondary {
+  color: var(--el-text-color-secondary);
+}
+
+.page-header h2 {
+  margin: 0;
+  color: var(--el-text-color-primary);
 }
 
 .h-full {

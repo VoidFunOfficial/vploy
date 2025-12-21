@@ -1,5 +1,5 @@
 <template>
-  <div class="system-settings">
+  <div class="page-container">
     <!-- 标题栏 -->
     <div class="page-header">
       <h2 class="page-title">系统设置</h2>
@@ -434,8 +434,6 @@ export default {
 </script>
 
 <style scoped>
-/* Removed .system-settings since we use .page-container */
-
 .page-header {
   display: flex;
   justify-content: space-between;
@@ -456,7 +454,7 @@ export default {
 }
 
 .namespace-text {
-  color: var(--text-color-secondary);
+  color: var(--el-text-color-secondary);
   margin-right: 4px;
 }
 

@@ -511,11 +511,7 @@ export default {
 </script>
 
 <style scoped>
-.filter-management {
-  padding: 20px;
-  max-width: 1400px;
-  margin: 0 auto;
-}
+/* Removed .filter-management since we use .page-container */
 
 .stats-container {
   margin-bottom: 20px;
@@ -523,8 +519,7 @@ export default {
 
 .header h2 {
   margin: 0;
-  font-size: 18px;
-  color: #303133;
+  color: var(--el-text-color-primary);
 }
 
 .main-content {
@@ -547,7 +542,7 @@ export default {
   margin: 0;
   font-size: 16px;
   font-weight: 600;
-  color: #303133;
+  color: var(--el-text-color-primary);
 }
 
 .filter-form {
@@ -562,7 +557,7 @@ export default {
 
 .monospace-font {
    font-family: monospace;
-   color: #606266;
+   color: var(--text-color-secondary);
 }
 </style>
 

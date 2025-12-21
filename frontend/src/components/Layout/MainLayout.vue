@@ -179,7 +179,7 @@ export default {
     const handleGlobalRefresh = () => {
       if (isRefreshing.value) return
       isRefreshing.value = true
-      window.dispatchEvent(new CustomEvent('global-refresh'))
+      emit('global-refresh')
       setTimeout(() => {
         isRefreshing.value = false
       }, 1000)
@@ -204,12 +204,12 @@ export default {
 <style scoped>
 .layout-container {
   height: 100vh;
-  background-color: var(--bg-color-page);
+  background-color: var(--el-bg-color-page);
 }
 
 .aside {
   background-color: #fff;
-  border-right: 1px solid var(--border-color-light);
+  border-right: 1px solid var(--el-border-color-light);
   display: flex;
   flex-direction: column;
   transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
@@ -222,7 +222,7 @@ export default {
   display: flex;
   align-items: center;
   justify-content: center;
-  border-bottom: 1px solid var(--border-color-light);
+  border-bottom: 1px solid var(--el-border-color-light);
   cursor: pointer;
 }
 
@@ -247,7 +247,7 @@ export default {
 .logo-text {
   font-size: 20px;
   font-weight: 700;
-  color: var(--text-color-primary);
+  color: var(--el-text-color-primary);
   letter-spacing: -0.5px;
   font-family: 'Inter', sans-serif;
 }
@@ -264,7 +264,7 @@ export default {
   align-items: center;
   justify-content: space-between;
   padding: 0 24px;
-  border-bottom: 1px solid var(--border-color-light);
+  border-bottom: 1px solid var(--el-border-color-light);
   box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
 }
 
@@ -276,13 +276,13 @@ export default {
 
 .collapse-btn {
   font-size: 18px;
-  color: var(--text-color-regular);
+  color: var(--el-text-color-regular);
 }
 
 .page-title {
   font-size: 18px;
   font-weight: 600;
-  color: var(--text-color-primary);
+  color: var(--el-text-color-primary);
   margin: 0;
 }
 
@@ -304,8 +304,8 @@ export default {
 }
 
 .user-profile:hover {
-  background-color: var(--bg-color-page);
-  border-color: var(--border-color-light);
+  background-color: var(--el-bg-color-page);
+  border-color: var(--el-border-color-light);
 }
 
 .user-avatar {
@@ -318,12 +318,12 @@ export default {
 .username {
   font-size: 14px;
   font-weight: 500;
-  color: var(--text-color-primary);
+  color: var(--el-text-color-primary);
 }
 
 .main-content {
   padding: 0;
-  background-color: var(--bg-color-page);
+  background-color: var(--el-bg-color-page);
   overflow-y: auto;
 }
 
@@ -343,7 +343,7 @@ export default {
 }
 
 :deep(.el-menu-item:hover) {
-  background-color: var(--bg-color-page);
+  background-color: var(--el-bg-color-page);
 }
 
 /* 折叠时的微调 */

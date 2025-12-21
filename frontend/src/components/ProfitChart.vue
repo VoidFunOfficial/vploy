@@ -1,9 +1,9 @@
 <template>
-  <div class="profit-chart">
+  <div class="page-container">
     <!-- 标题栏 -->
     <div class="header-actions mb-4">
       <div class="left">
-        <h2>收益曲线</h2>
+        <h2 class="text-xl font-bold">收益曲线</h2>
       </div>
       <div class="right">
         <el-button-group>
@@ -616,8 +616,8 @@ export default {
 </script>
 
 <style scoped>
-.profit-chart {
-  /* 使用 page-container 替代 */
+.page-container {
+  padding: 20px;
 }
 
 .header-actions {
@@ -627,9 +627,8 @@ export default {
 }
 
 .header-actions h2 {
-  font-size: 20px;
-  color: var(--el-text-color-primary);
   margin: 0;
+  color: var(--el-text-color-primary);
 }
 
 .filter-form {

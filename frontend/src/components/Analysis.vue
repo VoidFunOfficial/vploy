@@ -1,5 +1,5 @@
 <template>
-  <div class="analysis-container">
+  <div class="page-container">
     <el-card shadow="hover">
       <template #header>
         <div class="card-header">
@@ -287,7 +287,7 @@ export default {
 }
 
 .empty-hint {
-  color: var(--text-color-secondary);
+  color: var(--el-text-color-secondary);
   font-size: 14px;
 }
 

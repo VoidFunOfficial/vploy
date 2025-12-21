@@ -217,9 +217,28 @@ class OrderMonitor:
                     error_code="E-POSITION-028",
                     extra={"order_id": order_id}
                 )
+
+                # 自动删除不存在的订单记录
+                try:
+                    deleted = self.db.delete_order(order_id)
+                    if deleted:
+                        vlogger.info(
+                            "ORDER_MONITOR.AUTO_DELETE",
+                            msg="订单不存在，已自动删除订单记录",
+                            extra={"order_id": order_id}
+                        )
+                except Exception as e:
+                    vlogger.error(
+                        "ORDER_MONITOR.AUTO_DELETE.ERROR",
+                        msg="自动删除订单记录失败",
+                        error_code="E-POSITION-030",
+                        extra={"order_id": order_id, "error": str(e)}
+                    )
+
                 return {
                     "success": False,
-                    "message": "API返回空结果，订单可能不存在或已被删除"
+                    "message": "API返回空结果，订单可能不存在或已被删除",
+                    "order_deleted": True
                 }
 
             # 解析订单状态

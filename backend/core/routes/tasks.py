@@ -696,59 +696,7 @@ def poll_analysis_once(task_id):
         }), 500
 
 
-@tasks_bp.route('/<int:task_id>/split', methods=['POST'])
-def split_analysis_task_route(task_id):
-    """
-    拆分成功的analysis任务为多个decision任务
 
-    适用场景:
-    - analysis任务成功完成后，将每个市场的分析结果拆分为独立的decision任务
-
-    处理流程:
-    1. 验证任务状态（必须是analysis阶段且成功）
-    2. 提交到Huey队列异步执行拆分操作
-    3. 返回提交成功消息
-
-    返回:
-        {
-            "success": true,
-            "message": "拆分任务已提交到队列"
-        }
-    """
-    try:
-        from ...task_manager import execute_split_analysis_task
-
-        logger.info(
-            "TASKS.API.SPLIT.START",
-            msg=f"提交拆分任务到Huey队列: {task_id}",
-            extra={"task_id": task_id}
-        )
-
-        # 提交到Huey队列异步执行
-        execute_split_analysis_task(task_id)
-
-        logger.info(
-            "TASKS.API.SPLIT.SUBMITTED",
-            msg=f"拆分任务已提交到Huey队列: {task_id}",
-            extra={"task_id": task_id}
-        )
-
-        return jsonify({
-            'success': True,
-            'message': '拆分任务已提交到队列，将在后台异步执行'
-        }), 202
-
-    except Exception as e:
-        logger.error(
-            "TASKS.API.SPLIT.ERROR",
-            msg=f"拆分任务异常: {task_id}",
-            error_code="E-TASKS-API-014",
-            extra={"task_id": task_id, "error": str(e)}
-        )
-        return jsonify({
-            'success': False,
-            'message': f'拆分任务失败: {str(e)}'
-        }), 500
 
 
 @tasks_bp.route('/decision/pending', methods=['GET'])
@@ -1208,4 +1156,96 @@ def execute_decision():
         return jsonify({
             'success': False,
             'message': f'决策处理失败: {str(e)}'
+        }), 500
+
+
+@tasks_bp.route('/gpt-quota', methods=['GET'])
+def get_gpt_quota_status():
+    """
+    获取GPT请求额度状态
+
+    返回:
+        {
+            "success": true,
+            "data": {
+                "allowed": true,
+                "reason": "",
+                "usage": {
+                    "6h": {"current": 5, "limit": 30, "remaining": 25},
+                    "72h": {"current": 15, "limit": 180, "remaining": 165}
+                },
+                "next_available": null,
+                "limits": [
+                    {"hours": 6, "max_requests": 30},
+                    {"hours": 72, "max_requests": 180}
+                ]
+            }
+        }
+    """
+    try:
+        from ...ai_analysis.analysis_tasks import get_quota_status
+
+        quota_status = get_quota_status()
+
+        return jsonify({
+            'success': True,
+            'data': quota_status
+        }), 200
+
+    except Exception as e:
+        logger.error(
+            "TASKS.API.GPT_QUOTA.ERROR",
+            msg="获取GPT额度状态失败",
+            error_code="E-TASKS-API-028",
+            extra={"error": str(e)}
+        )
+        return jsonify({
+            'success': False,
+            'message': f'获取GPT额度状态失败: {str(e)}'
+        }), 500
+
+
+@tasks_bp.route('/gpt-quota/cleanup', methods=['POST'])
+def cleanup_gpt_quota_records():
+    """
+    清理旧的GPT请求记录
+
+    请求体:
+        days: 保留天数 (默认30天)
+    """
+    try:
+        from ...ai_analysis.analysis_tasks import cleanup_old_quota_records
+
+        data = request.get_json() or {}
+        days = data.get('days', 30)
+
+        if not isinstance(days, int) or days <= 0:
+            return jsonify({
+                'success': False,
+                'message': '保留天数必须是正整数'
+            }), 400
+
+        cleanup_old_quota_records(days)
+
+        logger.info(
+            "TASKS.API.GPT_QUOTA.CLEANUP.SUCCESS",
+            msg=f"清理GPT请求记录成功，保留{days}天",
+            extra={"days": days}
+        )
+
+        return jsonify({
+            'success': True,
+            'message': f'清理完成，保留了最近{days}天的记录'
+        }), 200
+
+    except Exception as e:
+        logger.error(
+            "TASKS.API.GPT_QUOTA.CLEANUP.ERROR",
+            msg="清理GPT请求记录失败",
+            error_code="E-TASKS-API-029",
+            extra={"error": str(e)}
+        )
+        return jsonify({
+            'success': False,
+            'message': f'清理GPT请求记录失败: {str(e)}'
         }), 500

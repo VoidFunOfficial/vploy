@@ -236,10 +236,10 @@ def get_position_detail(position_id: int):
 def monitor_position_endpoint(position_id: int):
     """
     手动监控单个持仓
-    
+
     参数:
         position_id: 持仓ID
-    
+
     响应:
         {
             "success": true/false,
@@ -249,18 +249,18 @@ def monitor_position_endpoint(position_id: int):
     """
     try:
         result = monitor_position(position_id)
-        
+
         vlogger.info("POSITIONS.MONITOR", msg="手动监控持仓", extra={
             "position_id": position_id,
             "result": result
         })
-        
+
         return jsonify({
             'success': True,
             'message': '监控持仓成功',
             'data': result
         }), 200
-        
+
     except Exception as e:
         vlogger.error("POSITIONS.MONITOR.ERROR", msg="监控持仓失败",
                      error_code="E-POSITIONS-004", extra={
@@ -270,6 +270,142 @@ def monitor_position_endpoint(position_id: int):
         return jsonify({
             'success': False,
             'message': f'监控持仓失败: {str(e)}'
+        }), 500
+
+
+@positions_bp.route('/<int:position_id>', methods=['PUT'])
+@require_auth
+def update_position_endpoint(position_id: int):
+    """
+    更新持仓信息
+
+    参数:
+        position_id: 持仓ID
+
+    请求体:
+        {
+            "current_price": 当前价格（可选）,
+            "status": 状态（可选，open/closed/monitoring）,
+            "settlement_result": 结算结果（可选，YES/NO）,
+            "settlement_payout": 结算收益（可选）
+        }
+
+    响应:
+        {
+            "success": true/false,
+            "message": "消息"
+        }
+    """
+    try:
+        data = request.get_json()
+
+        position = get_position(position_id)
+        if not position:
+            return jsonify({
+                'success': False,
+                'message': f'持仓不存在: {position_id}'
+            }), 404
+
+        # 更新价格
+        if 'current_price' in data:
+            from ...position_listener import update_position_price
+            update_position_price(position_id, float(data['current_price']))
+
+        # 更新状态
+        if 'status' in data:
+            from ...position_listener.models import PositionStatus
+            position.status = PositionStatus(data['status'])
+
+        # 结算持仓
+        if 'settlement_result' in data and 'settlement_payout' in data:
+            from ...position_listener import settle_position
+            settle_position(
+                position_id,
+                data['settlement_result'],
+                float(data['settlement_payout'])
+            )
+
+        vlogger.info("POSITIONS.UPDATE", msg="更新持仓", extra={
+            "position_id": position_id,
+            "updates": data
+        })
+
+        return jsonify({
+            'success': True,
+            'message': '更新持仓成功'
+        }), 200
+
+    except Exception as e:
+        vlogger.error("POSITIONS.UPDATE.ERROR", msg="更新持仓失败",
+                     error_code="E-POSITIONS-011", extra={
+                         "position_id": position_id,
+                         "error": str(e)
+                     })
+        return jsonify({
+            'success': False,
+            'message': f'更新持仓失败: {str(e)}'
+        }), 500
+
+
+@positions_bp.route('/<int:position_id>', methods=['DELETE'])
+@require_auth
+def delete_position_endpoint(position_id: int):
+    """
+    删除持仓记录
+
+    参数:
+        position_id: 持仓ID
+
+    响应:
+        {
+            "success": true/false,
+            "message": "消息"
+        }
+    """
+    try:
+        position = get_position(position_id)
+        if not position:
+            return jsonify({
+                'success': False,
+                'message': f'持仓不存在: {position_id}'
+            }), 404
+
+        # 删除持仓记录
+        db = PositionDatabase()
+        conn = db._get_connection()
+        cursor = conn.cursor()
+
+        try:
+            # 先删除关联的交易记录
+            cursor.execute("DELETE FROM trades WHERE position_id = ?", (position_id,))
+            # 再删除持仓记录
+            cursor.execute("DELETE FROM positions WHERE id = ?", (position_id,))
+            conn.commit()
+
+            vlogger.info("POSITIONS.DELETE", msg="删除持仓", extra={
+                "position_id": position_id
+            })
+
+            return jsonify({
+                'success': True,
+                'message': '删除持仓成功'
+            }), 200
+
+        except Exception as e:
+            conn.rollback()
+            raise
+        finally:
+            conn.close()
+
+    except Exception as e:
+        vlogger.error("POSITIONS.DELETE.ERROR", msg="删除持仓失败",
+                     error_code="E-POSITIONS-012", extra={
+                         "position_id": position_id,
+                         "error": str(e)
+                     })
+        return jsonify({
+            'success': False,
+            'message': f'删除持仓失败: {str(e)}'
         }), 500
 
 
@@ -423,6 +559,123 @@ def monitor_order_endpoint(order_id: str):
         return jsonify({
             'success': False,
             'message': f'监控订单失败: {str(e)}'
+        }), 500
+
+
+@positions_bp.route('/orders/<order_id>', methods=['PUT'])
+@require_auth
+def update_order_endpoint(order_id: str):
+    """
+    更新订单信息
+
+    参数:
+        order_id: 订单ID
+
+    请求体:
+        {
+            "status": 状态（可选，pending/filled/cancelled/failed）,
+            "filled_size": 已成交数量（可选）
+        }
+
+    响应:
+        {
+            "success": true/false,
+            "message": "消息"
+        }
+    """
+    try:
+        data = request.get_json()
+
+        order = get_order(order_id)
+        if not order:
+            return jsonify({
+                'success': False,
+                'message': f'订单不存在: {order_id}'
+            }), 404
+
+        # 更新订单状态
+        if 'status' in data or 'filled_size' in data:
+            from ...position_listener.models import OrderStatus
+            from ...position_listener import _db
+
+            status = OrderStatus(data['status']) if 'status' in data else order.status
+            filled_size = float(data['filled_size']) if 'filled_size' in data else order.filled_size
+
+            _db.update_order_status(order_id, status, filled_size)
+
+        vlogger.info("POSITIONS.ORDER.UPDATE", msg="更新订单", extra={
+            "order_id": order_id,
+            "updates": data
+        })
+
+        return jsonify({
+            'success': True,
+            'message': '更新订单成功'
+        }), 200
+
+    except Exception as e:
+        vlogger.error("POSITIONS.ORDER.UPDATE.ERROR", msg="更新订单失败",
+                     error_code="E-POSITIONS-013", extra={
+                         "order_id": order_id,
+                         "error": str(e)
+                     })
+        return jsonify({
+            'success': False,
+            'message': f'更新订单失败: {str(e)}'
+        }), 500
+
+
+@positions_bp.route('/orders/<order_id>', methods=['DELETE'])
+@require_auth
+def delete_order_endpoint(order_id: str):
+    """
+    删除订单记录
+
+    参数:
+        order_id: 订单ID
+
+    响应:
+        {
+            "success": true/false,
+            "message": "消息"
+        }
+    """
+    try:
+        order = get_order(order_id)
+        if not order:
+            return jsonify({
+                'success': False,
+                'message': f'订单不存在: {order_id}'
+            }), 404
+
+        # 删除订单记录
+        from ...position_listener import _db
+        success = _db.delete_order(order_id)
+
+        if success:
+            vlogger.info("POSITIONS.ORDER.DELETE", msg="删除订单", extra={
+                "order_id": order_id
+            })
+
+            return jsonify({
+                'success': True,
+                'message': '删除订单成功'
+            }), 200
+        else:
+            return jsonify({
+                'success': False,
+                'message': '删除订单失败'
+            }), 500
+
+    except Exception as e:
+        vlogger.error("POSITIONS.ORDER.DELETE.ERROR", msg="删除订单失败",
+                     error_code="E-POSITIONS-014", extra={
+                         "order_id": order_id,
+                         "error": str(e)
+                     })
+        return jsonify({
+            'success': False,
+            'message': f'删除订单失败: {str(e)}'
         }), 500
 
 

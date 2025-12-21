@@ -11,6 +11,8 @@ AI分析异步任务模块
 
 import time
 import asyncio
+import sqlite3
+from datetime import datetime, timedelta
 from typing import Dict, Any, Optional, List
 from enum import Enum
 
@@ -36,11 +38,286 @@ db = TaskDatabase()
 class AnalysisStatus(str, Enum):
     """分析任务状态"""
     PENDING = "pending"              # 待处理：等待发送GPT请求
+    WAITING_QUOTA = "waiting_quota"  # 等待额度中：达到频率限制，等待额度恢复
     REQUESTING = "requesting"        # 请求中：正在发送GPT请求
     POLLING = "polling"              # 轮询中：等待GPT响应
     VALIDATING = "validating"        # 验证中：验证返回结果
     SUCCESS = "success"              # 成功：分析完成
     FAILED = "failed"                # 失败：分析失败
+
+
+# ==================== GPT请求频率限制 ====================
+
+class GPTRequestDatabase:
+    """
+    GPT请求记录数据库管理器
+
+    用于记录每次GPT请求的时间戳，实现滑动窗口频率限制。
+    """
+
+    def __init__(self, db_path: str = "backend/ai_analysis/gpt_requests.db"):
+        """
+        初始化GPT请求记录数据库
+
+        参数:
+            db_path: 数据库文件路径
+        """
+        self.db_path = db_path
+        self._init_database()
+
+    def _get_connection(self) -> sqlite3.Connection:
+        """获取数据库连接"""
+        conn = sqlite3.connect(self.db_path)
+        conn.row_factory = sqlite3.Row
+        return conn
+
+    def _init_database(self):
+        """初始化数据库表结构"""
+        conn = self._get_connection()
+        cursor = conn.cursor()
+
+        # 创建GPT请求记录表
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS gpt_requests (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                request_time TIMESTAMP NOT NULL,
+                task_id INTEGER,
+                conversation_id TEXT,
+                success INTEGER DEFAULT 1,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+
+        # 创建索引以提高查询性能
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_request_time
+            ON gpt_requests(request_time)
+        """)
+
+        conn.commit()
+        conn.close()
+
+    def record_request(self, task_id: int, conversation_id: Optional[str] = None, success: bool = True) -> int:
+        """
+        记录一次GPT请求
+
+        参数:
+            task_id: 任务ID
+            conversation_id: 会话ID（可选）
+            success: 请求是否成功
+
+        返回:
+            int: 记录ID
+        """
+        conn = self._get_connection()
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            INSERT INTO gpt_requests (request_time, task_id, conversation_id, success)
+            VALUES (?, ?, ?, ?)
+        """, (datetime.now(), task_id, conversation_id, 1 if success else 0))
+
+        record_id = cursor.lastrowid
+        conn.commit()
+        conn.close()
+
+        return record_id
+
+    def get_request_count_in_window(self, hours: int) -> int:
+        """
+        获取指定时间窗口内的请求数量
+
+        参数:
+            hours: 时间窗口（小时）
+
+        返回:
+            int: 请求数量
+        """
+        conn = self._get_connection()
+        cursor = conn.cursor()
+
+        window_start = datetime.now() - timedelta(hours=hours)
+
+        cursor.execute("""
+            SELECT COUNT(*) as count
+            FROM gpt_requests
+            WHERE request_time >= ? AND success = 1
+        """, (window_start,))
+
+        result = cursor.fetchone()
+        conn.close()
+
+        return result['count'] if result else 0
+
+    def get_next_available_time(self, hours: int, max_requests: int) -> Optional[datetime]:
+        """
+        获取下一个可用时间点（当前窗口内请求数达到限制时）
+
+        参数:
+            hours: 时间窗口（小时）
+            max_requests: 最大请求数
+
+        返回:
+            Optional[datetime]: 下一个可用时间点，如果当前可用则返回None
+        """
+        current_count = self.get_request_count_in_window(hours)
+
+        if current_count < max_requests:
+            return None
+
+        # 找到窗口内最早的请求时间
+        conn = self._get_connection()
+        cursor = conn.cursor()
+
+        window_start = datetime.now() - timedelta(hours=hours)
+
+        cursor.execute("""
+            SELECT request_time
+            FROM gpt_requests
+            WHERE request_time >= ? AND success = 1
+            ORDER BY request_time ASC
+            LIMIT 1
+        """, (window_start,))
+
+        result = cursor.fetchone()
+        conn.close()
+
+        if result:
+            # 最早请求时间 + 窗口时长 = 下一个可用时间
+            earliest_request = datetime.fromisoformat(result['request_time'])
+            return earliest_request + timedelta(hours=hours)
+
+        return None
+
+    def cleanup_old_records(self, days: int = 30):
+        """
+        清理旧的请求记录
+
+        参数:
+            days: 保留天数
+        """
+        conn = self._get_connection()
+        cursor = conn.cursor()
+
+        cutoff_time = datetime.now() - timedelta(days=days)
+
+        cursor.execute("""
+            DELETE FROM gpt_requests
+            WHERE request_time < ?
+        """, (cutoff_time,))
+
+        deleted_count = cursor.rowcount
+        conn.commit()
+        conn.close()
+
+        logger.info(
+            "GPT.QUOTA.CLEANUP",
+            msg=f"清理了 {deleted_count} 条旧的GPT请求记录",
+            extra={"deleted_count": deleted_count, "cutoff_days": days}
+        )
+
+
+class GPTQuotaManager:
+    """
+    GPT请求额度管理器
+
+    实现滑动窗口频率限制：
+    - 6小时内最多30次请求
+    - 3天内最多180次请求
+    """
+
+    # 限制规则配置
+    LIMITS = [
+        {"hours": 6, "max_requests": 30},    # 6小时内最多30次
+        {"hours": 72, "max_requests": 180},  # 3天内最多180次
+    ]
+
+    def __init__(self):
+        """初始化额度管理器"""
+        self.db = GPTRequestDatabase()
+
+    def check_quota(self) -> Dict[str, Any]:
+        """
+        检查当前请求额度
+
+        返回:
+            Dict[str, Any]: {
+                "allowed": bool,           # 是否允许请求
+                "reason": str,             # 不允许的原因
+                "current_usage": Dict,     # 当前使用情况
+                "next_available": datetime # 下一个可用时间（如果被限制）
+            }
+        """
+        current_usage = {}
+        next_available_times = []
+
+        for limit in self.LIMITS:
+            hours = limit["hours"]
+            max_requests = limit["max_requests"]
+
+            current_count = self.db.get_request_count_in_window(hours)
+            current_usage[f"{hours}h"] = {
+                "current": current_count,
+                "limit": max_requests,
+                "remaining": max(0, max_requests - current_count)
+            }
+
+            if current_count >= max_requests:
+                next_available = self.db.get_next_available_time(hours, max_requests)
+                if next_available:
+                    next_available_times.append(next_available)
+
+        if next_available_times:
+            # 如果有限制，返回最晚的可用时间
+            next_available = max(next_available_times)
+            return {
+                "allowed": False,
+                "reason": "已达到GPT请求频率限制",
+                "current_usage": current_usage,
+                "next_available": next_available
+            }
+
+        return {
+            "allowed": True,
+            "reason": "",
+            "current_usage": current_usage,
+            "next_available": None
+        }
+
+    def record_request(self, task_id: int, conversation_id: Optional[str] = None, success: bool = True) -> int:
+        """
+        记录一次GPT请求
+
+        参数:
+            task_id: 任务ID
+            conversation_id: 会话ID
+            success: 请求是否成功
+
+        返回:
+            int: 记录ID
+        """
+        return self.db.record_request(task_id, conversation_id, success)
+
+    def get_quota_status(self) -> Dict[str, Any]:
+        """
+        获取详细的额度状态信息
+
+        返回:
+            Dict[str, Any]: 详细的额度状态
+        """
+        quota_check = self.check_quota()
+
+        return {
+            "allowed": quota_check["allowed"],
+            "reason": quota_check["reason"],
+            "usage": quota_check["current_usage"],
+            "next_available": quota_check["next_available"].isoformat() if quota_check["next_available"] else None,
+            "limits": self.LIMITS
+        }
+
+
+# 全局额度管理器实例
+quota_manager = GPTQuotaManager()
 
 
 # ==================== JSON结构验证 ====================
@@ -330,6 +607,49 @@ def submit_gpt_request(
                 )
                 return
 
+            # 检查GPT请求额度
+            quota_check = quota_manager.check_quota()
+            if not quota_check["allowed"]:
+                # 额度不足，设置任务为等待额度状态
+                task.result["analysis_status"] = AnalysisStatus.WAITING_QUOTA.value
+                task.result["quota_reason"] = quota_check["reason"]
+                task.result["quota_usage"] = quota_check["current_usage"]
+                task.result["next_available"] = quota_check["next_available"].isoformat() if quota_check["next_available"] else None
+                db.update_async_task(task)
+
+                logger.warn(
+                    "ANALYSIS.SUBMIT.QUOTA_EXCEEDED",
+                    msg=f"GPT请求额度不足，任务进入等待状态",
+                    extra={
+                        "async_task_id": async_task_id,
+                        "quota_reason": quota_check["reason"],
+                        "current_usage": quota_check["current_usage"],
+                        "next_available": quota_check["next_available"].isoformat() if quota_check["next_available"] else None
+                    },
+                    trace_id=trace_id
+                )
+
+                # 调度延迟重试任务
+                if quota_check["next_available"]:
+                    delay_seconds = int((quota_check["next_available"] - datetime.now()).total_seconds())
+                    if delay_seconds > 0:
+                        # 调度在额度恢复后重新提交
+                        submit_gpt_request.schedule(
+                            args=(async_task_id, event_summary),
+                            delay=delay_seconds
+                        )
+                        logger.info(
+                            "ANALYSIS.SUBMIT.QUOTA_SCHEDULED",
+                            msg=f"已调度任务在 {delay_seconds} 秒后重新提交",
+                            extra={
+                                "async_task_id": async_task_id,
+                                "delay_seconds": delay_seconds,
+                                "retry_time": quota_check["next_available"].isoformat()
+                            },
+                            trace_id=trace_id
+                        )
+                return
+
             # 获取Cookie
             token_refresher = get_token_refresher()
             access_token_status = token_refresher.get_token_status(TokenType.ACCESS_TOKEN.value)
@@ -417,6 +737,10 @@ def submit_gpt_request(
                 task.result["analysis_status"] = AnalysisStatus.FAILED.value
                 task.result["error"] = error_msg
                 db.update_async_task(task)
+
+                # 记录失败的GPT请求
+                quota_manager.record_request(async_task_id, None, success=False)
+
                 logger.error(
                     "ANALYSIS.SUBMIT.REQUEST_FAILED",
                     msg=error_msg,
@@ -432,6 +756,9 @@ def submit_gpt_request(
             task.result["analysis_status"] = AnalysisStatus.POLLING.value
             task.result["submit_time"] = time.time()
             db.update_async_task(task)
+
+            # 记录成功的GPT请求
+            quota_manager.record_request(async_task_id, conversation_id, success=True)
 
             logger.info(
                 "ANALYSIS.SUBMIT.SUCCESS",
@@ -1159,4 +1486,125 @@ def split_analysis_task(async_task_id: int) -> Dict[str, Any]:
             "success_count": 0,
             "failed_count": 0
         }
+
+
+# ==================== 额度恢复检查任务 ====================
+
+@huey.task()
+def check_quota_recovery():
+    """
+    检查等待额度的任务，如果额度已恢复则重新提交
+
+    这个任务应该定期运行（例如每5分钟），检查所有处于WAITING_QUOTA状态的任务
+    """
+    with TraceContext() as trace_id:
+        logger.info(
+            "QUOTA.CHECK.START",
+            msg="开始检查等待额度的任务",
+            trace_id=trace_id
+        )
+
+        try:
+            # 查询所有等待额度的分析任务
+            waiting_tasks = db.query_async_tasks(
+                stage=TaskStage.ANALYSIS,
+                status=TaskStatus.PROCESSING,  # 分析任务在处理中状态
+                limit=100
+            )
+
+            quota_waiting_tasks = []
+            for task in waiting_tasks:
+                analysis_status = task.result.get("analysis_status")
+                if analysis_status == AnalysisStatus.WAITING_QUOTA.value:
+                    quota_waiting_tasks.append(task)
+
+            if not quota_waiting_tasks:
+                logger.debug(
+                    "QUOTA.CHECK.NO_WAITING",
+                    msg="没有等待额度的任务",
+                    trace_id=trace_id
+                )
+                return
+
+            logger.info(
+                "QUOTA.CHECK.FOUND",
+                msg=f"找到 {len(quota_waiting_tasks)} 个等待额度的任务",
+                extra={"waiting_count": len(quota_waiting_tasks)},
+                trace_id=trace_id
+            )
+
+            # 检查当前额度状态
+            quota_check = quota_manager.check_quota()
+
+            if quota_check["allowed"]:
+                # 额度已恢复，重新提交第一个等待的任务
+                task = quota_waiting_tasks[0]  # 按创建时间排序，处理最早的任务
+
+                event_summary = task.result.get("event_summary")
+                if event_summary:
+                    # 重置任务状态为PENDING
+                    task.result["analysis_status"] = AnalysisStatus.PENDING.value
+                    task.result.pop("quota_reason", None)
+                    task.result.pop("quota_usage", None)
+                    task.result.pop("next_available", None)
+                    db.update_async_task(task)
+
+                    # 重新提交GPT请求
+                    submit_gpt_request(task.id, event_summary)
+
+                    logger.info(
+                        "QUOTA.CHECK.RESUBMIT",
+                        msg=f"额度已恢复，重新提交任务: {task.id}",
+                        extra={
+                            "task_id": task.id,
+                            "quota_usage": quota_check["current_usage"]
+                        },
+                        trace_id=trace_id
+                    )
+                else:
+                    logger.warn(
+                        "QUOTA.CHECK.NO_SUMMARY",
+                        msg=f"任务缺少event_summary，无法重新提交: {task.id}",
+                        extra={"task_id": task.id},
+                        trace_id=trace_id
+                    )
+            else:
+                logger.debug(
+                    "QUOTA.CHECK.STILL_LIMITED",
+                    msg="额度仍然受限，继续等待",
+                    extra={
+                        "quota_reason": quota_check["reason"],
+                        "next_available": quota_check["next_available"].isoformat() if quota_check["next_available"] else None
+                    },
+                    trace_id=trace_id
+                )
+
+        except Exception as e:
+            logger.error(
+                "QUOTA.CHECK.EXCEPTION",
+                msg=f"检查额度恢复异常: {str(e)}",
+                error_code="E-QUOTA-001",
+                extra={"exception": str(e)},
+                trace_id=trace_id
+            )
+
+
+def get_quota_status() -> Dict[str, Any]:
+    """
+    获取GPT请求额度状态（供API调用）
+
+    返回:
+        Dict[str, Any]: 额度状态信息
+    """
+    return quota_manager.get_quota_status()
+
+
+def cleanup_old_quota_records(days: int = 30):
+    """
+    清理旧的GPT请求记录（供定时任务调用）
+
+    参数:
+        days: 保留天数
+    """
+    quota_manager.db.cleanup_old_records(days)
 

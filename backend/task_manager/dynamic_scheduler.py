@@ -48,6 +48,8 @@ class DynamicScheduler:
             'periodic_health_check': self._execute_periodic_health_check,
             'event_sniffing': self._execute_event_sniffing,
             'position_monitor': self._execute_position_monitor,
+            'gpt_quota_check': self._execute_gpt_quota_check,
+            'gpt_quota_cleanup': self._execute_gpt_quota_cleanup,
         }
         
         logger.info(
@@ -509,6 +511,64 @@ class DynamicScheduler:
             "DYNAMIC_SCHEDULER.STOPPED",
             msg="动态调度器已停止"
         )
+
+    def _execute_gpt_quota_check(self, task: ScheduledTask):
+        """执行GPT额度检查任务"""
+        with TraceContext() as trace_id:
+            logger.info(
+                "DYNAMIC_SCHEDULER.GPT_QUOTA_CHECK.START",
+                msg="开始执行GPT额度检查任务",
+                trace_id=trace_id
+            )
+
+            try:
+                # 调用Huey任务
+                from .tasks import scheduled_gpt_quota_check
+                scheduled_gpt_quota_check()
+
+                logger.info(
+                    "DYNAMIC_SCHEDULER.GPT_QUOTA_CHECK.SUCCESS",
+                    msg="GPT额度检查任务执行成功",
+                    trace_id=trace_id
+                )
+
+            except Exception as e:
+                logger.error(
+                    "DYNAMIC_SCHEDULER.GPT_QUOTA_CHECK.ERROR",
+                    msg=f"GPT额度检查任务执行失败: {str(e)}",
+                    error_code="E-DYNAMIC-SCHEDULER-007",
+                    extra={"error": str(e)},
+                    trace_id=trace_id
+                )
+
+    def _execute_gpt_quota_cleanup(self, task: ScheduledTask):
+        """执行GPT请求记录清理任务"""
+        with TraceContext() as trace_id:
+            logger.info(
+                "DYNAMIC_SCHEDULER.GPT_QUOTA_CLEANUP.START",
+                msg="开始执行GPT请求记录清理任务",
+                trace_id=trace_id
+            )
+
+            try:
+                # 调用Huey任务
+                from .tasks import scheduled_gpt_quota_cleanup
+                scheduled_gpt_quota_cleanup()
+
+                logger.info(
+                    "DYNAMIC_SCHEDULER.GPT_QUOTA_CLEANUP.SUCCESS",
+                    msg="GPT请求记录清理任务执行成功",
+                    trace_id=trace_id
+                )
+
+            except Exception as e:
+                logger.error(
+                    "DYNAMIC_SCHEDULER.GPT_QUOTA_CLEANUP.ERROR",
+                    msg=f"GPT请求记录清理任务执行失败: {str(e)}",
+                    error_code="E-DYNAMIC-SCHEDULER-008",
+                    extra={"error": str(e)},
+                    trace_id=trace_id
+                )
 
     def register_executor(self, task_name: str, executor: Callable):
         """

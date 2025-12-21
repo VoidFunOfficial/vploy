@@ -552,6 +552,60 @@ def init_default_scheduled_tasks():
             extra={"task_id": task_id, "next_run": position_monitor_next.isoformat()}
         )
 
+    # GPT额度检查任务（每5分钟）
+    gpt_quota_cron = "*/5 * * * *"  # 每5分钟
+    gpt_quota_next = croniter(gpt_quota_cron, now).get_next(datetime)
+
+    task_id = add_scheduled_task(
+        name="gpt_quota_check",
+        task_type="cron",
+        schedule=gpt_quota_cron,
+        enabled=True,
+        metadata={
+            "description": "GPT额度检查任务 - 每5分钟检查等待额度的任务并在额度恢复后重新提交",
+            "auto_created": True,
+            "huey_task": True  # 由Huey执行
+        }
+    )
+
+    # 更新下次运行时间
+    task = db.get_scheduled_task(task_id)
+    if task and not task.next_run:
+        task.next_run = gpt_quota_next
+        db.update_scheduled_task(task)
+        logger.info(
+            "SCHEDULER.INIT.GPT_QUOTA",
+            msg=f"GPT额度检查任务已初始化，下次运行: {gpt_quota_next}",
+            extra={"task_id": task_id, "next_run": gpt_quota_next.isoformat()}
+        )
+
+    # GPT请求记录清理任务（每天凌晨2点）
+    gpt_cleanup_cron = "0 2 * * *"  # 每天凌晨2点
+    gpt_cleanup_next = croniter(gpt_cleanup_cron, now).get_next(datetime)
+
+    task_id = add_scheduled_task(
+        name="gpt_quota_cleanup",
+        task_type="cron",
+        schedule=gpt_cleanup_cron,
+        enabled=True,
+        metadata={
+            "description": "GPT请求记录清理任务 - 每天凌晨2点清理30天前的请求记录",
+            "auto_created": True,
+            "huey_task": True  # 由Huey执行
+        }
+    )
+
+    # 更新下次运行时间
+    task = db.get_scheduled_task(task_id)
+    if task and not task.next_run:
+        task.next_run = gpt_cleanup_next
+        db.update_scheduled_task(task)
+        logger.info(
+            "SCHEDULER.INIT.GPT_CLEANUP",
+            msg=f"GPT请求记录清理任务已初始化，下次运行: {gpt_cleanup_next}",
+            extra={"task_id": task_id, "next_run": gpt_cleanup_next.isoformat()}
+        )
+
     logger.info(
         "SCHEDULER.INIT.SUCCESS",
         msg="预定义定时任务初始化完成"

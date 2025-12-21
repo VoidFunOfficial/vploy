@@ -1,10 +1,10 @@
 <template>
-  <div class="task-management">
+  <div class="page-container">
     <el-card shadow="never">
       <template #header>
         <div class="header-actions">
           <div class="header-left">
-            <h2>任务管理</h2>
+            <h2 class="text-xl font-bold">任务管理</h2>
             <el-tag type="info" effect="plain" round>共 {{ tasks.length }} 条任务</el-tag>
           </div>
           <div class="header-right">
@@ -97,8 +97,13 @@
               <div v-if="row.extended_info.market_count > 0" class="info-detail">
                 <small>市场: {{ row.extended_info.market_count }}</small>
               </div>
+              <div v-if="row.extended_info.analysis_status === 'waiting_quota' && row.result?.next_available" class="info-detail">
+                <small style="color: var(--el-color-warning)">
+                  预计恢复: {{ formatTime(row.result.next_available) }}
+                </small>
+              </div>
             </div>
-            <span v-else class="text-muted">-</span>
+            <span v-else style="color: var(--el-text-color-secondary)">-</span>
           </template>
         </el-table-column>
         <el-table-column label="元数据" width="140">
@@ -126,7 +131,7 @@
         <el-table-column label="错误信息" min-width="150" show-overflow-tooltip>
           <template #default="{ row }">
             <span v-if="row.error_msg" class="error-text">{{ row.error_msg }}</span>
-            <span v-else class="text-muted">-</span>
+            <span v-else style="color: var(--el-text-color-secondary)">-</span>
           </template>
         </el-table-column>
         <el-table-column label="创建时间" width="160">
@@ -414,8 +419,11 @@ export default {
 
     const getAnalysisStatusLabel = (status) => {
       const map = {
+        pending: '待处理',
+        waiting_quota: '等待额度中',
         requesting: '请求中',
         polling: '轮询中',
+        validating: '验证中',
         success: '成功',
         failed: '失败'
       }
@@ -424,8 +432,11 @@ export default {
 
     const getAnalysisStatusType = (status) => {
       const map = {
+        pending: 'info',
+        waiting_quota: 'warning',
         requesting: 'warning',
         polling: 'info',
+        validating: 'primary',
         success: 'success',
         failed: 'danger'
       }
@@ -809,12 +820,6 @@ export default {
 </script>
 
 <style scoped>
-.task-management {
-  padding: 20px;
-  max-width: 1600px;
-  margin: 0 auto;
-}
-
 .header-actions {
   display: flex;
   justify-content: space-between;
@@ -829,8 +834,7 @@ export default {
 
 .header-left h2 {
   margin: 0;
-  font-size: 18px;
-  color: #303133;
+  color: var(--el-text-color-primary);
 }
 
 .filter-form {
@@ -845,11 +849,11 @@ export default {
 
 .info-detail {
   font-size: 12px;
-  color: #606266;
+  color: var(--el-text-color-secondary);
 }
 
 .error-text {
-  color: #F56C6C;
+  color: var(--el-color-danger);
   font-size: 12px;
 }
 
@@ -867,7 +871,7 @@ export default {
 }
 
 .json-view {
-  background-color: #f5f7fa;
+  background-color: var(--el-fill-color-light);
   padding: 10px;
   border-radius: 4px;
   overflow: auto;
@@ -879,18 +883,14 @@ export default {
 
 .form-tip {
   font-size: 12px;
-  color: #909399;
+  color: var(--text-color-secondary);
   margin-top: 5px;
 }
 
 
 
 /* 容器 */
-.task-management {
-  padding: 20px;
-  height: 100%;
-  overflow-y: auto;
-}
+/* .task-management removed */
 
 /* 标题栏 */
 .header {
@@ -900,38 +900,31 @@ export default {
   margin-bottom: 12px;
 }
 
-.header-left {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
+/* .header-left duplicated above, removing/merging */
 
 .header h2 {
   font-size: 18px;
-  color: #333;
+  color: var(--el-text-color-primary);
   margin: 0;
 }
 
 .task-count {
   padding: 4px 10px;
-  background: #f0f0f0;
+  background: var(--el-fill-color);
   border-radius: 12px;
   font-size: 12px;
-  color: #666;
+  color: var(--text-color-secondary);
 }
 
-.header-actions {
-  display: flex;
-  gap: 10px;
-}
+/* .header-actions duplicated above */
 
 /* 过滤器 */
 .filter-section {
-  background: #fff;
+  background: var(--el-bg-color);
   padding: 15px;
   border-radius: 8px;
   margin-bottom: 20px;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  box-shadow: var(--el-box-shadow-light);
 }
 
 .filter-row {
@@ -947,6 +940,8 @@ export default {
 }
 
 .filter-item label {
+  font-size: 14px;
+  color: var(--el-text-color-regular);
   font-weight: 500;
   color: #666;
 }

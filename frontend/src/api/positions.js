@@ -131,3 +131,57 @@ export function getPositionPriceCurve(positionId, params = {}) {
   })
 }
 
+/**
+ * 更新持仓信息
+ * @param {number} positionId - 持仓ID
+ * @param {Object} data - 更新数据
+ * @param {number} data.current_price - 当前价格（可选）
+ * @param {string} data.status - 状态（可选，open/closed/monitoring）
+ * @param {string} data.settlement_result - 结算结果（可选，YES/NO）
+ * @param {number} data.settlement_payout - 结算收益（可选）
+ */
+export function updatePosition(positionId, data) {
+  return request({
+    url: `/positions/${positionId}`,
+    method: 'put',
+    data
+  })
+}
+
+/**
+ * 删除持仓记录
+ * @param {number} positionId - 持仓ID
+ */
+export function deletePosition(positionId) {
+  return request({
+    url: `/positions/${positionId}`,
+    method: 'delete'
+  })
+}
+
+/**
+ * 更新订单信息
+ * @param {string} orderId - 订单ID
+ * @param {Object} data - 更新数据
+ * @param {string} data.status - 状态（可选，pending/filled/cancelled/failed）
+ * @param {number} data.filled_size - 已成交数量（可选）
+ */
+export function updateOrder(orderId, data) {
+  return request({
+    url: `/positions/orders/${orderId}`,
+    method: 'put',
+    data
+  })
+}
+
+/**
+ * 删除订单记录
+ * @param {string} orderId - 订单ID
+ */
+export function deleteOrder(orderId) {
+  return request({
+    url: `/positions/orders/${orderId}`,
+    method: 'delete'
+  })
+}
+

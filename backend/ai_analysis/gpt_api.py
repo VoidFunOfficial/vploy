@@ -18,7 +18,7 @@ token_refresher = get_token_refresher()
 
 def handle_error_response(result: dict) -> None:
     """
-    处理错误响应,如果error不为空或success为false,立即标记token为过期
+    处理错误响应,如果error不为空或success为false,立即标记token为过期,如果是额度不足,立即标记token为过期
 
     参数:
         result: API响应结果字典
@@ -28,6 +28,14 @@ def handle_error_response(result: dict) -> None:
         # 立即标记 auth_token 和 access_token 为过期
         token_refresher.set_expired_immediate(TokenType.AUTH_TOKEN.value)
         token_refresher.set_expired_immediate(TokenType.ACCESS_TOKEN.value)
+#     # 如果响应为{
+#     "detail": {
+#         "message": "当前账号的 gpt-5-pro 次数已耗尽，你可以导出当前对话切换到其他账号继续使用。**注意这不是你的积分用完了**，如果你无法理解这条信息请查看新对话界面的必读卡片 ([必读] 次数和积分相关信息显示。)"
+#     }
+# }
+    if result.get("detail") and result["detail"].get("message") and "次数已耗尽" in result["detail"]["message"]:
+        token_refresher.set_expired_immediate(TokenType.ACCESS_TOKEN.value)
+        token_refresher.set_expired_immediate(TokenType.AUTH_TOKEN.value)
 
 def parse_cookie_string(cookie_string: str) -> dict:
     """

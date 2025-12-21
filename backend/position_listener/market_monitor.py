@@ -12,6 +12,7 @@ from huey import crontab
 from ..task_manager.tasks import huey
 from .database import PositionDatabase
 from .trade_recorder import TradeRecorder
+from .models import Position
 from ..polymarket_api import GammaMarketsAPI, PolymarketOrderbookClient
 from ..vlogger import TraceContext
 from ..sys_configs.global_event_reg import vlogger
@@ -20,10 +21,13 @@ from ..sys_configs.global_event_reg import vlogger
 class MarketMonitor:
     """
     市场监控器
-    
+
     监控已交易市场的价格变化和结算状态。
     """
-    
+
+    # 价格涨幅阈值（10%）
+    PRICE_SURGE_THRESHOLD = 0.10
+
     def __init__(
         self,
         db: Optional[PositionDatabase] = None,
@@ -31,17 +35,46 @@ class MarketMonitor:
     ):
         """
         初始化市场监控器
-        
+
         参数:
             db: PositionDatabase实例
             recorder: TradeRecorder实例
         """
         self.db = db or PositionDatabase()
         self.recorder = recorder or TradeRecorder(self.db)
-        
+
         vlogger.info(
             "MARKET_MONITOR.INIT",
             msg="市场监控器初始化完成"
+        )
+
+    def _handle_price_surge(self, position: Position, price_change_pct: float):
+        """
+        处理价格涨幅超过阈值的情况
+
+        参数:
+            position: Position对象
+            price_change_pct: 价格涨跌幅百分比（例如 0.15 表示 15%）
+
+        TODO: 实现具体的价格涨幅处理逻辑，例如：
+        - 发送价格预警通知
+        - 触发自动止盈/止损策略
+        - 记录到专门的价格异动表
+        - 调整持仓风险等级
+        """
+        vlogger.info(
+            "MARKET_MONITOR.PRICE_SURGE",
+            msg="检测到价格涨幅超过阈值",
+            extra={
+                "position_id": position.id,
+                "market_id": position.market_id,
+                "side": position.side,
+                "entry_price": position.entry_price,
+                "current_price": position.current_price,
+                "price_change_pct": price_change_pct,
+                "threshold": self.PRICE_SURGE_THRESHOLD,
+                "pnl": position.pnl
+            }
         )
     
     def monitor_position(self, position_id: int) -> Dict[str, Any]:
@@ -116,7 +149,19 @@ class MarketMonitor:
                     
                     # 更新持仓价格
                     self.recorder.update_position_price(position_id, current_price)
-                    
+
+                    # 计算价格涨跌幅百分比
+                    price_change_pct = 0.0
+                    if position.entry_price > 0:
+                        price_change_pct = (current_price - position.entry_price) / position.entry_price
+
+                    # 检测价格涨幅是否超过阈值
+                    if abs(price_change_pct) > self.PRICE_SURGE_THRESHOLD:
+                        # 获取更新后的持仓信息
+                        updated_position = self.db.get_position(position_id)
+                        if updated_position:
+                            self._handle_price_surge(updated_position, price_change_pct)
+
                     vlogger.info(
                         "MARKET_MONITOR.PRICE_UPDATE",
                         msg="更新持仓价格",
@@ -125,16 +170,18 @@ class MarketMonitor:
                             "market_id": position.market_id,
                             "old_price": position.current_price,
                             "new_price": current_price,
+                            "price_change_pct": price_change_pct,
                             "pnl": (current_price - position.entry_price) * position.shares
                         }
                     )
-                    
+
                     return {
                         "success": True,
                         "status": "monitoring",
                         "market_active": True,
                         "current_price": current_price,
                         "price_change": current_price - position.entry_price,
+                        "price_change_pct": price_change_pct,
                         "pnl": (current_price - position.entry_price) * position.shares
                     }
                     

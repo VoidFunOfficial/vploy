@@ -166,3 +166,25 @@ export function getPendingTradeTasks() {
     method: 'get'
   })
 }
+
+/**
+ * 获取GPT请求额度状态
+ */
+export function getGptQuotaStatus() {
+  return request({
+    url: '/tasks/gpt-quota',
+    method: 'get'
+  })
+}
+
+/**
+ * 清理GPT请求记录
+ * @param {number} days - 保留天数
+ */
+export function cleanupGptQuotaRecords(days = 30) {
+  return request({
+    url: '/tasks/gpt-quota/cleanup',
+    method: 'post',
+    data: { days }
+  })
+}

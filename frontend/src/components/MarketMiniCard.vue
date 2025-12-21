@@ -127,7 +127,7 @@ export default {
 .market-question {
   font-size: 15px;
   font-weight: 600;
-  color: var(--text-color);
+  color: var(--el-text-color-primary);
   margin: 0;
   flex: 1;
   line-height: 1.4;

@@ -1,9 +1,9 @@
 <template>
-  <div class="database-management h-full">
-    <el-container class="h-full">
-      <el-aside width="240px" class="bg-white border-r border-gray-200 flex flex-col">
-        <div class="p-4 border-b border-gray-100 flex justify-between items-center">
-          <h2 class="text-lg font-bold text-gray-800 m-0">数据库管理</h2>
+  <div class="page-container h-full">
+    <el-container class="h-full db-container">
+      <el-aside width="240px" class="db-aside">
+        <div class="aside-header">
+          <h2 class="aside-title">数据库管理</h2>
           <el-button circle size="small" @click="loadTables">
             <el-icon><Refresh /></el-icon>
           </el-button>
@@ -11,7 +11,7 @@
         <el-scrollbar>
           <el-menu
             :default-active="selectedTable"
-            class="border-none"
+            class="db-menu"
             @select="selectTable"
           >
             <el-menu-item v-for="table in tables" :key="table.name" :index="table.name">
@@ -22,13 +22,13 @@
         </el-scrollbar>
       </el-aside>
       
-      <el-main class="bg-gray-50 p-6">
+      <el-main class="db-main">
         <el-card shadow="hover" class="h-full flex flex-col" :body-style="{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }">
           <template #header>
             <div class="flex justify-between items-center">
               <div class="flex items-center gap-2">
-                <el-icon size="20" class="text-blue-500" v-if="selectedTable"><Grid /></el-icon>
-                <h3 class="m-0 text-lg font-medium text-gray-800">{{ selectedTable || '请选择数据表' }}</h3>
+                <el-icon size="20" class="text-primary" v-if="selectedTable"><Grid /></el-icon>
+                <h3 class="m-0 text-lg font-medium text-primary-text">{{ selectedTable || '请选择数据表' }}</h3>
               </div>
               <el-button 
                 v-if="selectedTable" 
@@ -41,7 +41,7 @@
             </div>
           </template>
           
-          <div v-if="!selectedTable" class="flex flex-col items-center justify-center h-full text-gray-400">
+          <div v-if="!selectedTable" class="flex flex-col items-center justify-center h-full text-secondary">
             <el-empty description="请从左侧选择一个数据表查看数据" />
           </div>
           
@@ -85,7 +85,7 @@
               </el-table>
             </div>
             
-            <div class="mt-4 flex justify-end pt-4 border-t border-gray-100">
+            <div class="mt-4 flex justify-end pt-4 border-t-light">
               <el-pagination
                 v-model:current-page="currentPage"
                 v-model:page-size="pageSize"
@@ -386,15 +386,57 @@ export default {
 </script>
 
 <style scoped>
-/* Element Plus 样式覆盖或补充 */
-.el-menu {
+.db-container {
+  height: calc(100vh - 140px);
+  border: 1px solid var(--el-border-color-light);
+  border-radius: 8px;
+  overflow: hidden;
+  background-color: #fff;
+}
+
+.db-aside {
+  background-color: #fff;
+  border-right: 1px solid var(--el-border-color-light);
+  display: flex;
+  flex-direction: column;
+}
+
+.aside-header {
+  padding: 16px;
+  border-bottom: 1px solid var(--el-border-color-light);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.aside-title {
+  font-size: 16px;
+  font-weight: bold;
+  color: var(--el-text-color-primary);
+  margin: 0;
+}
+
+.db-menu {
   border-right: none;
 }
+
+.db-main {
+  background-color: var(--el-bg-color-page);
+  padding: 20px;
+}
+
+.text-primary { color: var(--el-color-primary); }
+.text-primary-text { color: var(--el-text-color-primary); }
+.text-secondary { color: var(--el-text-color-secondary); }
+.border-t-light { border-top: 1px solid var(--el-border-color-light); }
+
+/* Element Plus 样式覆盖或补充 */
 .el-menu-item {
   height: 40px;
   line-height: 40px;
   margin-bottom: 4px;
   border-radius: 4px;
+  margin: 4px 8px;
 }
 .el-menu-item.is-active {
   background-color: var(--el-color-primary-light-9);
@@ -402,6 +444,6 @@ export default {
   font-weight: 500;
 }
 .el-menu-item:hover {
-  background-color: var(--el-color-primary-light-9);
+  background-color: var(--el-fill-color-light);
 }
 </style>

@@ -1,7 +1,7 @@
 <template>
-  <div class="token-management">
-    <div class="header">
-      <h2>API Token 管理</h2>
+  <div class="page-container">
+    <div class="header mb-4">
+      <h2 class="text-xl font-bold">API Token 管理</h2>
       <div class="header-actions">
         <el-button type="primary" :icon="Download" @click="showQuickImportDialog = true">
           快捷导入
@@ -595,21 +595,17 @@ export default {
 </script>
 
 <style scoped>
-.token-management {
-  padding: 20px;
-}
+/* Removed .token-management since we use .page-container */
 
 .header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 20px;
 }
 
 .header h2 {
   margin: 0;
-  font-size: 20px;
-  color: var(--text-color);
+  color: var(--el-text-color-primary);
 }
 
 .header-actions {
@@ -617,9 +613,7 @@ export default {
   gap: 10px;
 }
 
-.mb-4 {
-  margin-bottom: 20px;
-}
+/* Removed .mb-4 since it is global */
 
 .card-header {
   display: flex;
@@ -636,6 +630,7 @@ export default {
 .token-title {
   font-weight: bold;
   font-size: 16px;
+  color: var(--el-text-color-primary);
 }
 
 .token-info {
@@ -650,11 +645,11 @@ export default {
 }
 
 .info-item .label {
-  color: #909399;
+  color: var(--el-text-color-secondary);
 }
 
 .info-item .value {
-  color: #303133;
+  color: var(--el-text-color-primary);
 }
 
 .token-value {
@@ -669,32 +664,32 @@ export default {
   display: flex;
   justify-content: flex-end;
   gap: 10px;
-  border-top: 1px solid #EBEEF5;
+  border-top: 1px solid var(--el-border-color-lighter);
   padding-top: 15px;
 }
 
 .form-hint {
   font-size: 12px;
-  color: #909399;
+  color: var(--text-color-secondary);
   margin-top: 5px;
 }
 
 .parsed-tokens-area {
   margin-top: 20px;
   padding: 15px;
-  background: #f5f7fa;
+  background: var(--el-fill-color-light);
   border-radius: 4px;
 }
 
 .parsed-tokens-area h4 {
   margin: 0 0 10px 0;
   font-size: 14px;
-  color: #606266;
+  color: var(--text-color-secondary);
 }
 
 .parsed-token-item {
-  background: white;
-  border: 1px solid #dcdfe6;
+  background: var(--el-bg-color);
+  border: 1px solid var(--el-border-color);
   padding: 10px;
   margin-bottom: 10px;
   border-radius: 4px;
@@ -702,16 +697,14 @@ export default {
 
 .parsed-token-header {
   margin-bottom: 5px;
-}
-
 .parsed-token-value {
   font-family: monospace;
   font-size: 12px;
-  color: #606266;
+  color: var(--el-text-color-regular);
   padding: 5px;
-  background: #f9f9f9;
+  background: var(--el-fill-color-light);
   border-radius: 2px;
-  word-break: break-all;
+} word-break: break-all;
 }
 
 /* Expired card styling */

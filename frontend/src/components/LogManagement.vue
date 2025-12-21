@@ -1,8 +1,8 @@
 <template>
-  <div class="log-management p-4">
+  <div class="page-container">
     <!-- 标题栏 -->
     <div class="flex justify-between items-center mb-4">
-      <h2 class="text-xl font-bold text-gray-800">
+      <h2 class="text-xl font-bold">
         {{ traceMode ? `Trace 追踪: ${currentTraceId}` : '日志管理' }}
       </h2>
       <div class="flex gap-2">
@@ -99,7 +99,7 @@
       >
         <el-table-column type="expand">
           <template #default="props">
-            <div class="p-4 bg-gray-50">
+            <div class="p-4" style="background-color: var(--el-fill-color-lighter)">
                <el-descriptions :column="2" border size="small">
                   <el-descriptions-item label="时间戳">{{ props.row.ts }}</el-descriptions-item>
                   <el-descriptions-item label="事件码">
@@ -110,21 +110,21 @@
                   </el-descriptions-item>
                   <el-descriptions-item label="服务">{{ props.row.service }}</el-descriptions-item>
                   <el-descriptions-item label="错误码" v-if="props.row.error_code">
-                    <span class="text-red-500 font-mono">{{ props.row.error_code }}</span>
+                    <span class="text-danger font-mono">{{ props.row.error_code }}</span>
                   </el-descriptions-item>
                   <el-descriptions-item label="错误名称" v-if="props.row.error_name">
-                    <span class="text-red-500">{{ props.row.error_name }}</span>
+                    <span class="text-danger">{{ props.row.error_name }}</span>
                   </el-descriptions-item>
                </el-descriptions>
                
                <div class="mt-4">
-                 <div class="font-bold mb-2 text-gray-700">消息内容:</div>
-                 <div class="p-3 bg-white border rounded text-sm text-gray-600 break-words">{{ props.row.msg }}</div>
+                 <div class="font-bold mb-2" style="color: var(--el-text-color-regular)">消息内容:</div>
+                 <div class="p-3 border rounded text-sm break-words" style="background-color: var(--el-bg-color); color: var(--el-text-color-secondary)">{{ props.row.msg }}</div>
                </div>
 
                <div v-if="props.row.extra && Object.keys(props.row.extra).length > 0" class="mt-4">
-                 <div class="font-bold mb-2 text-gray-700">额外信息:</div>
-                 <pre class="p-3 bg-gray-900 text-green-400 rounded overflow-auto text-xs font-mono">{{ formatJSON(props.row.extra) }}</pre>
+                 <div class="font-bold mb-2" style="color: var(--el-text-color-regular)">额外信息:</div>
+                 <pre class="p-3 rounded overflow-auto text-xs font-mono" style="background-color: #1a1a1a; color: #67c23a">{{ formatJSON(props.row.extra) }}</pre>
                </div>
             </div>
           </template>
@@ -468,8 +468,5 @@ export default {
 </script>
 
 <style scoped>
-.log-management {
-  background-color: transparent;
-  min-height: 100%;
-}
+/* .log-management styles removed as we use .page-container */
 </style>

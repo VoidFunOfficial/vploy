@@ -1,7 +1,11 @@
 <template>
-  <MainLayout :active-menu="activeMenu" @menu-change="handleMenuChange">
+  <MainLayout :active-menu="activeMenu" @menu-change="handleMenuChange" @global-refresh="handleRefresh">
+    <template v-if="isContentVisible">
     <!-- 根据激活的菜单显示不同内容 -->
-    <SystemOverview v-if="activeMenu === 'overview'" />
+   <SystemOverview v-if="activeMenu === 'overview'" />
+
+    <!-- 系统信息 -->
+    <SystemInfo v-else-if="activeMenu === 'system'" />
 
     <!-- 日志管理 -->
     <LogManagement v-else-if="activeMenu === 'logs'" />
@@ -47,13 +51,15 @@
         </template>
       </el-empty>
     </div>
+    </template>
   </MainLayout>
 </template>
 
 <script>
-import { ref } from 'vue'
+import { ref, nextTick } from 'vue'
 import MainLayout from '@/components/Layout/MainLayout.vue'
 import SystemOverview from '@/components/SystemOverview.vue'
+import SystemInfo from '@/components/SystemInfo.vue'
 import LogManagement from '@/components/LogManagement.vue'
 import DatabaseManagement from '@/components/DatabaseManagement.vue'
 import SchedulerManagement from '@/components/SchedulerManagement.vue'
@@ -72,6 +78,7 @@ export default {
   components: {
     MainLayout,
     SystemOverview,
+    SystemInfo,
     LogManagement,
     DatabaseManagement,
     SchedulerManagement,
@@ -87,6 +94,7 @@ export default {
   },
   setup() {
     const activeMenu = ref('overview')
+    const isContentVisible = ref(true)
 
     // 菜单标题映射
     const menuTitles = {
@@ -111,6 +119,14 @@ export default {
       activeMenu.value = menuId
     }
 
+    // 处理全局刷新
+    const handleRefresh = () => {
+      isContentVisible.value = false
+      nextTick(() => {
+        isContentVisible.value = true
+      })
+    }
+
     // 获取菜单标题
     const getMenuTitle = (menuId) => {
       return menuTitles[menuId] || '未知菜单'
@@ -118,7 +134,9 @@ export default {
 
     return {
       activeMenu,
+      isContentVisible,
       handleMenuChange,
+      handleRefresh,
       getMenuTitle
     }
   }

@@ -207,10 +207,16 @@
           <el-table-column prop="create_time" label="创建时间" width="160" sortable>
             <template #default="scope">{{ formatTime(scope.row.create_time) }}</template>
           </el-table-column>
-          <el-table-column label="操作" width="100" fixed="right">
+          <el-table-column label="操作" width="200" fixed="right">
             <template #default="scope">
               <el-button type="primary" link size="small" @click="monitorPositionAction(scope.row.id)">
                 监控
+              </el-button>
+              <el-button type="warning" link size="small" @click="editPosition(scope.row)">
+                编辑
+              </el-button>
+              <el-button type="danger" link size="small" @click="deletePositionAction(scope.row)">
+                删除
               </el-button>
             </template>
           </el-table-column>
@@ -269,16 +275,100 @@
           <el-table-column prop="create_time" label="创建时间" width="160" sortable>
             <template #default="scope">{{ formatTime(scope.row.create_time) }}</template>
           </el-table-column>
-          <el-table-column label="操作" width="100" fixed="right">
+          <el-table-column label="操作" width="200" fixed="right">
             <template #default="scope">
               <el-button type="primary" link size="small" @click="monitorOrderAction(scope.row.order_id)">
                 监控
+              </el-button>
+              <el-button type="warning" link size="small" @click="editOrder(scope.row)">
+                编辑
+              </el-button>
+              <el-button type="danger" link size="small" @click="deleteOrderAction(scope.row)">
+                删除
               </el-button>
             </template>
           </el-table-column>
         </el-table>
       </el-tab-pane>
     </el-tabs>
+
+    <!-- 编辑持仓对话框 -->
+    <el-dialog v-model="editPositionDialog" title="编辑持仓" width="500px">
+      <el-form :model="editPositionForm" label-width="120px">
+        <el-form-item label="市场ID">
+          <el-input v-model="editPositionForm.market_id" disabled />
+        </el-form-item>
+        <el-form-item label="方向">
+          <el-tag :type="editPositionForm.side === 'YES' ? 'success' : 'danger'">
+            {{ editPositionForm.side }}
+          </el-tag>
+        </el-form-item>
+        <el-form-item label="入场价格">
+          <el-input v-model="editPositionForm.entry_price" disabled />
+        </el-form-item>
+        <el-form-item label="当前价格">
+          <el-input-number v-model="editPositionForm.current_price" :precision="4" :step="0.01" :min="0" :max="1" />
+        </el-form-item>
+        <el-form-item label="状态">
+          <el-select v-model="editPositionForm.status">
+            <el-option label="未平仓" value="open" />
+            <el-option label="已平仓" value="closed" />
+            <el-option label="监控中" value="monitoring" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="结算结果" v-if="editPositionForm.status === 'closed'">
+          <el-select v-model="editPositionForm.settlement_result">
+            <el-option label="YES" value="YES" />
+            <el-option label="NO" value="NO" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="结算收益" v-if="editPositionForm.status === 'closed'">
+          <el-input-number v-model="editPositionForm.settlement_payout" :precision="2" :step="1" :min="0" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="editPositionDialog = false">取消</el-button>
+        <el-button type="primary" @click="savePosition" :loading="saving">保存</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 编辑订单对话框 -->
+    <el-dialog v-model="editOrderDialog" title="编辑订单" width="500px">
+      <el-form :model="editOrderForm" label-width="120px">
+        <el-form-item label="订单ID">
+          <el-input v-model="editOrderForm.order_id" disabled />
+        </el-form-item>
+        <el-form-item label="市场ID">
+          <el-input v-model="editOrderForm.market_id" disabled />
+        </el-form-item>
+        <el-form-item label="方向">
+          <el-tag :type="editOrderForm.side === 'BUY' ? 'success' : 'danger'">
+            {{ editOrderForm.side }}
+          </el-tag>
+        </el-form-item>
+        <el-form-item label="价格">
+          <el-input v-model="editOrderForm.price" disabled />
+        </el-form-item>
+        <el-form-item label="数量">
+          <el-input v-model="editOrderForm.size" disabled />
+        </el-form-item>
+        <el-form-item label="已成交数量">
+          <el-input-number v-model="editOrderForm.filled_size" :precision="2" :step="1" :min="0" :max="editOrderForm.size" />
+        </el-form-item>
+        <el-form-item label="状态">
+          <el-select v-model="editOrderForm.status">
+            <el-option label="待成交" value="pending" />
+            <el-option label="已成交" value="filled" />
+            <el-option label="已撤销" value="cancelled" />
+            <el-option label="失败" value="failed" />
+          </el-select>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="editOrderDialog = false">取消</el-button>
+        <el-button type="primary" @click="saveOrder" :loading="saving">保存</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -292,9 +382,13 @@ import {
   monitorPosition,
   monitorOrder,
   getMarketPositions,
-  getPositionPriceCurve
+  getPositionPriceCurve,
+  updatePosition,
+  deletePosition,
+  updateOrder,
+  deleteOrder
 } from '@/api/positions'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { Refresh, Shop, DataAnalysis, CollectionTag, Setting } from '@element-plus/icons-vue'
 
 export default {
@@ -314,6 +408,30 @@ export default {
     const activeTab = ref('positions')
     const positionFilter = ref('')
     const orderFilter = ref('')
+
+    // 编辑对话框状态
+    const editPositionDialog = ref(false)
+    const editOrderDialog = ref(false)
+    const saving = ref(false)
+    const editPositionForm = ref({
+      id: null,
+      market_id: '',
+      side: '',
+      entry_price: 0,
+      current_price: 0,
+      status: 'open',
+      settlement_result: '',
+      settlement_payout: 0
+    })
+    const editOrderForm = ref({
+      order_id: '',
+      market_id: '',
+      side: '',
+      price: 0,
+      size: 0,
+      filled_size: 0,
+      status: 'pending'
+    })
 
     // 图表相关 - 每个持仓独立的图表状态
     const chartOptions = ref({}) // 存储每个持仓的图表配置
@@ -406,6 +524,148 @@ export default {
       } catch (error) {
         console.error('监控订单失败:', error)
         ElMessage.error('监控订单失败')
+      }
+    }
+
+    // 编辑持仓
+    const editPosition = (position) => {
+      editPositionForm.value = {
+        id: position.id,
+        market_id: position.market_id,
+        side: position.side,
+        entry_price: position.entry_price,
+        current_price: position.current_price || position.entry_price,
+        status: position.status,
+        settlement_result: position.settlement_result || '',
+        settlement_payout: position.settlement_payout || 0
+      }
+      editPositionDialog.value = true
+    }
+
+    // 保存持仓
+    const savePosition = async () => {
+      saving.value = true
+      try {
+        const data = {
+          current_price: editPositionForm.value.current_price,
+          status: editPositionForm.value.status
+        }
+
+        if (editPositionForm.value.status === 'closed') {
+          data.settlement_result = editPositionForm.value.settlement_result
+          data.settlement_payout = editPositionForm.value.settlement_payout
+        }
+
+        const response = await updatePosition(editPositionForm.value.id, data)
+        if (response.success) {
+          ElMessage.success('更新持仓成功')
+          editPositionDialog.value = false
+          await loadPositions()
+          await loadSummary()
+        } else {
+          ElMessage.error(response.message || '更新持仓失败')
+        }
+      } catch (error) {
+        console.error('更新持仓失败:', error)
+        ElMessage.error('更新持仓失败')
+      } finally {
+        saving.value = false
+      }
+    }
+
+    // 删除持仓
+    const deletePositionAction = async (position) => {
+      try {
+        await ElMessageBox.confirm(
+          `确定要删除持仓 ${position.market_id} 吗？此操作不可恢复！`,
+          '删除确认',
+          {
+            confirmButtonText: '确定',
+            cancelButtonText: '取消',
+            type: 'warning'
+          }
+        )
+
+        const response = await deletePosition(position.id)
+        if (response.success) {
+          ElMessage.success('删除持仓成功')
+          await loadPositions()
+          await loadSummary()
+        } else {
+          ElMessage.error(response.message || '删除持仓失败')
+        }
+      } catch (error) {
+        if (error !== 'cancel') {
+          console.error('删除持仓失败:', error)
+          ElMessage.error('删除持仓失败')
+        }
+      }
+    }
+
+    // 编辑订单
+    const editOrder = (order) => {
+      editOrderForm.value = {
+        order_id: order.order_id,
+        market_id: order.market_id,
+        side: order.side,
+        price: order.price,
+        size: order.size,
+        filled_size: order.filled_size || 0,
+        status: order.status
+      }
+      editOrderDialog.value = true
+    }
+
+    // 保存订单
+    const saveOrder = async () => {
+      saving.value = true
+      try {
+        const data = {
+          status: editOrderForm.value.status,
+          filled_size: editOrderForm.value.filled_size
+        }
+
+        const response = await updateOrder(editOrderForm.value.order_id, data)
+        if (response.success) {
+          ElMessage.success('更新订单成功')
+          editOrderDialog.value = false
+          await loadOrders()
+        } else {
+          ElMessage.error(response.message || '更新订单失败')
+        }
+      } catch (error) {
+        console.error('更新订单失败:', error)
+        ElMessage.error('更新订单失败')
+      } finally {
+        saving.value = false
+      }
+    }
+
+    // 删除订单
+    const deleteOrderAction = async (order) => {
+      try {
+        await ElMessageBox.confirm(
+          `确定要删除订单 ${order.order_id} 吗？此操作不可恢复！`,
+          '删除确认',
+          {
+            confirmButtonText: '确定',
+            cancelButtonText: '取消',
+            type: 'warning'
+          }
+        )
+
+        const response = await deleteOrder(order.order_id)
+        if (response.success) {
+          ElMessage.success('删除订单成功')
+          await loadOrders()
+        } else {
+          ElMessage.error(response.message || '删除订单失败')
+        }
+      } catch (error) {
+        if (error !== 'cancel') {
+          console.error('删除订单失败:', error)
+          ElMessage.error('删除订单失败')
+        }
       }
     }
 
@@ -705,6 +965,11 @@ export default {
       activeTab,
       positionFilter,
       orderFilter,
+      editPositionDialog,
+      editOrderDialog,
+      saving,
+      editPositionForm,
+      editOrderForm,
       chartOptions,
       chartSeries,
       chartIntervals,
@@ -714,6 +979,12 @@ export default {
       loadOrders,
       monitorPositionAction,
       monitorOrderAction,
+      editPosition,
+      savePosition,
+      deletePositionAction,
+      editOrder,
+      saveOrder,
+      deleteOrderAction,
       handleExpandChange,
       loadPositionChart,
       formatDate,
@@ -740,16 +1011,15 @@ export default {
 </script>
 
 <style scoped>
-.position-monitor {
-  padding: 20px;
-  max-width: 1400px;
-  margin: 0 auto;
+.header-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
 
-.header h2 {
-  font-size: 20px;
-  color: var(--text-color);
+.header-actions h2 {
   margin: 0;
+  color: var(--el-text-color-primary);
 }
 
 .summary-card {

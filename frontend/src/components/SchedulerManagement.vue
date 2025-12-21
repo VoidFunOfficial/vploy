@@ -1,13 +1,13 @@
 <template>
-  <div class="scheduler-management p-6 h-full flex flex-col gap-6 bg-gray-50">
-    <el-card shadow="hover" class="flex-1 flex flex-col" :body-style="{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }">
+  <div class="page-container">
+    <el-card shadow="hover" class="main-card" :body-style="{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }">
       <template #header>
-        <div class="flex justify-between items-center">
-          <div class="flex items-center gap-2">
-            <el-icon size="20" class="text-purple-500"><Timer /></el-icon>
-            <h2 class="text-lg font-bold text-gray-800 m-0">定时任务管理</h2>
+        <div class="header-row">
+          <div class="header-title">
+            <el-icon size="20" class="text-primary"><Timer /></el-icon>
+            <h2 class="title-text">定时任务管理</h2>
           </div>
-          <div class="flex gap-2">
+          <div class="header-actions">
             <el-button type="primary" icon="Plus" @click="showCreateDialog">新建任务</el-button>
             <el-button icon="Refresh" @click="refreshTasks">刷新</el-button>
           </div>
@@ -15,7 +15,7 @@
       </template>
 
       <!-- Filters -->
-      <div class="mb-4">
+      <div class="filter-container">
         <el-form :inline="true" :model="filters" class="demo-form-inline">
           <el-form-item label="状态">
             <el-select v-model="filters.enabled" placeholder="选择状态" @change="refreshTasks" style="width: 150px">
@@ -28,7 +28,7 @@
       </div>
 
       <!-- Task Table -->
-      <div class="flex-1 overflow-hidden">
+      <div class="table-container">
         <el-table
           v-loading="loading"
           :data="tasks"
@@ -41,7 +41,7 @@
           
           <el-table-column label="任务名称" min-width="200">
             <template #default="scope">
-              <div class="flex items-center gap-2">
+              <div class="cell-content">
                 <span class="font-medium">{{ scope.row.name }}</span>
                 <el-tag v-if="isHueyTask(scope.row)" size="small" type="info" effect="plain">Huey</el-tag>
               </div>
@@ -64,7 +64,7 @@
           
           <el-table-column label="调度配置" min-width="150">
             <template #default="scope">
-              <code class="bg-gray-100 px-2 py-1 rounded text-sm font-mono text-pink-600">{{ scope.row.schedule }}</code>
+              <code class="schedule-code">{{ scope.row.schedule }}</code>
             </template>
           </el-table-column>
           
@@ -89,9 +89,9 @@
           
           <el-table-column label="时间" width="220">
             <template #default="scope">
-              <div class="text-xs text-gray-500">
+              <div class="time-info">
                 <div>上次: {{ formatTime(scope.row.last_run) }}</div>
-                <div :class="{ 'text-orange-500 font-bold': isNextRunSoon(scope.row) }">
+                <div :class="{ 'text-warning font-bold': isNextRunSoon(scope.row) }">
                   下次: {{ formatTime(scope.row.next_run) }}
                 </div>
               </div>
@@ -154,7 +154,7 @@
         
         <!-- Interval Config -->
         <el-form-item v-if="formData.task_type === 'interval'" label="间隔配置" required>
-          <div class="flex gap-2 w-full">
+          <div class="dialog-input-group">
             <el-input-number v-model="intervalValue" :min="1" class="flex-1" />
             <el-select v-model="intervalUnit" style="width: 120px">
               <el-option label="秒" value="seconds" />
@@ -163,13 +163,13 @@
               <el-option label="天" value="days" />
             </el-select>
           </div>
-          <div class="text-xs text-gray-400 mt-1">{{ getIntervalPreview() }}</div>
+          <div class="help-text">{{ getIntervalPreview() }}</div>
         </el-form-item>
         
         <!-- Cron Config -->
         <el-form-item v-else label="Cron配置" required>
-          <div class="flex flex-col gap-2 w-full">
-            <div class="flex flex-wrap gap-2 mb-2">
+          <div class="cron-config">
+            <div class="preset-tags">
               <el-tag 
                 v-for="preset in cronPresets" 
                 :key="preset.value"
@@ -193,7 +193,7 @@
               </el-input>
             </div>
             
-            <div v-else-if="isDailyPreset()" class="flex items-center gap-2 bg-gray-50 p-2 rounded">
+            <div v-else-if="isDailyPreset()" class="time-picker-wrapper">
               <span class="text-sm">每天</span>
               <el-time-picker
                 v-model="cronTime"
@@ -205,7 +205,7 @@
               <span class="text-sm">执行</span>
             </div>
             
-            <div class="text-xs text-gray-400 mt-1">{{ getCronPreview() }}</div>
+            <div class="help-text">{{ getCronPreview() }}</div>
           </div>
         </el-form-item>
         
@@ -672,5 +672,117 @@ export default {
 </script>
 
 <style scoped>
-/* Scoped styles mostly replaced by utility classes */
+.page-container {
+  height: 100%;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  background-color: var(--el-bg-color-page);
+}
+
+.main-card {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.header-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.title-text {
+  font-size: 18px;
+  font-weight: bold;
+  margin: 0;
+  color: var(--el-text-color-primary);
+}
+
+.header-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.filter-container {
+  margin-bottom: 16px;
+}
+
+.table-container {
+  flex: 1;
+  overflow: hidden;
+}
+
+.cell-content {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.font-medium {
+  font-weight: 500;
+}
+
+.schedule-code {
+  background-color: var(--el-fill-color-light);
+  padding: 2px 4px;
+  border-radius: 4px;
+  font-size: 14px;
+  font-family: monospace;
+  color: var(--el-color-primary);
+}
+
+.time-info {
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+}
+
+.dialog-input-group {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+}
+
+.help-text {
+  font-size: 12px;
+  color: var(--el-text-color-placeholder);
+  margin-top: 4px;
+}
+
+.cron-config {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+
+.preset-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.cursor-pointer {
+  cursor: pointer;
+}
+
+.time-picker-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background-color: var(--el-fill-color-light);
+  padding: 8px;
+  border-radius: 4px;
+}
+
+.text-sm {
+  font-size: 14px;
+}
 </style>
