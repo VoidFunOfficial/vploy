@@ -116,7 +116,7 @@ class MarketMonitor:
                     }
             
             # 检查市场是否已结算
-            if not market.active:
+            if not market.close:
                 vlogger.info(
                     "MARKET_MONITOR.SETTLED",
                     msg="市场已结算",
@@ -127,7 +127,26 @@ class MarketMonitor:
                 )
                 
                 # TODO: 获取结算结果并更新持仓
-                # 这里需要根据实际API确定如何获取结算结果
+                # 获取Yes方向价格是否为1,否则则为No
+                if market.outcome_prices[0] == 1:
+                    outcome = "YES"
+                else:
+                    outcome = "NO"
+                if position.side == outcome:
+                    settlement_payout = position.shares
+                else:
+                    settlement_payout = - position.shares * position.entry_price
+                self.recorder.settle_position(position_id, outcome, settlement_payout)
+                vlogger.info(
+                    "MARKET_MONITOR.SETTLED",
+                    msg="市场已结算",
+                    extra={
+                        "position_id": position_id,
+                        "market_id": position.market_id,
+                        "outcome": outcome,
+                        "settlement_payout": settlement_payout
+                    }
+                )
                 
                 return {
                     "success": True,

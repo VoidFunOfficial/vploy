@@ -30,6 +30,7 @@ from ..polymarket_api.clob_api import (
     OrderType
 )
 
+from ..purse.purse import get_purse
 
 def scan_orderbook(
     token_id: str,
@@ -321,32 +322,9 @@ def get_aggressive_price(
         spread_info = orderbook_client.get_spread(token_id)
         spread = float(spread_info.get('spread', 0))
 
-        # BUY: 我们要买入，看bids（买单），取最低价格（最后一层）- spread
-        # SELL: 我们要卖出，看asks（卖单），取最高价格（最后一层）+ spread
+        # BUY: 我们要买入，看asks（卖单），取最低价格（最后一层）- spread
+        # SELL: 我们要卖出，看bids（买单），取最高价格（最后一层）+ spread
         if side == BUY:
-            bids = orderbook.get('bids', [])
-            if not bids:
-                vlogger.warn("TRADE.AGGRESSIVE_PRICE.NO_BIDS", msg="订单簿bids为空", extra={
-                    "token_id": token_id,
-                    "side": side
-                })
-                return None
-
-            # 取bids的最低价格（最后一层）
-            lowest_bid = float(bids[-1]['price'])
-            # 贪婪压价：最低bid - spread
-            aggressive_price = max(0.01, lowest_bid - spread)  # 确保价格不低于0.01
-
-            vlogger.info("TRADE.AGGRESSIVE_PRICE.SUCCESS", msg="计算贪婪压价（BUY）", extra={
-                "token_id": token_id,
-                "side": side,
-                "lowest_bid": lowest_bid,
-                "spread": spread,
-                "aggressive_price": aggressive_price,
-                "bids_depth": len(bids)
-            })
-
-        else:  # SELL
             asks = orderbook.get('asks', [])
             if not asks:
                 vlogger.warn("TRADE.AGGRESSIVE_PRICE.NO_ASKS", msg="订单簿asks为空", extra={
@@ -355,18 +333,41 @@ def get_aggressive_price(
                 })
                 return None
 
-            # 取asks的最高价格（最后一层）
-            highest_ask = float(asks[-1]['price'])
-            # 贪婪压价：最高ask + spread
-            aggressive_price = min(0.99, highest_ask + spread)  # 确保价格不超过0.99
+            # 取asks的最低价格（最后一层）
+            lowest_ask = float(asks[-1]['price'])
+            # 贪婪压价：最低ask - spread
+            aggressive_price = max(0.01, lowest_ask - spread)  # 确保价格不低于0.01
+
+            vlogger.info("TRADE.AGGRESSIVE_PRICE.SUCCESS", msg="计算贪婪压价（BUY）", extra={
+                "token_id": token_id,
+                "side": side,
+                "lowest_ask": lowest_ask,
+                "spread": spread,
+                "aggressive_price": aggressive_price,
+                "asks_depth": len(asks)
+            })
+
+        else:  # SELL
+            bids = orderbook.get('bids', [])
+            if not bids:
+                vlogger.warn("TRADE.AGGRESSIVE_PRICE.NO_ASKS", msg="订单簿asks为空", extra={
+                    "token_id": token_id,
+                    "side": side
+                })
+                return None
+
+            # 取bids的最高价格（最后一层）
+            highest_bid = float(bids[-1]['price'])
+            # 贪婪压价：最高bid + spread
+            aggressive_price = min(0.99, highest_bid + spread)  # 确保价格不超过0.99
 
             vlogger.info("TRADE.AGGRESSIVE_PRICE.SUCCESS", msg="计算贪婪压价（SELL）", extra={
                 "token_id": token_id,
                 "side": side,
-                "highest_ask": highest_ask,
+                "highest_bid": highest_bid,
                 "spread": spread,
                 "aggressive_price": aggressive_price,
-                "asks_depth": len(asks)
+                "bids_depth": len(bids)
             })
 
         return aggressive_price
@@ -481,7 +482,10 @@ def trade(
             vlogger.warn("TRADE.ORDER.NO_ORDER_ID", msg="订单响应中未找到order_id", extra={
                 "order_response": order_response
             })
-
+        #锁定资金
+        purse = get_purse()
+        lock_amount = aggressive_price * order_size
+        purse.lock_fund(lock_amount)
         result = {
             'success': True,
             'order_id': order_id,
@@ -489,7 +493,8 @@ def trade(
             'price': aggressive_price,
             'size': order_size,
             'order_type': 'LIMIT_AGGRESSIVE',
-            'message': f"交易执行成功，已挂贪婪压价限价单（价格: {aggressive_price}, 数量: {order_size}）"
+            'message': f"交易执行成功，已挂贪婪压价限价单（价格: {aggressive_price}, 数量: {order_size}）,"
+                       f"已锁定资金{lock_amount}美元"
         }
 
         vlogger.info("TRADE.EXECUTE.SUCCESS", msg="交易执行成功", extra={

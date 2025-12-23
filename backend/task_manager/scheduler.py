@@ -606,6 +606,33 @@ def init_default_scheduled_tasks():
             extra={"task_id": task_id, "next_run": gpt_cleanup_next.isoformat()}
         )
 
+    # 自动决策任务（每2小时）
+    auto_decision_cron = "0 */2 * * *"  # 每2小时
+    auto_decision_next = croniter(auto_decision_cron, now).get_next(datetime)
+
+    task_id = add_scheduled_task(
+        name="auto_decision",
+        task_type="cron",
+        schedule=auto_decision_cron,
+        enabled=True,
+        metadata={
+            "description": "自动决策任务 - 每2小时执行一次，如果待决策市场少于10个则跳过",
+            "auto_created": True,
+            "huey_task": True  # 由Huey执行
+        }
+    )
+
+    # 更新下次运行时间
+    task = db.get_scheduled_task(task_id)
+    if task and not task.next_run:
+        task.next_run = auto_decision_next
+        db.update_scheduled_task(task)
+        logger.info(
+            "SCHEDULER.INIT.AUTO_DECISION",
+            msg=f"自动决策任务已初始化，下次运行: {auto_decision_next}",
+            extra={"task_id": task_id, "next_run": auto_decision_next.isoformat()}
+        )
+
     logger.info(
         "SCHEDULER.INIT.SUCCESS",
         msg="预定义定时任务初始化完成"

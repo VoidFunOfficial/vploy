@@ -1626,3 +1626,358 @@ def scheduled_gpt_quota_cleanup():
                 trace_id=trace_id
             )
 
+
+@huey.task()
+def scheduled_auto_decision():
+    """
+    定时自动决策任务
+
+    每2小时执行一次，如果待决策市场列表少于10个则跳过
+    使用与 /api/tasks/decision/execute 相同的决策逻辑
+    """
+    from ..auto_decision import allocate, SimpleMarket
+    from ..purse import get_purse
+    import json
+
+    with TraceContext() as trace_id:
+        logger.info(
+            "SCHEDULED.AUTO_DECISION.START",
+            msg="开始执行定时自动决策",
+            trace_id=trace_id
+        )
+
+        try:
+            # 1. 获取所有待决策任务
+            pending_tasks = db.query_async_tasks(
+                stage=TaskStage.DECISION,
+                status=TaskStatus.WAITING,
+                limit=100
+            )
+
+            # 检查待决策任务数量
+            # if len(pending_tasks) < 10:
+            #     logger.info(
+            #         "SCHEDULED.AUTO_DECISION.SKIP",
+            #         msg=f"待决策任务数量不足10个({len(pending_tasks)}个)，跳过本次执行",
+            #         extra={"pending_count": len(pending_tasks)},
+            #         trace_id=trace_id
+            #     )
+            #     return
+
+            logger.info(
+                "SCHEDULED.AUTO_DECISION.PENDING_TASKS",
+                msg=f"待决策任务: {len(pending_tasks)}个",
+                extra={"pending_count": len(pending_tasks)},
+                trace_id=trace_id
+            )
+
+            # 2. 构建Market列表和任务映射
+            markets = []
+            task_map = {}  # market_id -> task
+            now_day = 0  # 当前天索引
+
+            for task in pending_tasks:
+                metadata = task.metadata
+                market_data = metadata.get('market')
+                analysis_data = metadata.get('analysis')
+
+                # 严格验证：不使用默认值
+                if not market_data:
+                    logger.error(
+                        "SCHEDULED.AUTO_DECISION.SKIP_TASK",
+                        msg=f"任务缺少market数据，跳过: {task.id}",
+                        error_code="E-SCHEDULED-DECISION-001",
+                        extra={"task_id": task.id},
+                        trace_id=trace_id
+                    )
+                    continue
+
+                if not analysis_data:
+                    logger.error(
+                        "SCHEDULED.AUTO_DECISION.SKIP_TASK",
+                        msg=f"任务缺少analysis数据，跳过: {task.id}",
+                        error_code="E-SCHEDULED-DECISION-002",
+                        extra={"task_id": task.id},
+                        trace_id=trace_id
+                    )
+                    continue
+
+                market_id = market_data.get('id')
+                if not market_id:
+                    logger.error(
+                        "SCHEDULED.AUTO_DECISION.SKIP_TASK",
+                        msg=f"任务缺少market_id，跳过: {task.id}",
+                        error_code="E-SCHEDULED-DECISION-003",
+                        extra={"task_id": task.id},
+                        trace_id=trace_id
+                    )
+                    continue
+
+                # 严格解析outcome_prices - 不使用默认值
+                outcome_prices_str = market_data.get('outcome_prices')
+                if not outcome_prices_str:
+                    logger.error(
+                        "SCHEDULED.AUTO_DECISION.SKIP_TASK",
+                        msg=f"任务缺少outcome_prices，跳过: {task.id}",
+                        error_code="E-SCHEDULED-DECISION-004",
+                        extra={"task_id": task.id, "market_id": market_id},
+                        trace_id=trace_id
+                    )
+                    continue
+
+                try:
+                    if isinstance(outcome_prices_str, str):
+                        outcome_prices = json.loads(outcome_prices_str)
+                    else:
+                        outcome_prices = outcome_prices_str
+
+                    if not outcome_prices or len(outcome_prices) < 1:
+                        raise ValueError("outcome_prices为空或长度不足")
+
+                    yes_price = float(outcome_prices[0])
+                except Exception as e:
+                    logger.error(
+                        "SCHEDULED.AUTO_DECISION.SKIP_TASK",
+                        msg=f"解析outcome_prices失败，跳过: {task.id}",
+                        error_code="E-SCHEDULED-DECISION-005",
+                        extra={"task_id": task.id, "market_id": market_id, "error": str(e)},
+                        trace_id=trace_id
+                    )
+                    continue
+
+                # 严格解析end_date计算结算天数 - 不使用默认值
+                end_date_str = market_data.get('end_date')
+                if not end_date_str:
+                    logger.error(
+                        "SCHEDULED.AUTO_DECISION.SKIP_TASK",
+                        msg=f"任务缺少end_date，跳过: {task.id}",
+                        error_code="E-SCHEDULED-DECISION-006",
+                        extra={"task_id": task.id, "market_id": market_id},
+                        trace_id=trace_id
+                    )
+                    continue
+
+                try:
+                    from datetime import datetime as dt
+                    end_date = dt.strptime(end_date_str, "%Y-%m-%dT%H:%M:%SZ")
+                    tau = max(1, (end_date - dt.now()).days)
+                except Exception as e:
+                    logger.error(
+                        "SCHEDULED.AUTO_DECISION.SKIP_TASK",
+                        msg=f"解析end_date失败，跳过: {task.id}",
+                        error_code="E-SCHEDULED-DECISION-007",
+                        extra={"task_id": task.id, "market_id": market_id, "error": str(e)},
+                        trace_id=trace_id
+                    )
+                    continue
+
+                # 严格获取分析结果 - 不使用默认值
+                p_predict = analysis_data.get('p')  # AI预测的YES概率
+                p_no_predict = analysis_data.get('n')  # AI预测的NO概率
+                a = analysis_data.get('a')  # 风险因子
+
+                if p_predict is None:
+                    logger.error(
+                        "SCHEDULED.AUTO_DECISION.SKIP_TASK",
+                        msg=f"任务缺少分析结果p，跳过: {task.id}",
+                        error_code="E-SCHEDULED-DECISION-008",
+                        extra={"task_id": task.id, "market_id": market_id},
+                        trace_id=trace_id
+                    )
+                    continue
+
+                if p_no_predict is None:
+                    logger.error(
+                        "SCHEDULED.AUTO_DECISION.SKIP_TASK",
+                        msg=f"任务缺少分析结果n，跳过: {task.id}",
+                        error_code="E-SCHEDULED-DECISION-009",
+                        extra={"task_id": task.id, "market_id": market_id},
+                        trace_id=trace_id
+                    )
+                    continue
+
+                if a is None:
+                    logger.error(
+                        "SCHEDULED.AUTO_DECISION.SKIP_TASK",
+                        msg=f"任务缺少风险因子a，跳过: {task.id}",
+                        error_code="E-SCHEDULED-DECISION-010",
+                        extra={"task_id": task.id, "market_id": market_id},
+                        trace_id=trace_id
+                    )
+                    continue
+
+                # 使用风险因子a进行概率放缩
+                # 公式: p = pmarket + a*(p_predict - pmarket)
+                p_yes = yes_price + a * (p_predict - yes_price)
+                p_no = (1.0 - yes_price) + a * (p_no_predict - (1.0 - yes_price))
+
+                logger.info(
+                    "SCHEDULED.AUTO_DECISION.PROB_SCALING",
+                    msg=f"概率放缩: {task.id}",
+                    extra={
+                        "task_id": task.id,
+                        "market_id": market_id,
+                        "pmarket": yes_price,
+                        "p_predict": p_predict,
+                        "a": a,
+                        "p_scaled": p_yes,
+                        "p_no_predict": p_no_predict,
+                        "p_no_scaled": p_no
+                    },
+                    trace_id=trace_id
+                )
+
+                # 创建SimpleMarket对象
+                market = SimpleMarket(
+                    id=market_id,
+                    m=yes_price,
+                    p_yes=p_yes,
+                    d=now_day + tau,  # 结算日期 = 当前天 + 剩余天数
+                    p_no=p_no
+                )
+                markets.append(market)
+                task_map[market_id] = task
+
+            if not markets:
+                logger.warn(
+                    "SCHEDULED.AUTO_DECISION.NO_VALID_MARKETS",
+                    msg="没有有效的市场数据",
+                    trace_id=trace_id
+                )
+                return
+
+            logger.info(
+                "SCHEDULED.AUTO_DECISION.MARKETS",
+                msg=f"待决策市场: {len(markets)}个",
+                extra={"market_count": len(markets), "market_ids": [m.id for m in markets]},
+                trace_id=trace_id
+            )
+
+            # 3. 从purse获取资金状态并调用仓位分配
+            purse = get_purse()
+            wealth = purse.get_total_fund()
+            locked_value = purse.get_locked_fund()
+
+            logger.info(
+                "SCHEDULED.AUTO_DECISION.PURSE_STATUS",
+                msg="从purse获取资金状态",
+                extra={"wealth": wealth, "locked_value": locked_value},
+                trace_id=trace_id
+            )
+
+            # 策略参数
+            theta_params = {
+                "lambda_time": 0.0,   # 久期贴现系数（0表示不贴现）
+                "c_fraction": 0.5,    # 分数Kelly系数（0.5表示半Kelly）
+                "f_cap": 0.95         # 单市场仓位上限
+            }
+            k = 0.6  # 最大锁仓占比
+
+            allocations = allocate(
+                markets_today=markets,
+                wealth=wealth,
+                locked_value_now=locked_value,
+                now_day=now_day,
+                k=k,
+                theta=theta_params
+            )
+
+            # 4. 将分配结果写回任务（过滤投入金额少于5*side_price的decision）
+            allocation_map = {alloc.id: alloc for alloc in allocations}
+
+            processed_count = 0
+            filtered_count = 0  # 被过滤掉的任务数
+
+            for market_id, task in task_map.items():
+                alloc = allocation_map.get(market_id)
+                from ..mark import mark
+                from ..types import Market
+                market_info = task.metadata.get("market")
+                mark_result = mark(market_info,alloc)
+                #将 mark_result添加到task.metadata
+                task.metadata["mark"] = mark_result
+
+                if alloc:
+                    # 有分配结果，检查投入金额是否满足最小阈值
+                    side_price = alloc.price  # 交易方向的价格
+                    min_invest = 5.0 * side_price  # 最小投入金额阈值
+
+                    if alloc.invest < min_invest:
+                        # 投入金额不足，过滤掉
+                        task.result = {
+                            'decision': 'skip',
+                            'reason': f'投入金额${alloc.invest:.2f}低于最小阈值${min_invest:.2f} (5*{side_price:.2f})',
+                            'wealth': wealth,
+                            'filtered': True,
+                            'original_allocation': {
+                                'side': alloc.side,
+                                'dollars': alloc.invest,
+                                'shares': alloc.shares,
+                                'cost': alloc.price
+                            }
+                        }
+                        filtered_count += 1
+
+                        logger.info(
+                            "SCHEDULED.AUTO_DECISION.FILTERED",
+                            msg=f"过滤低投入任务: {task.id}",
+                            extra={
+                                "task_id": task.id,
+                                "market_id": market_id,
+                                "invest": alloc.invest,
+                                "min_invest": min_invest,
+                                "side_price": side_price
+                            },
+                            trace_id=trace_id
+                        )
+                    else:
+                        # 投入金额满足要求
+                        # 计算评分（基于投资金额占总资金的比例）
+                        score = alloc.invest / wealth if wealth > 0 else 0.0
+                        task.result = {
+                            'decision': 'trade',
+                            'allocation': {
+                                'side': alloc.side,
+                                'score': score,
+                                'fraction_of_gross': alloc.f,
+                                'dollars': alloc.invest,
+                                'shares': alloc.shares,
+                                'cost': alloc.price
+                            },
+                            'wealth': wealth,
+                            'locked_value': locked_value,
+                            'mark': mark_result
+                        }
+                else:
+                    # 无分配（不值得交易）
+                    task.result = {
+                        'decision': 'skip',
+                        'reason': '根据Kelly准则，当前市场不值得交易',
+                        'wealth': wealth
+                    }
+                task.stage = TaskStage.TRADE
+                task.status = TaskStatus.WAITING
+                db.update_async_task(task)
+                processed_count += 1
+
+            logger.info(
+                "SCHEDULED.AUTO_DECISION.SUCCESS",
+                msg=f"定时自动决策完成: {processed_count}个任务, 过滤{filtered_count}个低投入任务",
+                extra={
+                    "processed_count": processed_count,
+                    "allocation_count": len(allocations),
+                    "filtered_count": filtered_count,
+                    "actual_trade_count": processed_count - filtered_count - (len(task_map) - len(allocations))
+                },
+                trace_id=trace_id
+            )
+
+        except Exception as e:
+            logger.error(
+                "SCHEDULED.AUTO_DECISION.ERROR",
+                msg=f"定时自动决策失败: {str(e)}",
+                error_code="E-SCHEDULED-DECISION-011",
+                extra={"error": str(e)},
+                trace_id=trace_id
+            )
+

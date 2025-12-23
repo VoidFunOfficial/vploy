@@ -50,6 +50,7 @@ class DynamicScheduler:
             'position_monitor': self._execute_position_monitor,
             'gpt_quota_check': self._execute_gpt_quota_check,
             'gpt_quota_cleanup': self._execute_gpt_quota_cleanup,
+            'auto_decision': self._execute_auto_decision,
         }
         
         logger.info(
@@ -354,6 +355,36 @@ class DynamicScheduler:
                     extra={"error": str(e)},
                     trace_id=trace_id
                 )
+
+    def _execute_auto_decision(self, task: ScheduledTask):
+        """
+        执行自动决策任务
+
+        每2小时执行一次，如果待决策市场少于10个则跳过
+        """
+        from .tasks import scheduled_auto_decision
+
+        logger.info(
+            "DYNAMIC_SCHEDULER.AUTO_DECISION.START",
+            msg="提交自动决策任务到Huey队列"
+        )
+
+        try:
+            # 提交到Huey队列异步执行
+            scheduled_auto_decision()
+
+            logger.info(
+                "DYNAMIC_SCHEDULER.AUTO_DECISION.SUBMITTED",
+                msg="自动决策任务已提交到Huey队列"
+            )
+
+        except Exception as e:
+            logger.error(
+                "DYNAMIC_SCHEDULER.AUTO_DECISION.ERROR",
+                msg="提交自动决策任务失败",
+                error_code="E-DYNAMIC-SCHEDULER-014",
+                extra={"error": str(e)}
+            )
 
     def _calculate_next_run(self, task: ScheduledTask) -> datetime:
         """
