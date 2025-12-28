@@ -14,7 +14,7 @@ Environment="PYTHONUNBUFFERED=1"
 Environment="PATH=%CONDA_PATH%"
 
 # 启动命令
-ExecStart=%PYTHON% %WORKDIR%/run_task_worker.py
+ExecStart=%PYTHON% /home/ubuntu/vploy/run_task_worker.py
 
 # 重启策略
 Restart=always

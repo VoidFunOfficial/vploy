@@ -31,8 +31,7 @@ if [ "$EUID" -ne 0 ]; then
 fi
 
 # 获取脚本所在目录
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
+PROJECT_DIR="/home/ubuntu/vploy"
 
 # 获取当前用户（非 root）
 REAL_USER="${SUDO_USER:-$USER}"
@@ -88,7 +87,7 @@ fi
 # 2. 如果没有找到 conda，使用系统 Python
 if [ -z "$PYTHON_PATH" ]; then
     print_warn "未检测到 conda，尝试使用系统 Python"
-    PYTHON_PATH=$(which python3 || which python)
+    PYTHON_PATH=$(which python)
     if [ -z "$PYTHON_PATH" ]; then
         print_error "未找到 Python，请先安装 Python 或 conda"
         exit 1
@@ -125,7 +124,7 @@ fi
 print_info "配置服务文件..."
 
 for service in voidpoly-api voidpoly-worker voidpoly-frontend; do
-    SERVICE_FILE="$SCRIPT_DIR/${service}.service"
+    SERVICE_FILE="$PROJECT_DIR/systemd/${service}.service"
     TARGET_FILE="/etc/systemd/system/${service}.service"
 
     if [ ! -f "$SERVICE_FILE" ]; then

@@ -13,7 +13,7 @@ print_info() {
 }
 
 # 获取脚本所在目录
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_DIR="/home/ubuntu/vploy/systemd"
 
 print_info "设置脚本执行权限..."
 

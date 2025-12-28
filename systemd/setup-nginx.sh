@@ -25,8 +25,7 @@ fi
 
 # 获取当前用户和工作目录
 CURRENT_USER=${SUDO_USER:-$USER}
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-WORKDIR="$(dirname "$SCRIPT_DIR")"
+WORKDIR="/home/ubuntu/vploy"
 
 echo -e "${YELLOW}[1/7] 检查 Nginx 是否已安装...${NC}"
 if ! command -v nginx &> /dev/null; then
@@ -56,7 +55,7 @@ echo -e "${GREEN}✓ 前端构建完成${NC}"
 echo ""
 echo -e "${YELLOW}[3/7] 配置 Nginx...${NC}"
 # 替换配置文件中的占位符
-sed "s|%WORKDIR%|$WORKDIR|g" "$SCRIPT_DIR/nginx/voidpoly.conf" > /tmp/voidpoly.conf
+sed "s|%WORKDIR%|$WORKDIR|g" "$WORKDIR/systemd/nginx/voidpoly.conf" > /tmp/voidpoly.conf
 
 # 复制配置文件
 cp /tmp/voidpoly.conf /etc/nginx/sites-available/voidpoly.conf
