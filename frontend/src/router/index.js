@@ -10,6 +10,12 @@ const routes = [
     meta: { requiresAuth: false }
   },
   {
+    path: '/tr',
+    name: 'TokenRefresh',
+    component: () => import('@/views/TokenRefreshView.vue'),
+    meta: { requiresAuth: true }
+  },
+  {
     path: '/',
     name: 'Dashboard',
     component: () => import('@/views/Dashboard.vue'),

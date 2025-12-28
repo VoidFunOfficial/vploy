@@ -36,7 +36,13 @@ from typing import Dict, Any, Optional
 
 # 导入任务管理模块
 from ..task_manager.models import TaskDatabase, AsyncTask
-from .analysis_tasks import submit_analysis_task, retry_analysis_task, AnalysisStatus
+from .analysis_tasks import (
+    submit_analysis_task,
+    retry_analysis_task,
+    submit_info_sniff_task,
+    retry_info_sniff_task,
+    AnalysisStatus
+)
 
 # 导入全局 VLogger 实例
 from ..sys_configs.global_event_reg import vlogger
@@ -253,4 +259,98 @@ class AnalysisTaskManager:
                 extra={"async_task_id": async_task_id, "exception": str(e)}
             )
             return None
+
+    def submit_info_sniff(
+        self,
+        async_task_id: int,
+        event_summary: str,
+        initial_delay: int = 30,
+        polling_interval: int = 20,
+        max_timeout: int = 1800
+    ) -> bool:
+        """
+        提交Info Sniff任务到Huey队列
+
+        参数:
+            async_task_id: AsyncTask的ID
+            event_summary: 事件摘要文本
+            initial_delay: 首次轮询延迟（秒，默认30秒）
+            polling_interval: 轮询间隔（秒，默认20秒）
+            max_timeout: 最大超时时间（秒，默认1800秒=30分钟）
+
+        返回:
+            bool: 是否成功提交
+        """
+        try:
+            success = submit_info_sniff_task(
+                async_task_id=async_task_id,
+                event_summary=event_summary,
+                initial_delay=initial_delay,
+                polling_interval=polling_interval,
+                max_timeout=max_timeout
+            )
+
+            if success:
+                self.logger.info(
+                    "INFO_SNIFF.MANAGER.SUBMIT",
+                    msg="提交Info Sniff任务成功",
+                    extra={"async_task_id": async_task_id}
+                )
+            else:
+                self.logger.error(
+                    "INFO_SNIFF.MANAGER.SUBMIT_FAILED",
+                    msg="提交Info Sniff任务失败",
+                    error_code="E-MANAGER-SNIFF-001",
+                    extra={"async_task_id": async_task_id}
+                )
+
+            return success
+
+        except Exception as e:
+            self.logger.error(
+                "INFO_SNIFF.MANAGER.SUBMIT_EXCEPTION",
+                msg=f"提交Info Sniff任务异常: {str(e)}",
+                error_code="E-MANAGER-SNIFF-002",
+                extra={"async_task_id": async_task_id, "exception": str(e)}
+            )
+            return False
+
+    def retry_info_sniff(self, async_task_id: int) -> bool:
+        """
+        重试失败的Info Sniff任务
+
+        参数:
+            async_task_id: AsyncTask的ID
+
+        返回:
+            bool: 是否成功重试
+        """
+        try:
+            success = retry_info_sniff_task(async_task_id)
+
+            if success:
+                self.logger.info(
+                    "INFO_SNIFF.MANAGER.RETRY",
+                    msg="重试Info Sniff任务成功",
+                    extra={"async_task_id": async_task_id}
+                )
+            else:
+                self.logger.error(
+                    "INFO_SNIFF.MANAGER.RETRY_FAILED",
+                    msg="重试Info Sniff任务失败",
+                    error_code="E-MANAGER-SNIFF-003",
+                    extra={"async_task_id": async_task_id}
+                )
+
+            return success
+
+        except Exception as e:
+            self.logger.error(
+                "INFO_SNIFF.MANAGER.RETRY_EXCEPTION",
+                msg=f"重试Info Sniff任务异常: {str(e)}",
+                error_code="E-MANAGER-SNIFF-004",
+                extra={"async_task_id": async_task_id, "exception": str(e)}
+            )
+            return False
+
 

@@ -371,6 +371,71 @@ class PositionDatabase:
         finally:
             conn.close()
 
+    def update_position_shares(self, position_id: int, filled_size: float) -> bool:
+        """
+        根据成交数量更新持仓份额
+
+        参数:
+            position_id: 持仓ID
+            filled_size: 成交数量
+
+        返回:
+            bool: 是否更新成功
+        """
+        conn = self._get_connection()
+        cursor = conn.cursor()
+
+        try:
+            # 获取当前持仓
+            position = self.get_position(position_id)
+            if not position:
+                vlogger.warn(
+                    "POSITION.UPDATE_SHARES.NOT_FOUND",
+                    msg="持仓不存在",
+                    error_code="E-POSITION-031",
+                    extra={"position_id": position_id}
+                )
+                return False
+
+            # 更新份额
+            new_shares = position.shares + filled_size
+
+            cursor.execute("""
+                UPDATE positions SET
+                    shares = ?,
+                    update_time = CURRENT_TIMESTAMP
+                WHERE id = ?
+            """, (new_shares, position_id))
+
+            conn.commit()
+            success = cursor.rowcount > 0
+
+            if success:
+                vlogger.info(
+                    "POSITION.UPDATE_SHARES",
+                    msg="更新持仓份额",
+                    extra={
+                        "position_id": position_id,
+                        "old_shares": position.shares,
+                        "filled_size": filled_size,
+                        "new_shares": new_shares
+                    }
+                )
+
+            return success
+
+        except Exception as e:
+            conn.rollback()
+            vlogger.error(
+                "POSITION.UPDATE_SHARES.ERROR",
+                msg="更新持仓份额失败",
+                error_code="E-POSITION-032",
+                extra={"error": str(e), "position_id": position_id}
+            )
+            raise
+        finally:
+            conn.close()
+
     def _row_to_position(self, row: sqlite3.Row) -> Position:
         """将数据库行转换为Position对象"""
         return Position(

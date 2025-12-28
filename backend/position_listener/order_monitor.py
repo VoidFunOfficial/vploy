@@ -12,9 +12,10 @@ from huey import crontab
 from ..task_manager.tasks import huey
 from .database import PositionDatabase
 from .models import OrderStatus
-from ..polymarket_api import get_order, get_orders
+from ..polymarket_api import get_order, get_orders, GammaMarketsAPI
 from ..vlogger import TraceContext
 from ..sys_configs.global_event_reg import vlogger
+from ..record import RecordManager
 
 
 class OrderMonitor:
@@ -32,11 +33,117 @@ class OrderMonitor:
             db: PositionDatabase实例
         """
         self.db = db or PositionDatabase()
+        self.record_manager = RecordManager()
 
         vlogger.info(
             "ORDER_MONITOR.INIT",
             msg="订单监控器初始化完成"
         )
+
+    def _get_market_end_date(self, market_id: str) -> Optional[str]:
+        """
+        获取市场的结算日期
+
+        参数:
+            market_id: 市场ID
+
+        返回:
+            str: 结算日期 (yyyy-mm-dd)，如果获取失败返回None
+        """
+        try:
+            with GammaMarketsAPI() as api:
+                market = api.get_market(market_id)
+                if market and market.end_date_iso:
+                    # 将ISO格式转换为 yyyy-mm-dd
+                    end_date = datetime.fromisoformat(market.end_date_iso.replace('Z', '+00:00'))
+                    return end_date.strftime('%Y-%m-%d')
+                else:
+                    vlogger.warn(
+                        "ORDER_MONITOR.END_DATE.NOT_FOUND",
+                        msg="市场没有结算日期",
+                        extra={"market_id": market_id}
+                    )
+                    return None
+        except Exception as e:
+            vlogger.error(
+                "ORDER_MONITOR.END_DATE.ERROR",
+                msg="获取市场结算日期失败",
+                error_code="E-POSITION-033",
+                extra={"market_id": market_id, "error": str(e)}
+            )
+            return None
+
+    def _record_trade_to_record_module(
+        self,
+        position_id: int,
+        market_id: str,
+        filled_size: float,
+        price: float
+    ):
+        """
+        将成交信息记录到 record 模块
+
+        参数:
+            position_id: 持仓ID
+            market_id: 市场ID
+            filled_size: 成交数量
+            price: 成交价格
+        """
+        try:
+            # 获取持仓信息
+            position = self.db.get_position(position_id)
+            if not position:
+                vlogger.warn(
+                    "ORDER_MONITOR.RECORD.NO_POSITION",
+                    msg="持仓不存在，无法记录到record模块",
+                    extra={"position_id": position_id}
+                )
+                return
+
+            # 获取市场结算日期
+            end_date = self._get_market_end_date(market_id)
+            if not end_date:
+                vlogger.warn(
+                    "ORDER_MONITOR.RECORD.NO_END_DATE",
+                    msg="无法获取市场结算日期，跳过记录到record模块",
+                    extra={"market_id": market_id}
+                )
+                return
+
+            # 记录到 record 模块
+            self.record_manager.update_info(
+                market_id=market_id,
+                side=position.side,
+                end_date=end_date,
+                operation='BUY',
+                price=price,
+                amount=filled_size,
+                tips=f"订单成交自动记录 (position_id: {position_id})"
+            )
+
+            vlogger.info(
+                "ORDER_MONITOR.RECORD.SUCCESS",
+                msg="成交信息已记录到record模块",
+                extra={
+                    "position_id": position_id,
+                    "market_id": market_id,
+                    "side": position.side,
+                    "amount": filled_size,
+                    "price": price
+                }
+            )
+
+        except Exception as e:
+            vlogger.error(
+                "ORDER_MONITOR.RECORD.ERROR",
+                msg="记录到record模块失败",
+                error_code="E-POSITION-034",
+                extra={
+                    "position_id": position_id,
+                    "market_id": market_id,
+                    "error": str(e)
+                }
+            )
 
     def _handle_order_cancelled(self, order, filled_size: float, original_size: float):
         """
@@ -64,6 +171,24 @@ class OrderMonitor:
                     }
                 )
                 return
+
+            # 如果有部分成交，更新持仓份额
+            if filled_size > 0:
+                previous_filled = order.filled_size or 0.0
+                new_filled = filled_size - previous_filled
+
+                if new_filled > 0:
+                    self.db.update_position_shares(order.position_id, new_filled)
+                    vlogger.info(
+                        "ORDER_MONITOR.CANCEL.UPDATE_SHARES",
+                        msg="订单取消前部分成交，已更新持仓份额",
+                        extra={
+                            "order_id": order.order_id,
+                            "position_id": order.position_id,
+                            "filled_size": filled_size,
+                            "new_filled": new_filled
+                        }
+                    )
 
             # 计算需要解锁的资金
             if filled_size == 0.0:
@@ -252,15 +377,33 @@ class OrderMonitor:
             if clob_status == "MATCHED" or size_matched >= original_size:
                 # 订单已完全成交
                 new_status = OrderStatus.FILLED
+
+                # 计算新增成交量（当前成交量 - 之前已记录的成交量）
+                previous_filled = order.filled_size or 0.0
+                new_filled = size_matched - previous_filled
+
                 self.db.update_order_status(order_id, new_status, filled_size=size_matched)
-                
+
+                # 如果有新增成交，更新持仓份额并记录到record模块
+                if new_filled > 0 and order.position_id:
+                    self.db.update_position_shares(order.position_id, new_filled)
+                    # 记录到 record 模块
+                    self._record_trade_to_record_module(
+                        position_id=order.position_id,
+                        market_id=order.market_id,
+                        filled_size=new_filled,
+                        price=order.price
+                    )
+
                 vlogger.trade(
                     "ORDER_MONITOR.FILLED",
                     msg="订单已成交",
                     extra={
                         "order_id": order_id,
+                        "position_id": order.position_id,
                         "size": original_size,
-                        "filled_size": size_matched
+                        "filled_size": size_matched,
+                        "new_filled": new_filled
                     }
                 )
                 
@@ -284,15 +427,32 @@ class OrderMonitor:
                 
             elif size_matched > 0:
                 # 订单部分成交
+                # 计算新增成交量（当前成交量 - 之前已记录的成交量）
+                previous_filled = order.filled_size or 0.0
+                new_filled = size_matched - previous_filled
+
                 self.db.update_order_status(order_id, OrderStatus.PENDING, filled_size=size_matched)
-                
+
+                # 如果有新增成交，更新持仓份额并记录到record模块
+                if new_filled > 0 and order.position_id:
+                    self.db.update_position_shares(order.position_id, new_filled)
+                    # 记录到 record 模块
+                    self._record_trade_to_record_module(
+                        position_id=order.position_id,
+                        market_id=order.market_id,
+                        filled_size=new_filled,
+                        price=order.price
+                    )
+
                 vlogger.info(
                     "ORDER_MONITOR.PARTIAL",
                     msg="订单部分成交",
                     extra={
                         "order_id": order_id,
+                        "position_id": order.position_id,
                         "size": original_size,
                         "filled_size": size_matched,
+                        "new_filled": new_filled,
                         "fill_rate": size_matched / original_size if original_size > 0 else 0
                     }
                 )
@@ -439,6 +599,14 @@ class OrderMonitor:
 
                 # 处理CANCELLED状态
                 if clob_status == "CANCELED" or clob_status == "CANCELLED":
+                    # 如果有部分成交，更新持仓份额
+                    if filled_size > 0:
+                        previous_filled = order.filled_size or 0.0
+                        new_filled = filled_size - previous_filled
+
+                        if new_filled > 0 and order.position_id:
+                            self.db.update_position_shares(order.position_id, new_filled)
+
                     # 更新订单状态
                     self.db.update_order_status(order_id, OrderStatus.CANCELLED, filled_size=filled_size)
 
@@ -499,7 +667,23 @@ class OrderMonitor:
 
                 # 处理FILLED/MATCHED状态
                 elif clob_status == "MATCHED" or fill_rate >= 1.0:
+                    # 计算新增成交量
+                    previous_filled = order.filled_size or 0.0
+                    new_filled = filled_size - previous_filled
+
                     self.db.update_order_status(order_id, OrderStatus.FILLED, filled_size=filled_size)
+
+                    # 如果有新增成交，更新持仓份额并记录到record模块
+                    if new_filled > 0 and order.position_id:
+                        self.db.update_position_shares(order.position_id, new_filled)
+                        # 记录到 record 模块
+                        self._record_trade_to_record_module(
+                            position_id=order.position_id,
+                            market_id=market_id,
+                            filled_size=new_filled,
+                            price=order.price
+                        )
+
                     filled_count += 1
 
                     vlogger.trade(
@@ -507,8 +691,10 @@ class OrderMonitor:
                         msg="订单已成交",
                         extra={
                             "order_id": order_id,
+                            "position_id": order.position_id,
                             "market_id": market_id,
                             "filled_size": filled_size,
+                            "new_filled": new_filled,
                             "original_size": original_size
                         }
                     )
@@ -516,7 +702,22 @@ class OrderMonitor:
                 # 处理LIVE/PENDING状态
                 elif clob_status == "LIVE":
                     if filled_size > 0:
+                        # 计算新增成交量
+                        previous_filled = order.filled_size or 0.0
+                        new_filled = filled_size - previous_filled
+
                         self.db.update_order_status(order_id, OrderStatus.PENDING, filled_size=filled_size)
+
+                        # 如果有新增成交，更新持仓份额并记录到record模块
+                        if new_filled > 0 and order.position_id:
+                            self.db.update_position_shares(order.position_id, new_filled)
+                            # 记录到 record 模块
+                            self._record_trade_to_record_module(
+                                position_id=order.position_id,
+                                market_id=market_id,
+                                filled_size=new_filled,
+                                price=order.price
+                            )
                     live_count += 1
 
                 processed_count += 1

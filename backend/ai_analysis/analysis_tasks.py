@@ -84,6 +84,8 @@ class GPTRequestDatabase:
                 task_id INTEGER,
                 conversation_id TEXT,
                 success INTEGER DEFAULT 1,
+                credits INTEGER DEFAULT 6,
+                task_type TEXT DEFAULT 'analysis',
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
@@ -97,7 +99,7 @@ class GPTRequestDatabase:
         conn.commit()
         conn.close()
 
-    def record_request(self, task_id: int, conversation_id: Optional[str] = None, success: bool = True) -> int:
+    def record_request(self, task_id: int, conversation_id: Optional[str] = None, success: bool = True, credits: int = 6, task_type: str = 'analysis') -> int:
         """
         记录一次GPT请求
 
@@ -105,6 +107,8 @@ class GPTRequestDatabase:
             task_id: 任务ID
             conversation_id: 会话ID（可选）
             success: 请求是否成功
+            credits: 消耗的积分（默认6分）
+            task_type: 任务类型（'analysis' 或 'info_sniff'）
 
         返回:
             int: 记录ID
@@ -113,9 +117,9 @@ class GPTRequestDatabase:
         cursor = conn.cursor()
 
         cursor.execute("""
-            INSERT INTO gpt_requests (request_time, task_id, conversation_id, success)
-            VALUES (?, ?, ?, ?)
-        """, (datetime.now(), task_id, conversation_id, 1 if success else 0))
+            INSERT INTO gpt_requests (request_time, task_id, conversation_id, success, credits, task_type)
+            VALUES (?, ?, ?, ?, ?, ?)
+        """, (datetime.now(), task_id, conversation_id, 1 if success else 0, credits, task_type))
 
         record_id = cursor.lastrowid
         conn.commit()
@@ -149,45 +153,82 @@ class GPTRequestDatabase:
 
         return result['count'] if result else 0
 
-    def get_next_available_time(self, hours: int, max_requests: int) -> Optional[datetime]:
+    def get_credits_in_window(self, hours: int) -> int:
         """
-        获取下一个可用时间点（当前窗口内请求数达到限制时）
+        获取指定时间窗口内消耗的总积分
 
         参数:
             hours: 时间窗口（小时）
-            max_requests: 最大请求数
 
         返回:
-            Optional[datetime]: 下一个可用时间点，如果当前可用则返回None
+            int: 消耗的总积分
         """
-        current_count = self.get_request_count_in_window(hours)
-
-        if current_count < max_requests:
-            return None
-
-        # 找到窗口内最早的请求时间
         conn = self._get_connection()
         cursor = conn.cursor()
 
         window_start = datetime.now() - timedelta(hours=hours)
 
         cursor.execute("""
-            SELECT request_time
+            SELECT COALESCE(SUM(credits), 0) as total_credits
             FROM gpt_requests
             WHERE request_time >= ? AND success = 1
-            ORDER BY request_time ASC
-            LIMIT 1
         """, (window_start,))
 
         result = cursor.fetchone()
         conn.close()
 
-        if result:
-            # 最早请求时间 + 窗口时长 = 下一个可用时间
-            earliest_request = datetime.fromisoformat(result['request_time'])
-            return earliest_request + timedelta(hours=hours)
+        return result['total_credits'] if result else 0
 
-        return None
+    def get_next_available_time(self, hours: int, max_credits: int) -> Optional[datetime]:
+        """
+        获取下一个可用时间点（当前窗口内积分达到限制时）
+
+        参数:
+            hours: 时间窗口（小时）
+            max_credits: 最大积分数
+
+        返回:
+            Optional[datetime]: 下一个可用时间点，如果当前可用则返回None
+        """
+        current_credits = self.get_credits_in_window(hours)
+
+        if current_credits < max_credits:
+            return None
+
+        # 找到窗口内最早的请求时间，并计算需要等待的时间
+        conn = self._get_connection()
+        cursor = conn.cursor()
+
+        window_start = datetime.now() - timedelta(hours=hours)
+
+        # 按时间顺序获取所有成功的请求及其积分
+        cursor.execute("""
+            SELECT request_time, credits
+            FROM gpt_requests
+            WHERE request_time >= ? AND success = 1
+            ORDER BY request_time ASC
+        """, (window_start,))
+
+        requests = cursor.fetchall()
+        conn.close()
+
+        if not requests:
+            return None
+
+        # 计算累积积分，找到需要移除的最早请求
+        cumulative_credits = current_credits
+        for req in requests:
+            cumulative_credits -= req['credits']
+            if cumulative_credits < max_credits:
+                # 找到了需要移除的请求，计算下一个可用时间
+                earliest_request_time = datetime.fromisoformat(req['request_time'])
+                next_available = earliest_request_time + timedelta(hours=hours)
+                return next_available
+
+        # 如果没有找到，返回最早请求的过期时间
+        earliest_request_time = datetime.fromisoformat(requests[0]['request_time'])
+        next_available = earliest_request_time + timedelta(hours=hours)
+        return next_available
 
     def cleanup_old_records(self, days: int = 30):
         """
@@ -221,24 +262,29 @@ class GPTQuotaManager:
     """
     GPT请求额度管理器
 
-    实现滑动窗口频率限制：
-    - 6小时内最多30次请求
-    - 3天内最多180次请求
+    实现基于积分的滑动窗口频率限制：
+    - 6小时内最多180积分（原30次 * 6积分）
+    - 3天内最多1080积分（原180次 * 6积分）
+    - analysis任务消耗6积分
+    - info_sniff任务消耗1积分
     """
 
-    # 限制规则配置
+    # 限制规则配置（基于积分）
     LIMITS = [
-        {"hours": 6, "max_requests": 30},    # 6小时内最多30次
-        {"hours": 72, "max_requests": 180},  # 3天内最多180次
+        {"hours": 6, "max_credits": 180},     # 6小时内最多180积分
+        {"hours": 72, "max_credits": 1080},   # 3天内最多1080积分
     ]
 
     def __init__(self):
         """初始化额度管理器"""
         self.db = GPTRequestDatabase()
 
-    def check_quota(self) -> Dict[str, Any]:
+    def check_quota(self, required_credits: int = 6) -> Dict[str, Any]:
         """
-        检查当前请求额度
+        检查当前请求额度（基于积分）
+
+        参数:
+            required_credits: 本次请求需要的积分（默认6分）
 
         返回:
             Dict[str, Any]: {
@@ -253,17 +299,18 @@ class GPTQuotaManager:
 
         for limit in self.LIMITS:
             hours = limit["hours"]
-            max_requests = limit["max_requests"]
+            max_credits = limit["max_credits"]
 
-            current_count = self.db.get_request_count_in_window(hours)
+            current_credits = self.db.get_credits_in_window(hours)
             current_usage[f"{hours}h"] = {
-                "current": current_count,
-                "limit": max_requests,
-                "remaining": max(0, max_requests - current_count)
+                "current": current_credits,
+                "limit": max_credits,
+                "remaining": max(0, max_credits - current_credits)
             }
 
-            if current_count >= max_requests:
-                next_available = self.db.get_next_available_time(hours, max_requests)
+            # 检查是否有足够的积分
+            if current_credits + required_credits > max_credits:
+                next_available = self.db.get_next_available_time(hours, max_credits - required_credits + 1)
                 if next_available:
                     next_available_times.append(next_available)
 
@@ -272,7 +319,7 @@ class GPTQuotaManager:
             next_available = max(next_available_times)
             return {
                 "allowed": False,
-                "reason": "已达到GPT请求频率限制",
+                "reason": f"积分不足，需要{required_credits}积分",
                 "current_usage": current_usage,
                 "next_available": next_available
             }
@@ -284,7 +331,7 @@ class GPTQuotaManager:
             "next_available": None
         }
 
-    def record_request(self, task_id: int, conversation_id: Optional[str] = None, success: bool = True) -> int:
+    def record_request(self, task_id: int, conversation_id: Optional[str] = None, success: bool = True, credits: int = 6, task_type: str = 'analysis') -> int:
         """
         记录一次GPT请求
 
@@ -292,11 +339,13 @@ class GPTQuotaManager:
             task_id: 任务ID
             conversation_id: 会话ID
             success: 请求是否成功
+            credits: 消耗的积分（默认6分）
+            task_type: 任务类型（'analysis' 或 'info_sniff'）
 
         返回:
             int: 记录ID
         """
-        return self.db.record_request(task_id, conversation_id, success)
+        return self.db.record_request(task_id, conversation_id, success, credits, task_type)
 
     def get_quota_status(self) -> Dict[str, Any]:
         """
@@ -321,6 +370,126 @@ quota_manager = GPTQuotaManager()
 
 
 # ==================== JSON结构验证 ====================
+
+def validate_info_sniff_result(result_text: str) -> tuple[bool, Optional[Dict[str, Any]]]:
+    """
+    验证info_sniff结果是否符合预期的JSON结构
+
+    预期结构:
+    {
+        "primary_driver": "HYPE" or "REALITY",
+        "new_reasons_yes": ["理由1", "理由2", ...],
+        "new_reasons_no": ["理由1", "理由2", ...]
+    }
+
+    参数:
+        result_text: GPT返回的文本结果
+
+    返回:
+        tuple[bool, Optional[Dict]]: (是否有效, 解析后的JSON对象)
+    """
+    import json
+    import re
+
+    if not result_text or not result_text.strip():
+        logger.debug("INFO_SNIFF.VALIDATE.EMPTY", msg="返回结果为空")
+        return False, None
+
+    try:
+        # 步骤1: 提取JSON内容（可能被包裹在markdown代码块或其他文本中）
+        json_text = result_text.strip()
+
+        # 移除markdown代码块标记
+        if json_text.startswith("```json"):
+            json_text = json_text[7:]
+        elif json_text.startswith("```"):
+            json_text = json_text[3:]
+
+        if json_text.endswith("```"):
+            json_text = json_text[:-3]
+
+        json_text = json_text.strip()
+
+        # 尝试查找JSON对象（如果文本中包含其他内容）
+        first_brace = json_text.find('{')
+        last_brace = json_text.rfind('}')
+
+        if first_brace != -1 and last_brace != -1 and last_brace > first_brace:
+            json_text = json_text[first_brace:last_brace + 1]
+
+        # 步骤2: 解析JSON
+        try:
+            data = json.loads(json_text)
+        except json.JSONDecodeError as e:
+            logger.warn(
+                "INFO_SNIFF.VALIDATE.JSON_ERROR",
+                msg=f"JSON解析失败: {str(e)}",
+                extra={"result_preview": result_text[:200]}
+            )
+            return False, None
+
+        # 步骤3: 验证结构
+        if not isinstance(data, dict):
+            logger.warn("INFO_SNIFF.VALIDATE.NOT_DICT", msg="返回结果不是字典")
+            return False, None
+
+        # 验证必需字段
+        required_fields = ["primary_driver", "new_reasons_yes", "new_reasons_no"]
+        missing_fields = [field for field in required_fields if field not in data]
+
+        if missing_fields:
+            logger.warn(
+                "INFO_SNIFF.VALIDATE.MISSING_FIELDS",
+                msg=f"缺少必需字段: {missing_fields}",
+                extra={"data_keys": list(data.keys())}
+            )
+            return False, None
+
+        # 验证primary_driver的值
+        if data["primary_driver"] not in ["HYPE", "REALITY"]:
+            logger.warn(
+                "INFO_SNIFF.VALIDATE.INVALID_DRIVER",
+                msg=f"primary_driver值无效: {data['primary_driver']}，必须是'HYPE'或'REALITY'"
+            )
+            return False, None
+
+        # 验证reasons数组
+        if not isinstance(data["new_reasons_yes"], list):
+            logger.warn("INFO_SNIFF.VALIDATE.INVALID_YES", msg="new_reasons_yes不是数组")
+            return False, None
+
+        if not isinstance(data["new_reasons_no"], list):
+            logger.warn("INFO_SNIFF.VALIDATE.INVALID_NO", msg="new_reasons_no不是数组")
+            return False, None
+
+        # 验证数组元素都是字符串
+        if not all(isinstance(r, str) for r in data["new_reasons_yes"]):
+            logger.warn("INFO_SNIFF.VALIDATE.YES_NOT_STRINGS", msg="new_reasons_yes包含非字符串元素")
+            return False, None
+
+        if not all(isinstance(r, str) for r in data["new_reasons_no"]):
+            logger.warn("INFO_SNIFF.VALIDATE.NO_NOT_STRINGS", msg="new_reasons_no包含非字符串元素")
+            return False, None
+
+        logger.info(
+            "INFO_SNIFF.VALIDATE.SUCCESS",
+            msg="Info Sniff结果验证成功",
+            extra={
+                "primary_driver": data["primary_driver"],
+                "yes_count": len(data["new_reasons_yes"]),
+                "no_count": len(data["new_reasons_no"])
+            }
+        )
+
+        return True, data
+
+    except Exception as e:
+        logger.error(
+            "INFO_SNIFF.VALIDATE.EXCEPTION",
+            msg=f"验证过程异常: {str(e)}",
+            extra={"exception": str(e)}
+        )
+        return False, None
 
 def validate_analysis_result(result_text: str) -> tuple[bool, Optional[Dict[str, Any]]]:
     """
@@ -607,8 +776,8 @@ def submit_gpt_request(
                 )
                 return
 
-            # 检查GPT请求额度
-            quota_check = quota_manager.check_quota()
+            # 检查GPT请求额度（analysis任务消耗6积分）
+            quota_check = quota_manager.check_quota(required_credits=6)
             if not quota_check["allowed"]:
                 # 额度不足，设置任务为等待额度状态
                 task.result["analysis_status"] = AnalysisStatus.WAITING_QUOTA.value
@@ -738,8 +907,8 @@ def submit_gpt_request(
                 task.result["error"] = error_msg
                 db.update_async_task(task)
 
-                # 记录失败的GPT请求
-                quota_manager.record_request(async_task_id, None, success=False)
+                # 记录失败的GPT请求（失败不消耗积分）
+                quota_manager.record_request(async_task_id, None, success=False, credits=0, task_type='analysis')
 
                 logger.error(
                     "ANALYSIS.SUBMIT.REQUEST_FAILED",
@@ -757,8 +926,8 @@ def submit_gpt_request(
             task.result["submit_time"] = time.time()
             db.update_async_task(task)
 
-            # 记录成功的GPT请求
-            quota_manager.record_request(async_task_id, conversation_id, success=True)
+            # 记录成功的GPT请求（analysis任务消耗6积分）
+            quota_manager.record_request(async_task_id, conversation_id, success=True, credits=6, task_type='analysis')
 
             logger.info(
                 "ANALYSIS.SUBMIT.SUCCESS",
@@ -1167,6 +1336,603 @@ def submit_analysis_task(
         )
         return False
 
+
+
+# ==================== Info Sniff 任务函数 ====================
+
+@huey.task()
+def submit_info_sniff_request(
+    async_task_id: int,
+    event_summary: str
+):
+    """
+    提交Info Sniff GPT请求任务（Huey异步任务）
+
+    工作流程:
+    1. 发送GPT请求（使用info.md作为prompt）
+    2. 获取conversation_id
+    3. 更新任务状态为POLLING
+    4. 调度轮询任务
+
+    参数:
+        async_task_id: AsyncTask的ID
+        event_summary: 事件摘要文本
+    """
+    with TraceContext() as trace_id:
+        logger.info(
+            "INFO_SNIFF.SUBMIT.START",
+            msg=f"开始提交Info Sniff GPT请求",
+            extra={"async_task_id": async_task_id},
+            trace_id=trace_id
+        )
+
+        try:
+            # 获取任务
+            task = db.get_async_task(async_task_id)
+            if not task:
+                logger.error(
+                    "INFO_SNIFF.SUBMIT.NOT_FOUND",
+                    msg=f"任务不存在: {async_task_id}",
+                    error_code="E-SNIFF-001",
+                    extra={"async_task_id": async_task_id},
+                    trace_id=trace_id
+                )
+                return
+
+            # 检查GPT请求额度（info_sniff任务消耗1积分）
+            quota_check = quota_manager.check_quota(required_credits=1)
+            if not quota_check["allowed"]:
+                # 额度不足，设置任务为等待额度状态
+                task.result["analysis_status"] = AnalysisStatus.WAITING_QUOTA.value
+                task.result["quota_reason"] = quota_check["reason"]
+                task.result["quota_usage"] = quota_check["current_usage"]
+                task.result["next_available"] = quota_check["next_available"].isoformat() if quota_check["next_available"] else None
+                db.update_async_task(task)
+
+                logger.warn(
+                    "INFO_SNIFF.SUBMIT.QUOTA_EXCEEDED",
+                    msg=f"GPT请求额度不足，任务进入等待状态",
+                    extra={
+                        "async_task_id": async_task_id,
+                        "quota_reason": quota_check["reason"],
+                        "current_usage": quota_check["current_usage"],
+                        "next_available": quota_check["next_available"].isoformat() if quota_check["next_available"] else None
+                    },
+                    trace_id=trace_id
+                )
+
+                # 调度延迟重试任务
+                if quota_check["next_available"]:
+                    delay_seconds = int((quota_check["next_available"] - datetime.now()).total_seconds())
+                    if delay_seconds > 0:
+                        # 调度在额度恢复后重新提交
+                        submit_info_sniff_request.schedule(
+                            args=(async_task_id, event_summary),
+                            delay=delay_seconds
+                        )
+                        logger.info(
+                            "INFO_SNIFF.SUBMIT.QUOTA_SCHEDULED",
+                            msg=f"已调度任务在 {delay_seconds} 秒后重新提交",
+                            extra={
+                                "async_task_id": async_task_id,
+                                "delay_seconds": delay_seconds,
+                                "retry_time": quota_check["next_available"].isoformat()
+                            },
+                            trace_id=trace_id
+                        )
+                return
+
+            # 获取Cookie
+            token_refresher = get_token_refresher()
+            access_token_status = token_refresher.get_token_status(TokenType.ACCESS_TOKEN.value)
+            auth_token_status = token_refresher.get_token_status(TokenType.AUTH_TOKEN.value)
+
+            if not access_token_status or not auth_token_status:
+                error_msg = "未配置access_token或auth_token"
+                task.error_msg = error_msg
+                task.result["analysis_status"] = AnalysisStatus.FAILED.value
+                task.result["error"] = error_msg
+                db.update_async_task(task)
+                logger.error(
+                    "INFO_SNIFF.SUBMIT.NO_TOKEN",
+                    msg=error_msg,
+                    error_code="E-SNIFF-002",
+                    extra={"async_task_id": async_task_id},
+                    trace_id=trace_id
+                )
+                return
+
+            if access_token_status.get('is_expired') or auth_token_status.get('is_expired'):
+                error_msg = "access_token或auth_token已过期"
+                task.error_msg = error_msg
+                task.result["analysis_status"] = AnalysisStatus.FAILED.value
+                task.result["error"] = error_msg
+                db.update_async_task(task)
+                logger.error(
+                    "INFO_SNIFF.SUBMIT.TOKEN_EXPIRED",
+                    msg=error_msg,
+                    error_code="E-SNIFF-003",
+                    extra={"async_task_id": async_task_id},
+                    trace_id=trace_id
+                )
+                return
+
+            # 构建cookie_string
+            access_token = access_token_status.get('token_value')
+            auth_token = auth_token_status.get('token_value')
+            cookie_string = f"__Secure-access_token={access_token};__Secure-auth_token={auth_token}"
+            cookies_dict = parse_cookie_string(cookie_string)
+
+            # 加载info_sniff提示词
+            import os
+            prompt_path = os.path.join(os.path.dirname(__file__), 'info.md')
+            try:
+                with open(prompt_path, 'r', encoding='utf-8') as f:
+                    prompt_info = f.read()
+            except FileNotFoundError:
+                error_msg = f"提示词文件未找到: {prompt_path}"
+                task.error_msg = error_msg
+                task.result["analysis_status"] = AnalysisStatus.FAILED.value
+                task.result["error"] = error_msg
+                db.update_async_task(task)
+                logger.error(
+                    "INFO_SNIFF.SUBMIT.NO_PROMPT",
+                    msg=error_msg,
+                    error_code="E-SNIFF-004",
+                    extra={"async_task_id": async_task_id},
+                    trace_id=trace_id
+                )
+                return
+
+            # 发送GPT请求
+            prompt = f"{prompt_info}\n\n请对以下事件进行信息嗅探：\n\n{event_summary}"
+
+            task.result["analysis_status"] = AnalysisStatus.REQUESTING.value
+            db.update_async_task(task)
+
+            logger.info(
+                "INFO_SNIFF.SUBMIT.REQUEST",
+                msg="发送Info Sniff GPT请求",
+                extra={"async_task_id": async_task_id, "prompt_length": len(prompt)},
+                trace_id=trace_id
+            )
+
+            result = send_request(
+                prompt=prompt,
+                cookies=cookies_dict,
+                model="gpt-5-instant"
+            )
+
+            if not result.get("success"):
+                error_msg = f"GPT请求失败: {result.get('error', '未知错误')}"
+                task.error_msg = error_msg
+                task.result["analysis_status"] = AnalysisStatus.FAILED.value
+                task.result["error"] = error_msg
+                db.update_async_task(task)
+
+                # 记录失败的GPT请求（失败不消耗积分）
+                quota_manager.record_request(async_task_id, None, success=False, credits=0, task_type='info_sniff')
+
+                logger.error(
+                    "INFO_SNIFF.SUBMIT.REQUEST_FAILED",
+                    msg=error_msg,
+                    error_code="E-SNIFF-005",
+                    extra={"async_task_id": async_task_id, "result": result},
+                    trace_id=trace_id
+                )
+                return
+
+            # 提取conversation_id - 提交成功的标志
+            conversation_id = process_result(result)
+            task.result["conversation_id"] = conversation_id
+            task.result["analysis_status"] = AnalysisStatus.POLLING.value
+            task.result["submit_time"] = time.time()
+            db.update_async_task(task)
+
+            # 记录成功的GPT请求（info_sniff任务消耗1积分）
+            quota_manager.record_request(async_task_id, conversation_id, success=True, credits=1, task_type='info_sniff')
+
+            logger.info(
+                "INFO_SNIFF.SUBMIT.SUCCESS",
+                msg="Info Sniff GPT请求提交成功，获取到conversation_id",
+                extra={
+                    "async_task_id": async_task_id,
+                    "conversation_id": conversation_id
+                },
+                trace_id=trace_id
+            )
+
+        except Exception as e:
+            task = db.get_async_task(async_task_id)
+            if task:
+                task.error_msg = f"提交Info Sniff GPT请求异常: {str(e)}"
+                task.result["analysis_status"] = AnalysisStatus.FAILED.value
+                task.result["error"] = str(e)
+                db.update_async_task(task)
+
+            logger.error(
+                "INFO_SNIFF.SUBMIT.EXCEPTION",
+                msg=f"提交Info Sniff GPT请求异常: {str(e)}",
+                error_code="E-SNIFF-006",
+                extra={"async_task_id": async_task_id, "exception": str(e)},
+                trace_id=trace_id
+            )
+
+
+@huey.task()
+def poll_info_sniff_result(
+    async_task_id: int,
+    initial_delay: int = 30,
+    polling_interval: int = 20,
+    max_timeout: int = 1800,
+    max_retries: int = 3
+):
+    """
+    轮询Info Sniff GPT结果任务（Huey异步任务）
+
+    工作流程:
+    1. 等待初始延迟
+    2. 轮询结果直到完成或超时
+    3. 验证结果格式
+    4. 更新任务状态和结果
+
+    参数:
+        async_task_id: AsyncTask的ID
+        initial_delay: 首次轮询延迟（秒）
+        polling_interval: 轮询间隔（秒）
+        max_timeout: 最大超时时间（秒）
+        max_retries: 最大重试次数
+    """
+    with TraceContext() as trace_id:
+        logger.info(
+            "INFO_SNIFF.POLL.START",
+            msg=f"开始轮询Info Sniff GPT结果",
+            extra={"async_task_id": async_task_id},
+            trace_id=trace_id
+        )
+
+        try:
+            # 获取任务
+            task = db.get_async_task(async_task_id)
+            if not task:
+                logger.error(
+                    "INFO_SNIFF.POLL.NOT_FOUND",
+                    msg=f"任务不存在: {async_task_id}",
+                    error_code="E-SNIFF-POLL-001",
+                    extra={"async_task_id": async_task_id},
+                    trace_id=trace_id
+                )
+                return
+
+            # 获取conversation_id
+            conversation_id = task.result.get("conversation_id")
+            if not conversation_id:
+                error_msg = "缺少conversation_id"
+                task.error_msg = error_msg
+                task.result["analysis_status"] = AnalysisStatus.FAILED.value
+                task.result["error"] = error_msg
+                db.update_async_task(task)
+                logger.error(
+                    "INFO_SNIFF.POLL.NO_CONVERSATION_ID",
+                    msg=error_msg,
+                    error_code="E-SNIFF-POLL-002",
+                    extra={"async_task_id": async_task_id},
+                    trace_id=trace_id
+                )
+                return
+
+            # 获取Cookie
+            token_refresher = get_token_refresher()
+            access_token_status = token_refresher.get_token_status(TokenType.ACCESS_TOKEN.value)
+            auth_token_status = token_refresher.get_token_status(TokenType.AUTH_TOKEN.value)
+
+            if not access_token_status or not auth_token_status:
+                error_msg = "未配置access_token或auth_token"
+                task.error_msg = error_msg
+                task.result["analysis_status"] = AnalysisStatus.FAILED.value
+                task.result["error"] = error_msg
+                db.update_async_task(task)
+                logger.error(
+                    "INFO_SNIFF.POLL.NO_TOKEN",
+                    msg=error_msg,
+                    error_code="E-SNIFF-POLL-003",
+                    extra={"async_task_id": async_task_id},
+                    trace_id=trace_id
+                )
+                return
+
+            # 构建cookie_string
+            access_token = access_token_status.get('token_value')
+            auth_token = auth_token_status.get('token_value')
+            cookie_string = f"__Secure-access_token={access_token};__Secure-auth_token={auth_token}"
+            cookies_dict = parse_cookie_string(cookie_string)
+
+            # 等待初始延迟
+            logger.info(
+                "INFO_SNIFF.POLL.INITIAL_DELAY",
+                msg=f"等待初始延迟 {initial_delay} 秒",
+                extra={"async_task_id": async_task_id, "delay": initial_delay},
+                trace_id=trace_id
+            )
+            time.sleep(initial_delay)
+
+            # 开始轮询
+            start_time = time.time()
+            retry_count = 0
+
+            while True:
+                # 检查超时
+                elapsed_time = time.time() - start_time
+                if elapsed_time > max_timeout:
+                    error_msg = f"任务超时（{max_timeout}秒）"
+                    task.error_msg = error_msg
+                    task.result["analysis_status"] = AnalysisStatus.FAILED.value
+                    task.result["error"] = error_msg
+                    db.update_async_task(task)
+                    logger.error(
+                        "INFO_SNIFF.POLL.TIMEOUT",
+                        msg=error_msg,
+                        error_code="E-SNIFF-POLL-004",
+                        extra={"async_task_id": async_task_id, "elapsed_time": elapsed_time},
+                        trace_id=trace_id
+                    )
+                    return
+
+                # 查询结果
+                logger.debug(
+                    "INFO_SNIFF.POLL.QUERY",
+                    msg="轮询Info Sniff GPT结果",
+                    extra={"async_task_id": async_task_id, "conversation_id": conversation_id},
+                    trace_id=trace_id
+                )
+
+                poll_result = get_result(
+                    conversation_id=conversation_id,
+                    cookies=cookies_dict
+                )
+
+                if not poll_result.get("success"):
+                    retry_count += 1
+                    if retry_count >= max_retries:
+                        error_msg = f"轮询失败次数过多（{max_retries}次）: {poll_result.get('error', '未知错误')}"
+                        task.error_msg = error_msg
+                        task.result["analysis_status"] = AnalysisStatus.FAILED.value
+                        task.result["error"] = error_msg
+                        db.update_async_task(task)
+                        logger.error(
+                            "INFO_SNIFF.POLL.MAX_RETRIES",
+                            msg=error_msg,
+                            error_code="E-SNIFF-POLL-005",
+                            extra={"async_task_id": async_task_id, "retry_count": retry_count},
+                            trace_id=trace_id
+                        )
+                        return
+
+                    logger.warn(
+                        "INFO_SNIFF.POLL.RETRY",
+                        msg=f"轮询失败，等待重试 ({retry_count}/{max_retries})",
+                        extra={
+                            "async_task_id": async_task_id,
+                            "error": poll_result.get("error"),
+                            "retry_count": retry_count
+                        },
+                        trace_id=trace_id
+                    )
+                    time.sleep(polling_interval)
+                    continue
+
+                # 获取AI响应
+                ai_response = poll_result.get("ai_response", "")
+
+                if not ai_response or ai_response.strip() == "":
+                    # AI还在思考中
+                    logger.debug(
+                        "INFO_SNIFF.POLL.THINKING",
+                        msg="AI还在思考中，继续等待",
+                        extra={"async_task_id": async_task_id},
+                        trace_id=trace_id
+                    )
+                    time.sleep(polling_interval)
+                    continue
+
+                # 验证结果格式
+                logger.info(
+                    "INFO_SNIFF.POLL.VALIDATING",
+                    msg="开始验证Info Sniff结果格式",
+                    extra={"async_task_id": async_task_id},
+                    trace_id=trace_id
+                )
+
+                task.result["analysis_status"] = AnalysisStatus.VALIDATING.value
+                db.update_async_task(task)
+
+                is_valid, parsed_result = validate_info_sniff_result(ai_response)
+
+                if is_valid and parsed_result:
+                    # 验证成功
+                    task.result["analysis_status"] = AnalysisStatus.SUCCESS.value
+                    task.result["analysis_result"] = parsed_result
+                    task.result["raw_response"] = ai_response
+                    task.status = TaskStatus.FINISHED
+                    db.update_async_task(task)
+
+                    logger.info(
+                        "INFO_SNIFF.POLL.SUCCESS",
+                        msg="Info Sniff任务完成",
+                        extra={
+                            "async_task_id": async_task_id,
+                            "primary_driver": parsed_result.get("primary_driver"),
+                            "yes_count": len(parsed_result.get("new_reasons_yes", [])),
+                            "no_count": len(parsed_result.get("new_reasons_no", []))
+                        },
+                        trace_id=trace_id
+                    )
+                    return
+                else:
+                    # 验证失败
+                    error_msg = "Info Sniff结果格式验证失败"
+                    task.error_msg = error_msg
+                    task.result["analysis_status"] = AnalysisStatus.FAILED.value
+                    task.result["error"] = error_msg
+                    task.result["raw_response"] = ai_response
+                    db.update_async_task(task)
+
+                    logger.error(
+                        "INFO_SNIFF.POLL.VALIDATION_FAILED",
+                        msg=error_msg,
+                        error_code="E-SNIFF-POLL-006",
+                        extra={
+                            "async_task_id": async_task_id,
+                            "response_preview": ai_response[:500]
+                        },
+                        trace_id=trace_id
+                    )
+                    return
+
+        except Exception as e:
+            task = db.get_async_task(async_task_id)
+            if task:
+                task.error_msg = f"轮询Info Sniff结果异常: {str(e)}"
+                task.result["analysis_status"] = AnalysisStatus.FAILED.value
+                task.result["error"] = str(e)
+                db.update_async_task(task)
+
+            logger.error(
+                "INFO_SNIFF.POLL.EXCEPTION",
+                msg=f"轮询Info Sniff结果异常: {str(e)}",
+                error_code="E-SNIFF-POLL-007",
+                extra={"async_task_id": async_task_id, "exception": str(e)},
+                trace_id=trace_id
+            )
+
+
+def submit_info_sniff_task(
+    async_task_id: int,
+    event_summary: str,
+    initial_delay: int = 30,
+    polling_interval: int = 20,
+    max_timeout: int = 1800
+) -> bool:
+    """
+    提交Info Sniff任务到Huey队列
+
+    工作流程:
+    1. 保存event_summary到任务（用于重试）
+    2. 提交GPT请求任务（立即返回）
+    3. 调度轮询任务（在initial_delay后开始轮询）
+
+    参数:
+        async_task_id: AsyncTask的ID
+        event_summary: 事件摘要文本
+        initial_delay: 首次轮询延迟（秒）
+        polling_interval: 轮询间隔（秒）
+        max_timeout: 最大超时时间（秒）
+
+    返回:
+        bool: 是否成功提交
+    """
+    try:
+        # 保存event_summary到任务（用于重试）
+        task = db.get_async_task(async_task_id)
+        if not task:
+            logger.error(
+                "INFO_SNIFF.TASK.NOT_FOUND",
+                msg=f"任务不存在: {async_task_id}",
+                error_code="E-SNIFF-TASK-001",
+                extra={"async_task_id": async_task_id}
+            )
+            return False
+
+        task.result["event_summary"] = event_summary
+        task.result["analysis_status"] = AnalysisStatus.PENDING.value
+        task.result["task_type"] = "info_sniff"
+        db.update_async_task(task)
+
+        # 步骤1: 提交GPT请求
+        submit_info_sniff_request(
+            async_task_id=async_task_id,
+            event_summary=event_summary
+        )
+
+        # 步骤2: 调度轮询任务
+        poll_info_sniff_result(
+            async_task_id=async_task_id,
+            initial_delay=initial_delay,
+            polling_interval=polling_interval,
+            max_timeout=max_timeout
+        )
+
+        logger.info(
+            "INFO_SNIFF.TASK.SUBMITTED",
+            msg="Info Sniff任务已提交到Huey队列",
+            extra={"async_task_id": async_task_id}
+        )
+
+        return True
+
+    except Exception as e:
+        logger.error(
+            "INFO_SNIFF.TASK.SUBMIT_EXCEPTION",
+            msg=f"提交Info Sniff任务异常: {str(e)}",
+            error_code="E-SNIFF-TASK-002",
+            extra={"async_task_id": async_task_id, "exception": str(e)}
+        )
+        return False
+
+
+def retry_info_sniff_task(async_task_id: int) -> bool:
+    """
+    重试失败的Info Sniff任务
+
+    参数:
+        async_task_id: AsyncTask的ID
+
+    返回:
+        bool: 是否成功重试
+    """
+    try:
+        task = db.get_async_task(async_task_id)
+        if not task:
+            logger.error(
+                "INFO_SNIFF.RETRY.NOT_FOUND",
+                msg=f"任务不存在: {async_task_id}",
+                error_code="E-SNIFF-RETRY-001",
+                extra={"async_task_id": async_task_id}
+            )
+            return False
+
+        # 从任务结果中获取原始event_summary
+        event_summary = task.result.get("event_summary")
+        if not event_summary:
+            logger.error(
+                "INFO_SNIFF.RETRY.NO_SUMMARY",
+                msg=f"任务缺少event_summary: {async_task_id}",
+                error_code="E-SNIFF-RETRY-002",
+                extra={"async_task_id": async_task_id}
+            )
+            return False
+
+        # 重置任务状态
+        task.result["analysis_status"] = AnalysisStatus.PENDING.value
+        task.result.pop("conversation_id", None)
+        task.result.pop("error", None)
+        task.error_msg = None
+        db.update_async_task(task)
+
+        # 重新提交任务
+        return submit_info_sniff_task(async_task_id, event_summary)
+
+    except Exception as e:
+        logger.error(
+            "INFO_SNIFF.RETRY.EXCEPTION",
+            msg=f"重试Info Sniff任务异常: {str(e)}",
+            error_code="E-SNIFF-RETRY-003",
+            extra={"async_task_id": async_task_id, "exception": str(e)}
+        )
+        return False
+
+
+# ==================== Analysis 任务重试函数 ====================
 
 def retry_analysis_task(async_task_id: int) -> bool:
     """
