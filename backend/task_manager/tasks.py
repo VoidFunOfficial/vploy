@@ -508,7 +508,7 @@ def handle_mark_processing(task: AsyncTask) -> Dict[str, Any]:
         }
 
         # 将当前任务的metadata更新，添加mark结果
-        task.metadata["mark"] = mark_result
+        task.metadata["marks"] = mark_result
         task.metadata["event_title"] = event.title
 
         logger.info(
@@ -814,6 +814,7 @@ def handle_trade_processing(task: AsyncTask) -> Dict[str, Any]:
     try:
         # 从metadata中获取市场信息
         market = task.metadata.get("market")
+        analysis = task.metadata.get("analysis")
         if not market:
             error_msg = "metadata中缺少market信息"
             logger.error(
@@ -955,15 +956,23 @@ def handle_trade_processing(task: AsyncTask) -> Dict[str, Any]:
             # 创建TradeAllocation对象
             # 从allocation中提取信息，如果没有则使用默认值
             allocation_data = allocation or {}
-
+            p=0
+            b=0
+            if side == "YES":
+                p = analysis.get("p")
+                b = 1/ p;
+            else:
+                p = analysis.get("n")
+                b = 1/ p;
+            
             trade_allocation = TradeAllocation(
                 id=market.get("id"),  # 市场ID
                 side=side,  # 交易方向（YES/NO）
-                price=cost,  # 交易价格
-                p=allocation_data.get("p", 0.5),  # 主观概率（如果没有则默认0.5）
-                b=allocation_data.get("b", 2.0),  # 赔率（如果没有则默认2.0）
+                price=trade_result.get("price"),  # 交易价格
+                p=p,  # 主观概率（如果没有则默认0.5）
+                b=b,  # 赔率（如果没有则默认2.0）
                 f=allocation_data.get("f", 0.0),  # 仓位比例
-                invest=dollars,  # 投资金额
+                invest=trade_result.get("price"),  # 投资金额
                 shares=shares,  # 购买份额
                 settle_day=allocation_data.get("settle_day", 30)  # 结算日期（默认30天）
             )
@@ -1895,7 +1904,7 @@ def scheduled_auto_decision():
                 market_info = task.metadata.get("market")
                 mark_result = mark(market_info,alloc)
                 #将 mark_result添加到task.metadata
-                task.metadata["mark"] = mark_result
+                task.metadata["marks"] = mark_result
 
                 if alloc:
                     # 有分配结果，检查投入金额是否满足最小阈值
@@ -1946,7 +1955,7 @@ def scheduled_auto_decision():
                             },
                             'wealth': wealth,
                             'locked_value': locked_value,
-                            'mark': mark_result
+                            'marks': mark_result
                         }
                 else:
                     # 无分配（不值得交易）

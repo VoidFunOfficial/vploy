@@ -16,7 +16,8 @@ from ..task_manager.models import TaskStatus
 
 # 导入 GPT API 相关功能
 from .gpt_api import send_request, get_result, parse_cookie_string
-
+# 导入总结报告功能
+from .ai_summary import generate_summary_report
 # 可用性标志
 AI_ANALYSIS_AVAILABLE = True
 DEEP_ANALYSIS_AVAILABLE = True
@@ -35,6 +36,7 @@ __all__ = [
     'send_request',
     'get_result',
     'parse_cookie_string',
+    'generate_summary_report',
 
     # 可用性标志
     'AI_ANALYSIS_AVAILABLE',

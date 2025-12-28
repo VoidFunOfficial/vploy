@@ -335,37 +335,48 @@ def profit_email():
 
     每天下午6点发送收益报告邮件。
     """
-    logger.info(
-        "SCHEDULER.PROFIT.START",
-        msg="开始执行收益报告邮件任务"
-    )
-    
-    try:
-        # 更新任务运行时间
-        task = db.get_scheduled_task_by_name("profit_email")
-        if task:
-            task.last_run = datetime.now()
-            task.next_run = datetime.now() + timedelta(days=1)
-            db.update_scheduled_task(task)
-        
-        # TODO: 实现收益报告逻辑
-        # 1. 统计当日交易数据
-        # 2. 计算收益和损失
-        # 3. 生成收益报告
-        # 4. 发送邮件
-        
+    with TraceContext() as trace_id:
         logger.info(
-            "SCHEDULER.PROFIT.SUCCESS",
-            msg="收益报告邮件任务执行成功"
+            "SCHEDULER.PROFIT.START",
+            msg="开始执行收益报告邮件任务",
+            trace_id=trace_id
         )
-        
-    except Exception as e:
-        logger.error(
-            "SCHEDULER.PROFIT.FAILED",
-            msg="收益报告邮件任务执行失败",
-            error_code="E-SCHEDULER-003",
-            extra={"error": str(e)}
-        )
+
+        try:
+            # 更新任务运行时间
+            task = db.get_scheduled_task_by_name("profit_email")
+            if task:
+                task.last_run = datetime.now()
+                task.next_run = datetime.now() + timedelta(days=1)
+                db.update_scheduled_task(task)
+
+            # 调用每日投资报告生成函数
+            from ..record import generate_daily_report_foremail
+
+            success = generate_daily_report_foremail()
+
+            if success:
+                logger.info(
+                    "SCHEDULER.PROFIT.SUCCESS",
+                    msg="收益报告邮件任务执行成功",
+                    trace_id=trace_id
+                )
+            else:
+                logger.error(
+                    "SCHEDULER.PROFIT.EMAIL_FAILED",
+                    msg="收益报告邮件发送失败",
+                    error_code="E-SCHEDULER-003",
+                    trace_id=trace_id
+                )
+
+        except Exception as e:
+            logger.error(
+                "SCHEDULER.PROFIT.FAILED",
+                msg="收益报告邮件任务执行失败",
+                error_code="E-SCHEDULER-003",
+                extra={"error": str(e)},
+                trace_id=trace_id
+            )
 
 
 # ==================== 初始化预定义任务 ====================

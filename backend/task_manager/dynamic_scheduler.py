@@ -155,25 +155,41 @@ class DynamicScheduler:
     
     def _execute_profit_email(self, task: ScheduledTask):
         """执行收益报告邮件任务"""
-        logger.info(
-            "DYNAMIC_SCHEDULER.PROFIT_EMAIL.START",
-            msg="开始执行收益报告邮件任务"
-        )
-        
-        try:
-            # TODO: 实现收益报告逻辑
+        with TraceContext() as trace_id:
             logger.info(
-                "DYNAMIC_SCHEDULER.PROFIT_EMAIL.SUCCESS",
-                msg="收益报告邮件任务执行成功（占位符）"
+                "DYNAMIC_SCHEDULER.PROFIT_EMAIL.START",
+                msg="开始执行收益报告邮件任务",
+                trace_id=trace_id
             )
-            
-        except Exception as e:
-            logger.error(
-                "DYNAMIC_SCHEDULER.PROFIT_EMAIL.ERROR",
-                msg="收益报告邮件任务执行失败",
-                error_code="E-DYNAMIC-SCHEDULER-005",
-                extra={"error": str(e)}
-            )
+
+            try:
+                # 调用每日投资报告生成函数
+                from ..record import generate_daily_report_foremail
+
+                success = generate_daily_report_foremail()
+
+                if success:
+                    logger.info(
+                        "DYNAMIC_SCHEDULER.PROFIT_EMAIL.SUCCESS",
+                        msg="收益报告邮件任务执行成功",
+                        trace_id=trace_id
+                    )
+                else:
+                    logger.error(
+                        "DYNAMIC_SCHEDULER.PROFIT_EMAIL.FAILED",
+                        msg="收益报告邮件发送失败",
+                        error_code="E-DYNAMIC-SCHEDULER-005",
+                        trace_id=trace_id
+                    )
+
+            except Exception as e:
+                logger.error(
+                    "DYNAMIC_SCHEDULER.PROFIT_EMAIL.ERROR",
+                    msg="收益报告邮件任务执行失败",
+                    error_code="E-DYNAMIC-SCHEDULER-005",
+                    extra={"error": str(e)},
+                    trace_id=trace_id
+                )
     
     def _execute_periodic_health_check(self, task: ScheduledTask):
         """执行定期健康检查任务"""

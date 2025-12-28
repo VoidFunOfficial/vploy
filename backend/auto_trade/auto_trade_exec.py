@@ -486,14 +486,15 @@ def trade(
         purse = get_purse()
         lock_amount = aggressive_price * order_size
         purse.lock_fund(lock_amount)
+        actual_cost = lock_amount
         result = {
             'success': True,
             'order_id': order_id,
             'order_response': order_response,
-            'price': aggressive_price,
+            'price': actual_cost,
             'size': order_size,
             'order_type': 'LIMIT_AGGRESSIVE',
-            'message': f"交易执行成功，已挂贪婪压价限价单（价格: {aggressive_price}, 数量: {order_size}）,"
+            'message': f"交易执行成功，已挂贪婪压价限价单（价格: {actual_cost}, 数量: {order_size}）,"
                        f"已锁定资金{lock_amount}美元"
         }
 

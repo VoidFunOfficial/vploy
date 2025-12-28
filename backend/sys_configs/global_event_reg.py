@@ -49,6 +49,33 @@ def register_all_events():
     register_error("E-CLOB-010", "JSON_DECODE_ERROR", "JSON 解析错误", "error", overwrite=True)
     register_error("E-CLOB-011", "INVALID_RESPONSE", "无效响应", "error", overwrite=True)
 
+    # ==================== 止盈系统模块事件 ====================
+    # EVT-SURPLUS-xxx 系列
+    register_event("EVT-SURPLUS-001", "SURPLUS.DATA.REALTIME", "获取实时市场数据", overwrite=True)
+    register_event("EVT-SURPLUS-002", "SURPLUS.DATA.HISTORY", "获取历史市场数据", overwrite=True)
+    register_event("EVT-SURPLUS-003", "SURPLUS.DATA.PREPARE", "准备决策数据", overwrite=True)
+    register_event("EVT-SURPLUS-004", "SURPLUS.DECISION.START", "开始止盈决策", overwrite=True)
+    register_event("EVT-SURPLUS-005", "SURPLUS.DECISION.RESULT", "止盈决策完成", overwrite=True)
+    register_event("EVT-SURPLUS-006", "SURPLUS.SELL.ORDER", "准备下卖单", overwrite=True)
+    register_event("EVT-SURPLUS-007", "SURPLUS.SELL.SUCCESS", "卖单提交成功", overwrite=True)
+    register_event("EVT-SURPLUS-008", "SURPLUS.MONITOR.INIT", "止盈监控器初始化", overwrite=True)
+    register_event("EVT-SURPLUS-009", "SURPLUS.MONITOR.ALL.START", "开始批量监控", overwrite=True)
+    register_event("EVT-SURPLUS-010", "SURPLUS.MONITOR.ALL.COMPLETE", "批量监控完成", overwrite=True)
+    register_event("EVT-SURPLUS-011", "SURPLUS.MONITOR.TASK.START", "定时止盈监控开始", overwrite=True)
+    register_event("EVT-SURPLUS-012", "SURPLUS.MONITOR.TASK.SUCCESS", "定时止盈监控成功", overwrite=True)
+
+    # E-SURPLUS-xxx 系列错误码
+    register_error("E-SURPLUS-001", "REALTIME_DATA_ERROR", "获取实时市场数据失败", "error", overwrite=True)
+    register_error("E-SURPLUS-002", "HISTORY_DATA_ERROR", "获取历史市场数据失败", "error", overwrite=True)
+    register_error("E-SURPLUS-003", "PREPARE_DATA_ERROR", "准备决策数据失败", "error", overwrite=True)
+    register_error("E-SURPLUS-004", "SELL_ORDER_ERROR", "执行卖单失败", "error", overwrite=True)
+    register_error("E-SURPLUS-005", "DECISION_ERROR", "止盈决策失败", "error", overwrite=True)
+    register_error("E-SURPLUS-006", "BATCH_CHECK_ERROR", "批量止盈检查失败", "error", overwrite=True)
+    register_error("E-SURPLUS-007", "MONITOR_POSITION_ERROR", "监控持仓失败", "error", overwrite=True)
+    register_error("E-SURPLUS-008", "MONITOR_ALL_ERROR", "批量监控失败", "error", overwrite=True)
+    register_error("E-SURPLUS-009", "MONITOR_TASK_ERROR", "定时止盈监控失败", "error", overwrite=True)
+    register_error("E-SURPLUS-010", "MONITOR_POSITION_TASK_ERROR", "监控持仓任务失败", "error", overwrite=True)
+
     # ==================== 自动交易模块事件 ====================
     # EVT-AT-xxx 系列
     register_event("EVT-AT-001", "AUTO_TRADE.INIT", "自动交易器初始化", overwrite=True)
@@ -273,6 +300,8 @@ def register_need_to_alert():
         "E-SCHEDULER-API-004", "E-SCHEDULER-API-005", "E-SCHEDULER-API-006",
         "E-SPLIT-001", "E-SPLIT-002",
         "E-SUBMIT-001", "E-SUBMIT-002", "E-SUBMIT-003", "E-SUBMIT-004", "E-SUBMIT-005",
+        "E-SURPLUS-001", "E-SURPLUS-002", "E-SURPLUS-003", "E-SURPLUS-004", "E-SURPLUS-005",
+        "E-SURPLUS-006", "E-SURPLUS-007", "E-SURPLUS-008", "E-SURPLUS-009", "E-SURPLUS-010",
         "E-SYS-001", "E-SYS-004",
         "E-TASK-001", "E-TASK-002",
         "E-TASK-MANAGER-001",
