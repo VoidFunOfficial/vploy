@@ -11,10 +11,10 @@ WorkingDirectory=%WORKDIR%/frontend
 
 # 环境变量
 Environment="NODE_ENV=production"
-Environment="PATH=/usr/local/bin:/usr/bin:/bin"
+Environment="PATH=/home/ubuntu/.nvm/versions/node/v24.12.0/bin:/usr/local/bin:/usr/bin:/bin"
 
 # 构建命令（仅构建，不运行开发服务器）
-ExecStart=%NPM% run build
+ExecStart=/home/ubuntu/.nvm/versions/node/v24.12.0/bin/npm run build
 RemainAfterExit=yes
 
 # 日志配置

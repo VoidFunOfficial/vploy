@@ -39,12 +39,16 @@ fi
 echo ""
 echo -e "${YELLOW}[2/7] 构建前端静态文件...${NC}"
 cd "$WORKDIR/frontend"
+
+# 设置 Node.js 路径
+export PATH="/home/ubuntu/.nvm/versions/node/v24.12.0/bin:$PATH"
+
 if [ ! -d "node_modules" ]; then
     echo -e "${YELLOW}安装前端依赖...${NC}"
-    npm install
+    /home/ubuntu/.nvm/versions/node/v24.12.0/bin/npm install
 fi
 echo -e "${YELLOW}执行构建...${NC}"
-npm run build
+/home/ubuntu/.nvm/versions/node/v24.12.0/bin/npm run build
 
 if [ ! -d "dist" ]; then
     echo -e "${RED}错误: 构建失败，dist 目录不存在${NC}"

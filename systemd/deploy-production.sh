@@ -45,11 +45,15 @@ echo -e "${GREEN}✓ 系统依赖检查完成${NC}"
 echo ""
 echo -e "${YELLOW}[2/5] 构建前端...${NC}"
 cd "$WORKDIR/frontend"
+
+# 设置 Node.js 路径
+export PATH="/home/ubuntu/.nvm/versions/node/v24.12.0/bin:$PATH"
+
 if [ ! -d "node_modules" ]; then
     echo -e "${YELLOW}安装前端依赖...${NC}"
-    npm install
+    /home/ubuntu/.nvm/versions/node/v24.12.0/bin/npm install
 fi
-npm run build
+/home/ubuntu/.nvm/versions/node/v24.12.0/bin/npm run build
 echo -e "${GREEN}✓ 前端构建完成${NC}"
 
 # 步骤 3: 配置 Nginx

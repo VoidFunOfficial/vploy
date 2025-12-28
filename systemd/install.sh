@@ -100,12 +100,20 @@ PYTHON_VERSION=$($PYTHON_PATH --version 2>&1)
 print_info "Python 版本: $PYTHON_VERSION"
 
 # 检测 npm 路径
-NPM_PATH=$(which npm)
-if [ -z "$NPM_PATH" ]; then
-    print_error "未找到 npm，请先安装 Node.js"
+NPM_PATH="/home/ubuntu/.nvm/versions/node/v24.12.0/bin/npm"
+if [ ! -f "$NPM_PATH" ]; then
+    print_error "未找到 npm: $NPM_PATH"
     exit 1
 fi
 print_info "npm 路径: $NPM_PATH"
+
+# 设置 Node.js 路径
+NODE_PATH="/home/ubuntu/.nvm/versions/node/v24.12.0/bin/node"
+if [ ! -f "$NODE_PATH" ]; then
+    print_error "未找到 node: $NODE_PATH"
+    exit 1
+fi
+print_info "node 路径: $NODE_PATH"
 
 # 获取 conda 环境的 PATH（如果使用 conda）
 CONDA_PATH_ENV=""
@@ -137,6 +145,7 @@ for service in voidpoly-api voidpoly-worker voidpoly-frontend; do
         -e "s|%WORKDIR%|$PROJECT_DIR|g" \
         -e "s|%PYTHON%|$PYTHON_PATH|g" \
         -e "s|%NPM%|$NPM_PATH|g" \
+        -e "s|%NODE%|$NODE_PATH|g" \
         -e "s|%CONDA_PATH%|$CONDA_PATH_ENV|g" \
         "$SERVICE_FILE" > "$TARGET_FILE"
 
