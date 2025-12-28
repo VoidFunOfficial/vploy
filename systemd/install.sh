@@ -113,7 +113,9 @@ CONDA_PATH_ENV=""
 if [ -n "$CONDA_ENV_NAME" ]; then
     # 获取 conda 环境的完整 PATH
     CONDA_PATH_ENV=$(conda run -n "$CONDA_ENV_NAME" printenv PATH)
-    print_info "conda 环境 PATH: ${CONDA_PATH_ENV:0:100}..."
+    # 截取前100个字符用于显示（使用 POSIX 兼容的方式）
+    CONDA_PATH_PREVIEW=$(echo "$CONDA_PATH_ENV" | cut -c1-100)
+    print_info "conda 环境 PATH: ${CONDA_PATH_PREVIEW}..."
 else
     # 使用系统 PATH
     CONDA_PATH_ENV="$PATH"

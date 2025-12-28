@@ -21,7 +21,6 @@
 
 <script>
 import { ref, reactive } from 'vue'
-import request from '@/api/request'
 
 // 全局 toast 列表
 const toasts = reactive([])
@@ -65,18 +64,24 @@ const removeToast = (id) => {
 // 记录通知日志到后端
 const logNotification = async (toast) => {
   try {
-    await request({
-      url: '/logs/notification',
-      method: 'post',
-      data: {
+    await fetch('/api/logs/notification', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${localStorage.getItem('token')}`
+      },
+      body: JSON.stringify({
         type: toast.type,
         title: toast.title,
         message: toast.message,
         action: 'show',
         timestamp: new Date().toISOString()
-      }
+      })
     })
-  } catch (error) {}
+  } catch (error) {
+    // 静默失败，不影响用户体验
+    console.debug('通知日志记录失败:', error)
+  }
 }
 
 // 快捷方法
@@ -263,3 +268,4 @@ export default {
   }
 }
 </style>
+
