@@ -10,6 +10,7 @@ from datetime import datetime
 from huey import crontab
 
 from ..task_manager.tasks import huey
+from ..task_manager.models import AsyncTask, TaskStage, TaskStatus, TaskDatabase
 from .database import PositionDatabase
 from .trade_recorder import TradeRecorder
 from .models import Position
@@ -18,6 +19,7 @@ from ..vlogger import TraceContext
 from ..sys_configs.global_event_reg import vlogger
 from ..record import RecordManager
 from ..purse import get_purse
+from ..ai_analysis.deep_analysis import AnalysisTaskManager
 
 
 class MarketMonitor:
@@ -45,6 +47,8 @@ class MarketMonitor:
         self.db = db or PositionDatabase()
         self.recorder = recorder or TradeRecorder(self.db)
         self.record_manager = RecordManager()
+        self.task_db = TaskDatabase()
+        self.analysis_manager = AnalysisTaskManager()
 
         vlogger.info(
             "MARKET_MONITOR.INIT",
@@ -92,11 +96,11 @@ class MarketMonitor:
             position: Position对象
             price_change_pct: 价格涨跌幅百分比（例如 0.15 表示 15%）
 
-        TODO: 实现具体的价格涨幅处理逻辑，例如：
-        - 发送价格预警通知
-        - 触发自动止盈/止损策略
-        - 记录到专门的价格异动表
-        - 调整持仓风险等级
+        功能:
+        1. 集成AI分析模块获取价格涨跌分析
+        2. 解析分析结果（primary_driver, new_reasons_yes, new_reasons_no）
+        3. 判断涨跌幅类型（HYPE或REALITY）
+        4. 更新持仓metadata存储分析结果
         """
         vlogger.info(
             "MARKET_MONITOR.PRICE_SURGE",
@@ -112,6 +116,137 @@ class MarketMonitor:
                 "pnl": position.pnl
             }
         )
+
+        try:
+            # 1. 获取市场信息构建事件摘要
+            with GammaMarketsAPI() as api:
+                try:
+                    market = api.get_market_by_id(position.market_id)
+                except Exception as e:
+                    vlogger.error(
+                        "MARKET_MONITOR.PRICE_SURGE.MARKET_ERROR",
+                        msg="获取市场信息失败",
+                        error_code="E-POSITION-038",
+                        extra={
+                            "position_id": position.id,
+                            "market_id": position.market_id,
+                            "error": str(e)
+                        }
+                    )
+                    return
+
+            # 2. 构建事件摘要
+            event_summary =open("info.md", "r", encoding="utf-8").read()
+            event_summary = event_summary.replace("[QUESTION]", market.question)
+            event_summary = event_summary.replace("[SIDE]", position.side)
+            event_summary = event_summary.replace("[OUR_PROBABILITY]", str(position.entry_price))
+            event_summary = event_summary.replace("[CURRENT_PRICE]", str(position.current_price))
+            event_summary = event_summary.replace("[RULE]", market.description)
+            event_summary = event_summary.replace("[REASON_Y]",position.metadata["analysis"]["reasons_y"])
+            event_summary = event_summary.replace("[REASON_N]",position.metadata["analysis"]["reasons_n"])
+            
+
+
+
+            vlogger.info(
+                "MARKET_MONITOR.PRICE_SURGE.SUMMARY",
+                msg="构建事件摘要",
+                extra={
+                    "position_id": position.id,
+                    "summary_length": len(event_summary)
+                }
+            )
+
+            # 3. 创建AsyncTask用于AI分析
+            task = AsyncTask(
+                stage=TaskStage.ANALYSIS,
+                status=TaskStatus.PROCESSING,
+                metadata={
+                    "position_id": position.id,
+                    "market_id": position.market_id,
+                    "analysis_type": "price_surge",
+                    "price_change_pct": price_change_pct
+                }
+            )
+            task_id = self.task_db.create_async_task(task)
+
+            vlogger.info(
+                "MARKET_MONITOR.PRICE_SURGE.TASK_CREATED",
+                msg="创建AI分析任务",
+                extra={
+                    "position_id": position.id,
+                    "task_id": task_id
+                }
+            )
+
+            # 4. 提交Info Sniff任务（快速分析）
+            success = self.analysis_manager.submit_info_sniff(
+                async_task_id=task_id,
+                event_summary=event_summary,
+                initial_delay=30,      # 10秒后开始轮询
+                polling_interval=10,   # 每10秒轮询一次
+                max_timeout=300        # 最多等待5分钟
+            )
+
+            if not success:
+                vlogger.error(
+                    "MARKET_MONITOR.PRICE_SURGE.SUBMIT_FAILED",
+                    msg="提交AI分析任务失败",
+                    error_code="E-POSITION-039",
+                    extra={
+                        "position_id": position.id,
+                        "task_id": task_id
+                    }
+                )
+                return
+
+            vlogger.info(
+                "MARKET_MONITOR.PRICE_SURGE.SUBMITTED",
+                msg="已提交AI分析任务",
+                extra={
+                    "position_id": position.id,
+                    "task_id": task_id
+                }
+            )
+
+            # 5. 更新持仓metadata记录分析任务ID
+            if not position.metadata:
+                position.metadata = {}
+
+            if "price_surge_analyses" not in position.metadata:
+                position.metadata["price_surge_analyses"] = []
+
+            position.metadata["price_surge_analyses"].append({
+                "task_id": task_id,
+                "timestamp": datetime.now().isoformat(),
+                "price_change_pct": price_change_pct,
+                "entry_price": position.entry_price,
+                "current_price": position.current_price,
+                "status": "pending"
+            })
+
+            # 更新持仓
+            self.db.update_position(position)
+
+            vlogger.info(
+                "MARKET_MONITOR.PRICE_SURGE.METADATA_UPDATED",
+                msg="更新持仓metadata",
+                extra={
+                    "position_id": position.id,
+                    "task_id": task_id
+                }
+            )
+
+        except Exception as e:
+            vlogger.error(
+                "MARKET_MONITOR.PRICE_SURGE.ERROR",
+                msg="处理价格涨幅失败",
+                error_code="E-POSITION-040",
+                extra={
+                    "position_id": position.id,
+                    "error": str(e)
+                }
+            )
     
     def monitor_position(self, position_id: int) -> Dict[str, Any]:
         """
@@ -428,7 +563,7 @@ class MarketMonitor:
 def monitor_markets_task():
     """
     定时监控市场任务
-    
+
     每5分钟执行一次，监控所有未平仓持仓的市场状态。
     """
     with TraceContext() as trace_id:
@@ -437,23 +572,181 @@ def monitor_markets_task():
             msg="开始定时监控市场",
             trace_id=trace_id
         )
-        
+
         try:
             monitor = MarketMonitor()
             result = monitor.monitor_all_open_positions()
-            
+
             vlogger.info(
                 "MARKET_MONITOR.TASK.SUCCESS",
                 msg="定时监控市场完成",
                 extra=result,
                 trace_id=trace_id
             )
-            
+
         except Exception as e:
             vlogger.error(
                 "MARKET_MONITOR.TASK.ERROR",
                 msg="定时监控市场失败",
                 error_code="E-POSITION-017",
+                extra={"error": str(e)},
+                trace_id=trace_id
+            )
+
+
+@huey.periodic_task(crontab(minute='*/2'))
+def update_price_surge_analysis_task():
+    """
+    定时更新价格涨幅分析结果任务
+
+    每2分钟执行一次，检查待处理的价格涨幅分析任务，更新持仓metadata。
+    """
+    with TraceContext() as trace_id:
+        vlogger.info(
+            "MARKET_MONITOR.ANALYSIS_UPDATE.START",
+            msg="开始更新价格涨幅分析结果",
+            trace_id=trace_id
+        )
+
+        try:
+            monitor = MarketMonitor()
+            db = monitor.db
+            task_db = monitor.task_db
+            analysis_manager = monitor.analysis_manager
+
+            # 获取所有持仓
+            positions = db.get_open_positions()
+            updated_count = 0
+
+            for position in positions:
+                if not position.metadata or "price_surge_analyses" not in position.metadata:
+                    continue
+
+                analyses = position.metadata["price_surge_analyses"]
+                updated = False
+
+                for analysis in analyses:
+                    # 跳过已完成的分析
+                    if analysis.get("status") in ["completed", "failed"]:
+                        continue
+
+                    task_id = analysis.get("task_id")
+                    if not task_id:
+                        continue
+
+                    # 获取分析结果
+                    result = analysis_manager.get_analysis_result(task_id)
+                    status = analysis_manager.get_analysis_status(task_id)
+
+                    if result:
+                        # 解析分析结果
+                        primary_driver = result.get("primary_driver", "UNKNOWN")
+                        new_reasons_yes = result.get("new_reasons_yes", [])
+                        new_reasons_no = result.get("new_reasons_no", [])
+
+                        # 更新分析记录
+                        analysis["status"] = "completed"
+                        analysis["primary_driver"] = primary_driver
+                        analysis["reasons_yes"] = new_reasons_yes
+                        analysis["reasons_no"] = new_reasons_no
+                        analysis["completed_at"] = datetime.now().isoformat()
+
+                        updated = True
+
+                        # 根据价格变动方向和驱动类型添加标签
+                        current_price = position.current_price
+                        entry_price = position.entry_price
+                        price_change_pct = position.current_price - position.entry_price if position.entry_price > 0 else 0
+                        price_change_pct /= position.entry_price if position.entry_price > 0 else 1
+                        tag_to_add = None
+                        tags_now = position.metadata.get("marks", [])
+                        if primary_driver == "REALITY":
+                            if "normal_tau" in tags_now and current_price < 0.2:
+                                tag_to_add = "trapped"
+                            elif "normal_tau" in tags_now and current_price > 0.8:
+                                tag_to_add = "realized"
+                            elif "long_tau" in tags_now and current_price < 0.1:
+                                tag_to_add = "trapped"
+                            elif "long_tau" in tags_now and current_price > 0.7:
+                                tag_to_add = "realized"
+                        elif primary_driver == "HYPE":
+                            if "normal_tau" in tags_now and current_price < 0.2:
+                                tag_to_add = "hyped_down"
+                            elif "normal_tau" in tags_now and "speculation" in tags_now and price_change_pct > 1.8:
+                                tag_to_add = "hyped_up"
+                            elif "long_tau" in tags_now and current_price < 0.1:
+                                tag_to_add = "trapped"
+
+                        if tag_to_add:
+                            # 初始化tags列表（如果不存在）
+                            if "marks" not in position.metadata:
+                                position.metadata["marks"] = []
+
+                            # 避免重复添加
+                            if tag_to_add not in position.metadata["marks"]:
+                                position.metadata["marks"].append(tag_to_add)
+
+                                vlogger.info(
+                                    "MARKET_MONITOR.ANALYSIS_UPDATE.TAG_ADDED",
+                                    msg="根据价格涨幅分析添加标签",
+                                    extra={
+                                        "position_id": position.id,
+                                        "marks": tag_to_add,
+                                        "price_change_pct": price_change_pct,
+                                        "primary_driver": primary_driver
+                                    },
+                                    trace_id=trace_id
+                                )
+
+                        vlogger.info(
+                            "MARKET_MONITOR.ANALYSIS_UPDATE.COMPLETED",
+                            msg="价格涨幅分析完成",
+                            extra={
+                                "position_id": position.id,
+                                "task_id": task_id,
+                                "primary_driver": primary_driver,
+                                "reasons_yes_count": len(new_reasons_yes),
+                                "reasons_no_count": len(new_reasons_no),
+                                "tag_added": tag_to_add
+                            },
+                            trace_id=trace_id
+                        )
+                    elif status == "failed":
+                        # 标记为失败
+                        analysis["status"] = "failed"
+                        analysis["failed_at"] = datetime.now().isoformat()
+                        updated = True
+
+                        vlogger.warn(
+                            "MARKET_MONITOR.ANALYSIS_UPDATE.FAILED",
+                            msg="价格涨幅分析失败",
+                            extra={
+                                "position_id": position.id,
+                                "task_id": task_id
+                            },
+                            trace_id=trace_id
+                        )
+
+                # 如果有更新，保存持仓
+                if updated:
+                    db.update_position(position)
+                    updated_count += 1
+
+            vlogger.info(
+                "MARKET_MONITOR.ANALYSIS_UPDATE.SUCCESS",
+                msg="更新价格涨幅分析结果完成",
+                extra={
+                    "total_positions": len(positions),
+                    "updated_count": updated_count
+                },
+                trace_id=trace_id
+            )
+
+        except Exception as e:
+            vlogger.error(
+                "MARKET_MONITOR.ANALYSIS_UPDATE.ERROR",
+                msg="更新价格涨幅分析结果失败",
+                error_code="E-POSITION-041",
                 extra={"error": str(e)},
                 trace_id=trace_id
             )

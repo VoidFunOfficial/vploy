@@ -4,3 +4,4 @@ py_clob_client
 node_modules
 pnpm-lock.yaml
 test_*.py
+test

@@ -36,6 +36,7 @@ class Market:
         marks: 自定义标签集合（用于标记和分类）
         negRisk: 是否为负风险市场
         clobTokenIds: CLOB 代币 ID 列表
+        description: 市场描述
     """
     id: str
     question: str
@@ -52,6 +53,7 @@ class Market:
     marks: Set[str] = field(default_factory=set)
     negRisk: Optional[bool] = None
     clobTokenIds: Optional[List[str]] = None
+    description: Optional[str] = None
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> 'Market':
@@ -82,7 +84,8 @@ class Market:
             tau=tau,
             tags=data.get('tags', []),
             negRisk=data.get('negRisk'),
-            clobTokenIds=data.get('clobTokenIds')
+            clobTokenIds=data.get('clobTokenIds'),
+            description=data.get('description')
         )
 
         # 如果数据中包含 marks，则加载它

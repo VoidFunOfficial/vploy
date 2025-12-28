@@ -22,6 +22,7 @@
 
 <script>
 import { ref, reactive, computed } from 'vue'
+import request from '@/api/request'
 
 // 全局状态
 const state = reactive({
@@ -60,23 +61,18 @@ const hideConfirm = () => {
 // 记录确认框操作日志
 const logConfirmAction = async (action, message) => {
   try {
-    await fetch('/api/logs/notification', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${localStorage.getItem('token')}`
-      },
-      body: JSON.stringify({
+    await request({
+      url: '/logs/notification',
+      method: 'post',
+      data: {
         type: 'confirm',
         title: state.title,
         message: message,
         action: action,
         timestamp: new Date().toISOString()
-      })
+      }
     })
-  } catch (error) {
-    console.debug('确认框日志记录失败:', error)
-  }
+  } catch (error) {}
 }
 
 // confirm 函数 - 替代原生 confirm
@@ -286,4 +282,3 @@ export default {
   }
 }
 </style>
-

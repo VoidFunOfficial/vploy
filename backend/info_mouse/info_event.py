@@ -2,7 +2,7 @@ from enum import Enum
 from typing import Dict, Any
 from ..sys_configs.global_event_reg import vlogger
 from ..polymarket_api import GammaMarketsAPI
-
+from ..ai_analysis import InfoSniffTaskManager
 
 prompt = open("info.md", "r", encoding="utf-8").read()
 def judge_condition(analysis_result: Dict[str, Any], market_id: str,side: str,now_price: float,rule: str):

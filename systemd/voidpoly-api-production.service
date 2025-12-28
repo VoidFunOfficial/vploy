@@ -1,0 +1,53 @@
+[Unit]
+Description=VoidPoly API Server (Production with Gunicorn)
+Documentation=https://github.com/voidpoly/voidpoly
+After=network.target
+
+[Service]
+Type=notify
+User=%USER%
+Group=%USER%
+WorkingDirectory=%WORKDIR%
+
+# 环境变量
+Environment="PYTHONUNBUFFERED=1"
+Environment="FLASK_ENV=production"
+
+# 使用 Gunicorn 启动（生产环境推荐）
+# 4 个 worker 进程，绑定到 0.0.0.0:5000
+ExecStart=%PYTHON% -m gunicorn \
+    --workers 4 \
+    --bind 0.0.0.0:5000 \
+    --timeout 120 \
+    --access-logfile /var/log/voidpoly/api-access.log \
+    --error-logfile /var/log/voidpoly/api-error.log \
+    --log-level info \
+    backend.core.app:app
+
+# 重启策略
+Restart=always
+RestartSec=10
+StartLimitInterval=300
+StartLimitBurst=5
+
+# 日志配置
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=voidpoly-api
+
+# 资源限制
+LimitNOFILE=65536
+LimitNPROC=4096
+
+# 优雅关闭
+TimeoutStopSec=30
+KillMode=mixed
+KillSignal=SIGTERM
+
+# 安全加固
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
+

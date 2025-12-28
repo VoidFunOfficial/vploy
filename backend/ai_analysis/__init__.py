@@ -18,6 +18,8 @@ from ..task_manager.models import TaskStatus
 from .gpt_api import send_request, get_result, parse_cookie_string
 # 导入总结报告功能
 from .ai_summary import generate_summary_report
+# 导入 info sniff 功能
+from .info_sniff import InfoSniffTaskManager
 # 可用性标志
 AI_ANALYSIS_AVAILABLE = True
 DEEP_ANALYSIS_AVAILABLE = True
@@ -37,6 +39,7 @@ __all__ = [
     'get_result',
     'parse_cookie_string',
     'generate_summary_report',
+    'InfoSniffTaskManager',
 
     # 可用性标志
     'AI_ANALYSIS_AVAILABLE',

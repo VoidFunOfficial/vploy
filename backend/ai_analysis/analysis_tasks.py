@@ -897,7 +897,7 @@ def submit_gpt_request(
             result = send_request(
                 prompt=prompt,
                 cookies=cookies_dict,
-                model="gpt-5-1"
+                model="gpt-5-pro"
             )
 
             if not result.get("success"):
@@ -1500,7 +1500,7 @@ def submit_info_sniff_request(
             result = send_request(
                 prompt=prompt,
                 cookies=cookies_dict,
-                model="gpt-5-instant"
+                model="gpt-5-2-thinking"
             )
 
             if not result.get("success"):

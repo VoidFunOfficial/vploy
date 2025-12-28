@@ -6,9 +6,16 @@ import axios from 'axios'
 import { getToken, clearAuth } from '@/utils/auth'
 import router from '@/router'
 
-// 创建 axios 实例（直接指向后端 5000 端口，避免转发问题）
+const isProd = import.meta.env.PROD
+const envApiUrl = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL
+const baseURL = envApiUrl
+  ? envApiUrl
+  : (isProd
+    ? `${window.location.protocol}//${window.location.hostname}:5000/api`
+    : '/api')
+
 const request = axios.create({
-  baseURL: 'http://localhost:5000/api',
+  baseURL,
   timeout: 10000
 })
 
@@ -43,4 +50,3 @@ request.interceptors.response.use(
 )
 
 export default request
-

@@ -216,7 +216,6 @@ export default {
       { value: 'TRADE', label: 'TRADE', color: '#67C23A' },
       { value: 'WARN', label: 'WARN', color: '#E6A23C' },
       { value: 'ERROR', label: 'ERROR', color: '#F56C6C' },
-      { value: 'DEBUG', label: 'DEBUG', color: '#909399' },
       { value: 'AUDIT', label: 'AUDIT', color: '#9C27B0' }
     ]
 
@@ -269,7 +268,6 @@ export default {
         'TRADE': 'success',
         'WARN': 'warning',
         'ERROR': 'danger',
-        'DEBUG': 'info',
         'AUDIT': ''
       }
       return map[level] || 'info'
