@@ -15,7 +15,7 @@ Environment="FLASK_ENV=production"
 Environment="PATH=%CONDA_PATH%"
 
 # 启动命令
-ExecStart=%PYTHON% /home/ubuntu/vploy/run_api_server.py
+ExecStart=%PYTHON% %WORKDIR%/run_api_server.py
 
 # 重启策略
 Restart=always

@@ -31,7 +31,8 @@ if [ "$EUID" -ne 0 ]; then
 fi
 
 # 获取脚本所在目录
-PROJECT_DIR="/home/ubuntu/vploy"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 
 # 获取当前用户（非 root）
 REAL_USER="${SUDO_USER:-$USER}"
@@ -87,7 +88,7 @@ fi
 # 2. 如果没有找到 conda，使用系统 Python
 if [ -z "$PYTHON_PATH" ]; then
     print_warn "未检测到 conda，尝试使用系统 Python"
-    PYTHON_PATH=$(which python)
+    PYTHON_PATH=$(which python3 || which python)
     if [ -z "$PYTHON_PATH" ]; then
         print_error "未找到 Python，请先安装 Python 或 conda"
         exit 1
@@ -100,20 +101,12 @@ PYTHON_VERSION=$($PYTHON_PATH --version 2>&1)
 print_info "Python 版本: $PYTHON_VERSION"
 
 # 检测 npm 路径
-NPM_PATH="/home/ubuntu/.nvm/versions/node/v24.12.0/bin/npm"
-if [ ! -f "$NPM_PATH" ]; then
-    print_error "未找到 npm: $NPM_PATH"
+NPM_PATH=$(which npm)
+if [ -z "$NPM_PATH" ]; then
+    print_error "未找到 npm，请先安装 Node.js"
     exit 1
 fi
 print_info "npm 路径: $NPM_PATH"
-
-# 设置 Node.js 路径
-NODE_PATH="/home/ubuntu/.nvm/versions/node/v24.12.0/bin/node"
-if [ ! -f "$NODE_PATH" ]; then
-    print_error "未找到 node: $NODE_PATH"
-    exit 1
-fi
-print_info "node 路径: $NODE_PATH"
 
 # 获取 conda 环境的 PATH（如果使用 conda）
 CONDA_PATH_ENV=""
@@ -132,7 +125,7 @@ fi
 print_info "配置服务文件..."
 
 for service in voidpoly-api voidpoly-worker voidpoly-frontend; do
-    SERVICE_FILE="$PROJECT_DIR/systemd/${service}.service"
+    SERVICE_FILE="$SCRIPT_DIR/${service}.service"
     TARGET_FILE="/etc/systemd/system/${service}.service"
 
     if [ ! -f "$SERVICE_FILE" ]; then
@@ -145,7 +138,6 @@ for service in voidpoly-api voidpoly-worker voidpoly-frontend; do
         -e "s|%WORKDIR%|$PROJECT_DIR|g" \
         -e "s|%PYTHON%|$PYTHON_PATH|g" \
         -e "s|%NPM%|$NPM_PATH|g" \
-        -e "s|%NODE%|$NODE_PATH|g" \
         -e "s|%CONDA_PATH%|$CONDA_PATH_ENV|g" \
         "$SERVICE_FILE" > "$TARGET_FILE"
 

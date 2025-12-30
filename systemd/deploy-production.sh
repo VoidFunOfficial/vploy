@@ -25,7 +25,8 @@ if [ "$EUID" -ne 0 ]; then
 fi
 
 CURRENT_USER=${SUDO_USER:-$USER}
-WORKDIR="/home/ubuntu/vploy"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+WORKDIR="$(dirname "$SCRIPT_DIR")"
 
 echo -e "${BLUE}工作目录: $WORKDIR${NC}"
 echo -e "${BLUE}当前用户: $CURRENT_USER${NC}"
@@ -44,22 +45,18 @@ echo -e "${GREEN}✓ 系统依赖检查完成${NC}"
 # 步骤 2: 构建前端
 echo ""
 echo -e "${YELLOW}[2/5] 构建前端...${NC}"
-cd "$WORKDIR/frontend"
-
-# 设置 Node.js 路径
-export PATH="/home/ubuntu/.nvm/versions/node/v24.12.0/bin:$PATH"
-
+cd "$WORKDIR/vploy/frontend"
 if [ ! -d "node_modules" ]; then
     echo -e "${YELLOW}安装前端依赖...${NC}"
-    /home/ubuntu/.nvm/versions/node/v24.12.0/bin/npm install
+    npm install
 fi
-/home/ubuntu/.nvm/versions/node/v24.12.0/bin/npm run build
+npm run build
 echo -e "${GREEN}✓ 前端构建完成${NC}"
 
 # 步骤 3: 配置 Nginx
 echo ""
 echo -e "${YELLOW}[3/5] 配置 Nginx...${NC}"
-sed "s|%WORKDIR%|$WORKDIR|g" "$WORKDIR/systemd/nginx/voidpoly.conf" > /tmp/voidpoly.conf
+sed "s|%WORKDIR%|$WORKDIR|g" "$SCRIPT_DIR/systemd/nginx/voidpoly.conf" > /tmp/voidpoly.conf
 cp /tmp/voidpoly.conf /etc/nginx/sites-available/voidpoly.conf
 
 if [ -f /etc/nginx/sites-enabled/voidpoly.conf ]; then
@@ -87,7 +84,7 @@ echo -e "${BLUE}Python 路径: $PYTHON_PATH${NC}"
 sed -e "s|%USER%|$CURRENT_USER|g" \
     -e "s|%WORKDIR%|$WORKDIR|g" \
     -e "s|%PYTHON%|$PYTHON_PATH|g" \
-    "$WORKDIR/systemd/voidpoly-api-production.service" > /tmp/voidpoly-api-production.service
+    "$SCRIPT_DIR/systemd/voidpoly-api-production.service" > /tmp/voidpoly-api-production.service
 
 # 复制服务文件
 cp /tmp/voidpoly-api-production.service /etc/systemd/system/voidpoly-api-production.service

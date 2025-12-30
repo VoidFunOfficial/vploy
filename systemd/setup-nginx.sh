@@ -25,7 +25,8 @@ fi
 
 # 获取当前用户和工作目录
 CURRENT_USER=${SUDO_USER:-$USER}
-WORKDIR="/home/ubuntu/vploy"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+WORKDIR="$(dirname "$SCRIPT_DIR")"
 
 echo -e "${YELLOW}[1/7] 检查 Nginx 是否已安装...${NC}"
 if ! command -v nginx &> /dev/null; then
@@ -39,16 +40,12 @@ fi
 echo ""
 echo -e "${YELLOW}[2/7] 构建前端静态文件...${NC}"
 cd "$WORKDIR/frontend"
-
-# 设置 Node.js 路径
-export PATH="/home/ubuntu/.nvm/versions/node/v24.12.0/bin:$PATH"
-
 if [ ! -d "node_modules" ]; then
     echo -e "${YELLOW}安装前端依赖...${NC}"
-    /home/ubuntu/.nvm/versions/node/v24.12.0/bin/npm install
+    npm install
 fi
 echo -e "${YELLOW}执行构建...${NC}"
-/home/ubuntu/.nvm/versions/node/v24.12.0/bin/npm run build
+npm run build
 
 if [ ! -d "dist" ]; then
     echo -e "${RED}错误: 构建失败，dist 目录不存在${NC}"
@@ -59,7 +56,7 @@ echo -e "${GREEN}✓ 前端构建完成${NC}"
 echo ""
 echo -e "${YELLOW}[3/7] 配置 Nginx...${NC}"
 # 替换配置文件中的占位符
-sed "s|%WORKDIR%|$WORKDIR|g" "$WORKDIR/systemd/nginx/voidpoly.conf" > /tmp/voidpoly.conf
+sed "s|%WORKDIR%|$WORKDIR|g" "$SCRIPT_DIR/nginx/voidpoly.conf" > /tmp/voidpoly.conf
 
 # 复制配置文件
 cp /tmp/voidpoly.conf /etc/nginx/sites-available/voidpoly.conf
