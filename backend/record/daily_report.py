@@ -6,7 +6,6 @@
 
 from datetime import datetime
 from typing import Dict, Any
-from ..ai_analysis import generate_summary_report
 from ..vlogger.email_helper import email_send_with_db_config
 from ..sys_configs.global_event_reg import vlogger
 
@@ -462,6 +461,9 @@ def generate_daily_report_foremail() -> bool:
         bool: 邮件发送是否成功
     """
     try:
+        # 延迟导入以避免循环依赖
+        from ..ai_analysis import generate_summary_report
+
         vlogger.info(
             "DAILY_REPORT.EMAIL.START",
             msg="开始生成每日投资报告邮件"

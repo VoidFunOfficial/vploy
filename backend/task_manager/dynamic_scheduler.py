@@ -51,6 +51,8 @@ class DynamicScheduler:
             'gpt_quota_check': self._execute_gpt_quota_check,
             'gpt_quota_cleanup': self._execute_gpt_quota_cleanup,
             'auto_decision': self._execute_auto_decision,
+            'refresh_access_token': self._execute_refresh_access_token,
+            'refresh_auth_token': self._execute_refresh_auth_token,
         }
         
         logger.info(
@@ -613,6 +615,64 @@ class DynamicScheduler:
                     "DYNAMIC_SCHEDULER.GPT_QUOTA_CLEANUP.ERROR",
                     msg=f"GPT请求记录清理任务执行失败: {str(e)}",
                     error_code="E-DYNAMIC-SCHEDULER-008",
+                    extra={"error": str(e)},
+                    trace_id=trace_id
+                )
+
+    def _execute_refresh_access_token(self, task: ScheduledTask):
+        """执行 Access Token 刷新任务"""
+        with TraceContext() as trace_id:
+            logger.info(
+                "DYNAMIC_SCHEDULER.REFRESH_ACCESS_TOKEN.START",
+                msg="开始执行 Access Token 刷新任务",
+                trace_id=trace_id
+            )
+
+            try:
+                # 调用刷新函数
+                from .token_refresh_tasks import refresh_access_token_scheduled
+                refresh_access_token_scheduled()
+
+                logger.info(
+                    "DYNAMIC_SCHEDULER.REFRESH_ACCESS_TOKEN.SUCCESS",
+                    msg="Access Token 刷新任务执行成功",
+                    trace_id=trace_id
+                )
+
+            except Exception as e:
+                logger.error(
+                    "DYNAMIC_SCHEDULER.REFRESH_ACCESS_TOKEN.ERROR",
+                    msg=f"Access Token 刷新任务执行失败: {str(e)}",
+                    error_code="E-DYNAMIC-SCHEDULER-010",
+                    extra={"error": str(e)},
+                    trace_id=trace_id
+                )
+
+    def _execute_refresh_auth_token(self, task: ScheduledTask):
+        """执行 Auth Token 刷新任务"""
+        with TraceContext() as trace_id:
+            logger.info(
+                "DYNAMIC_SCHEDULER.REFRESH_AUTH_TOKEN.START",
+                msg="开始执行 Auth Token 刷新任务",
+                trace_id=trace_id
+            )
+
+            try:
+                # 调用刷新函数
+                from .token_refresh_tasks import refresh_auth_token_scheduled
+                refresh_auth_token_scheduled()
+
+                logger.info(
+                    "DYNAMIC_SCHEDULER.REFRESH_AUTH_TOKEN.SUCCESS",
+                    msg="Auth Token 刷新任务执行成功",
+                    trace_id=trace_id
+                )
+
+            except Exception as e:
+                logger.error(
+                    "DYNAMIC_SCHEDULER.REFRESH_AUTH_TOKEN.ERROR",
+                    msg=f"Auth Token 刷新任务执行失败: {str(e)}",
+                    error_code="E-DYNAMIC-SCHEDULER-011",
                     extra={"error": str(e)},
                     trace_id=trace_id
                 )

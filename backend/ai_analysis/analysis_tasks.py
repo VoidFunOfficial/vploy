@@ -22,7 +22,7 @@ from ..vlogger import TraceContext
 from .gpt_api import send_request, get_result, process_result, parse_cookie_string
 from ..sys_configs.token_refresher import get_token_refresher, TokenType
 from ..polymarket_api import GammaMarketsAPI
-from ..core.utils.helpers import market_to_dict
+from ..utils.converters import market_to_dict
 from ..sys_configs.global_event_reg import vlogger
 
 
@@ -89,6 +89,21 @@ class GPTRequestDatabase:
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
+
+        # 迁移：添加credits和task_type列（如果不存在）
+        try:
+            cursor.execute("PRAGMA table_info(gpt_requests)")
+            columns = [row[1] for row in cursor.fetchall()]
+
+            if 'credits' not in columns:
+                cursor.execute("ALTER TABLE gpt_requests ADD COLUMN credits INTEGER DEFAULT 6")
+                logger.info("DATABASE.MIGRATION", msg="添加credits列到gpt_requests表")
+
+            if 'task_type' not in columns:
+                cursor.execute("ALTER TABLE gpt_requests ADD COLUMN task_type TEXT DEFAULT 'analysis'")
+                logger.info("DATABASE.MIGRATION", msg="添加task_type列到gpt_requests表")
+        except Exception as e:
+            logger.warning("DATABASE.MIGRATION.WARNING", msg=f"数据库迁移检查失败: {str(e)}")
 
         # 创建索引以提高查询性能
         cursor.execute("""

@@ -19,7 +19,6 @@ from ..vlogger import TraceContext
 from ..sys_configs.global_event_reg import vlogger
 from ..record import RecordManager
 from ..purse import get_purse
-from ..ai_analysis.deep_analysis import AnalysisTaskManager
 
 
 class MarketMonitor:
@@ -44,6 +43,9 @@ class MarketMonitor:
             db: PositionDatabase实例
             recorder: TradeRecorder实例
         """
+        # 延迟导入以避免循环依赖
+        from ..ai_analysis.deep_analysis import AnalysisTaskManager
+
         self.db = db or PositionDatabase()
         self.recorder = recorder or TradeRecorder(self.db)
         self.record_manager = RecordManager()

@@ -4,10 +4,8 @@ from ..sys_configs.global_event_reg import vlogger
 from ..auto_decision import convert_gamma_market_to_simple_market
 def featureMark(market: dict,allocate: TradeAllocation) -> str:
     tags=[]
-    if float(market['volume']) < 100:
-        tags.append("low_volume")
-    if float(market['liquidity']) < 100:
-        tags.append("low_liquidity")
+    if int(market['tau']) < 3:
+        tags.append("short_tau")
     if int(market['tau']) < 7:
         tags.append("normal_tau")
     if int(market['tau']) < 14 and int(market['tau']) >= 7:

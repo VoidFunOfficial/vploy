@@ -63,6 +63,24 @@ from .dynamic_scheduler import (
     start_dynamic_scheduler,
     stop_dynamic_scheduler
 )
+from .token_refresh_tasks import (
+    refresh_access_token_scheduled,
+    refresh_auth_token_scheduled,
+    refresh_both_tokens_immediate,
+    trigger_immediate_refresh,
+    start_token_monitor,
+    stop_token_monitor,
+    init_token_refresh_tasks
+)
+from .token_refresh_tasks import (
+    refresh_access_token_scheduled,
+    refresh_auth_token_scheduled,
+    refresh_both_tokens_immediate,
+    trigger_immediate_refresh,
+    start_token_monitor,
+    stop_token_monitor,
+    init_token_refresh_tasks
+)
 
 __all__ = [
     # 配置
@@ -101,6 +119,15 @@ __all__ = [
     "get_scheduler",
     "start_dynamic_scheduler",
     "stop_dynamic_scheduler",
+
+    # Token 刷新任务
+    "refresh_access_token_scheduled",
+    "refresh_auth_token_scheduled",
+    "refresh_both_tokens_immediate",
+    "trigger_immediate_refresh",
+    "start_token_monitor",
+    "stop_token_monitor",
+    "init_token_refresh_tasks",
 ]
 
 
@@ -138,6 +165,13 @@ def init_task_manager():
         logger.info(
             "TASK_MANAGER.INIT.SCHEDULER",
             msg="动态调度器已启动"
+        )
+
+        # 初始化 Token 刷新任务系统
+        init_token_refresh_tasks()
+        logger.info(
+            "TASK_MANAGER.INIT.TOKEN_REFRESH",
+            msg="Token 刷新任务系统已启动"
         )
 
         logger.info(

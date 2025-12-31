@@ -8,7 +8,7 @@ from flask import Blueprint, request, jsonify
 
 from ...sys_configs.global_event_reg import vlogger
 from ..middleware.auth import require_auth
-from ..utils.helpers import event_to_dict, market_to_dict
+from ...utils.converters import event_to_dict, market_to_dict
 
 # 创建 Polymarket 路由蓝图
 polymarket_bp = Blueprint('polymarket', __name__, url_prefix='/api/polymarket')

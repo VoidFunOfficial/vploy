@@ -644,6 +644,60 @@ def init_default_scheduled_tasks():
             extra={"task_id": task_id, "next_run": auto_decision_next.isoformat()}
         )
 
+    # Token 刷新任务 - access_token（每天刷新）
+    token_access_cron = "0 0 * * *"  # 每天凌晨0点
+    token_access_next = croniter(token_access_cron, now).get_next(datetime)
+
+    task_id = add_scheduled_task(
+        name="refresh_access_token",
+        task_type="cron",
+        schedule=token_access_cron,
+        enabled=True,
+        metadata={
+            "description": "Access Token 自动刷新 - 每天凌晨0点刷新",
+            "auto_created": True,
+            "huey_task": False  # 由动态调度器执行
+        }
+    )
+
+    # 更新下次运行时间
+    task = db.get_scheduled_task(task_id)
+    if task and not task.next_run:
+        task.next_run = token_access_next
+        db.update_scheduled_task(task)
+        logger.info(
+            "SCHEDULER.INIT.TOKEN_ACCESS",
+            msg=f"Access Token 刷新任务已初始化，下次运行: {token_access_next}",
+            extra={"task_id": task_id, "next_run": token_access_next.isoformat()}
+        )
+
+    # Token 刷新任务 - auth_token（每7天刷新）
+    token_auth_cron = "0 1 */7 * *"  # 每7天凌晨1点
+    token_auth_next = croniter(token_auth_cron, now).get_next(datetime)
+
+    task_id = add_scheduled_task(
+        name="refresh_auth_token",
+        task_type="cron",
+        schedule=token_auth_cron,
+        enabled=True,
+        metadata={
+            "description": "Auth Token 自动刷新 - 每7天凌晨1点刷新",
+            "auto_created": True,
+            "huey_task": False  # 由动态调度器执行
+        }
+    )
+
+    # 更新下次运行时间
+    task = db.get_scheduled_task(task_id)
+    if task and not task.next_run:
+        task.next_run = token_auth_next
+        db.update_scheduled_task(task)
+        logger.info(
+            "SCHEDULER.INIT.TOKEN_AUTH",
+            msg=f"Auth Token 刷新任务已初始化，下次运行: {token_auth_next}",
+            extra={"task_id": task_id, "next_run": token_auth_next.isoformat()}
+        )
+
     logger.info(
         "SCHEDULER.INIT.SUCCESS",
         msg="预定义定时任务初始化完成"
